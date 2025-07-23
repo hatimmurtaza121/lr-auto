@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Tailwind cache (if used)
+.cache/
+
+# Production build
+build/
+
+# Environment & auth dumps
+.env.local
+.env.*.local
+auth-state.json
+
+# Playwright artifacts
+.playwright/
+playwright-report/
+test-results/
+screenshots/
+videos/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+components.json
+
+# Misc
+*.log

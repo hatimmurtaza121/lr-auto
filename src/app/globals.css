@@ -1,0 +1,187 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  
+  body {
+    @apply antialiased bg-surface-primary text-content-primary;
+  }
+}
+
+@layer components {
+  /* iOS-style components (existing) */
+  .ios-button {
+    @apply bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white font-medium py-3 px-4 rounded-2xl transition-all duration-150 active:animate-tap;
+  }
+  
+  .ios-input {
+    @apply w-full px-4 py-3 bg-surface-secondary border border-border-primary rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
+  }
+  
+  .ios-card {
+    @apply bg-surface-primary rounded-3xl shadow-ios hover:shadow-ios-lg transition-all duration-200;
+  }
+
+  /* New semantic component classes */
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply bg-surface-primary hover:bg-surface-secondary text-primary-500 font-medium py-2.5 px-4 rounded-xl border border-primary-500 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-success {
+    @apply bg-success-500 hover:bg-success-600 active:bg-success-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-success-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-warning {
+    @apply bg-warning-500 hover:bg-warning-600 active:bg-warning-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-warning-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-error {
+    @apply bg-error-500 hover:bg-error-600 active:bg-error-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-error-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .input-primary {
+    @apply w-full px-4 py-3 bg-surface-primary border border-border-primary rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 placeholder:text-content-tertiary;
+  }
+
+  .input-secondary {
+    @apply w-full px-4 py-3 bg-surface-secondary border border-border-primary rounded-xl focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-all duration-200 placeholder:text-content-tertiary;
+  }
+
+  .card-primary {
+    @apply bg-surface-primary rounded-2xl shadow-ios border border-border-primary;
+  }
+
+  .card-secondary {
+    @apply bg-surface-secondary rounded-2xl shadow-ios border border-border-primary;
+  }
+
+  .card-elevated {
+    @apply bg-surface-primary rounded-2xl shadow-ios-lg border border-border-primary hover:shadow-ios-xl transition-all duration-200;
+  }
+
+  .badge-primary {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800;
+  }
+
+  .badge-secondary {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-100 text-secondary-800;
+  }
+
+  .badge-success {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800;
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-100 text-warning-800;
+  }
+
+  .badge-error {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-error-100 text-error-800;
+  }
+
+  .text-heading {
+    @apply text-content-primary font-semibold;
+  }
+
+  .text-body {
+    @apply text-content-primary;
+  }
+
+  .text-caption {
+    @apply text-content-secondary text-sm;
+  }
+
+  .text-muted {
+    @apply text-content-tertiary;
+  }
+
+  .text-primary {
+    @apply text-primary-500;
+  }
+
+  .text-secondary {
+    @apply text-secondary-500;
+  }
+
+  .divider {
+    @apply border-t border-border-primary;
+  }
+
+  .divider-vertical {
+    @apply border-l border-border-primary;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  .animate-bounce-subtle {
+    animation: bounceSubtle 0.6s ease-in-out;
+  }
+
+  /* Focus utilities */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
+  }
+
+  .focus-ring-secondary {
+    @apply focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2;
+  }
+
+  .focus-ring-success {
+    @apply focus:outline-none focus:ring-2 focus:ring-success-500 focus:ring-offset-2;
+  }
+
+  .focus-ring-warning {
+    @apply focus:outline-none focus:ring-2 focus:ring-warning-500 focus:ring-offset-2;
+  }
+
+  .focus-ring-error {
+    @apply focus:outline-none focus:ring-2 focus:ring-error-500 focus:ring-offset-2;
+  }
+
+  /* Interactive states */
+  .interactive {
+    @apply transition-all duration-200 hover:scale-105 active:scale-95;
+  }
+
+  .interactive-subtle {
+    @apply transition-all duration-200 hover:scale-102 active:scale-98;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20;
+  }
+
+  .glass-dark {
+    @apply bg-black/80 backdrop-blur-sm border border-white/10;
+  }
+}
