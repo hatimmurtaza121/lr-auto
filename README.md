@@ -4,13 +4,13 @@ A comprehensive automation platform for managing game scripts with advanced feat
 
 ## Features
 
-- 🎮 **Multi-Game Support**: Manage automation scripts for multiple games
-- 🏢 **Team Management**: Multi-tenant support with team-based access control
-- 🤖 **AI Captcha Solving**: Automatic captcha detection and solving using Google Gemini Flash 2.0
-- 🔐 **Secure Authentication**: Automated login with state persistence
-- 📊 **Dashboard Interface**: Modern React-based UI for script management
-- ⚡ **Real-time Execution**: Run scripts directly from the dashboard
-- 🔧 **Configurable**: Easy configuration for different games and settings
+- **Multi-Game Support**: Manage automation scripts for multiple games
+- **Team Management**: Multi-tenant support with team-based access control
+- **AI Captcha Solving**: Automatic captcha detection and solving using Google Gemini Flash 2.0
+- **Secure Authentication**: Automated login with state persistence
+- **Dashboard Interface**: Modern React-based UI for script management
+- **Real-time Execution**: Run scripts directly from the dashboard
+- **Configurable**: Easy configuration for different games and settings
 
 ## Quick Start
 
