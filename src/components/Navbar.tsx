@@ -71,6 +71,16 @@ export default function Navbar() {
             {selectedTeamName}
           </button>
         )}
+        {/* Status Button */}
+        <button
+          onClick={() => router.push('/status')}
+          className="ml-4 flex items-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200 transition-colors cursor-pointer"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Status
+        </button>
       </div>
       {/* Center (removed) */}
       {/* Right */}
