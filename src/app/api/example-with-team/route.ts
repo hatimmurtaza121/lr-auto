@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
           session_data: { action, gameName, teamId: team.id },
           is_active: true,
           created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+          expires_at: new Date(Date.now()).toISOString(),
         }
       ])
       .select();

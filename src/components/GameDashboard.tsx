@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { runPlaywrightScript } from '@/utils/playwright';
+import { getSelectedTeamId } from '@/utils/team';
 
 interface GameDashboardProps {
   gameName: string;
@@ -11,6 +11,20 @@ interface GameDashboardProps {
 interface FormInputs {
   [key: string]: string;
 }
+
+// Map game names to action types
+const getActionType = (actionId: number): 'newAccount' | 'passwordReset' | 'recharge' | 'redeem' => {
+  switch (actionId) {
+    case 1: return 'newAccount';
+    case 2: return 'passwordReset';
+    case 3: return 'recharge';
+    case 4: return 'redeem';
+    default: return 'newAccount';
+  }
+};
+
+// Import game mapping utility
+import { getGameId } from '@/utils/game-mapping';
 
 export default function GameDashboard({ gameName, scriptPath }: GameDashboardProps) {
   const [selectedAction, setSelectedAction] = useState<number>(1);
@@ -24,9 +38,6 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
   const [output, setOutput] = useState<string>('');
   const [isExecuting, setIsExecuting] = useState(false);
 
-  // Default scriptPath for Game Vault if not provided
-  const effectiveScriptPath = scriptPath || 'scripts';
-
   const handleInputChange = (key: string, value: string) => {
     setFormInputs(prev => ({
       ...prev,
@@ -39,13 +50,65 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
     setOutput('');
     
     try {
-      const result = await runPlaywrightScript(
-        `${effectiveScriptPath}/action${selectedAction}.js`,
-        formInputs
-      );
-      setOutput(result);
+      const teamId = getSelectedTeamId();
+      if (!teamId) {
+        throw new Error('No team selected');
+      }
+
+      const actionType = getActionType(selectedAction);
+
+      // Prepare parameters based on action type
+      let params: any = {};
+      
+      switch (actionType) {
+        case 'newAccount':
+          params = {
+            newAccountName: formInputs.accountName,
+            newPassword: formInputs.password
+          };
+          break;
+        case 'passwordReset':
+          params = {
+            targetUsername: formInputs.accountName,
+            newPassword: formInputs.password
+          };
+          break;
+        case 'recharge':
+          params = {
+            targetUsername: formInputs.accountName,
+            amount: parseFloat(formInputs.rechargeAmount) || 0
+          };
+          break;
+        case 'redeem':
+          params = {
+            targetUsername: formInputs.accountName,
+            amount: parseFloat(formInputs.redeemAmount) || 0
+          };
+          break;
+      }
+
+      const response = await fetch('/api/execute-action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-team-id': teamId.toString(),
+        },
+        body: JSON.stringify({
+          action: actionType,
+          gameName: gameName,
+          params: params
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Action execution failed');
+      }
+
+      const result = await response.json();
+      setOutput(JSON.stringify(result, null, 2));
     } catch (error) {
-      setOutput(`Error: ${error}`);
+      setOutput(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExecuting(false);
     }

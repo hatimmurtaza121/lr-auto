@@ -19,6 +19,7 @@ CREATE TABLE game (
   name        TEXT         NOT NULL,         -- human-readable game name
   username    TEXT         NOT NULL,         -- login username for this game
   password    TEXT         NOT NULL,         -- login password for this game
+  login_url   TEXT         NOT NULL,         -- URL for login page
   created_at  TIMESTAMPTZ  DEFAULT now()
 );
 
@@ -27,13 +28,12 @@ CREATE TABLE session (
   id             SERIAL       PRIMARY KEY,   -- auto-incrementing ID
   user_id        UUID         NOT NULL       REFERENCES auth.users(id),
   game_id        INTEGER      NOT NULL       REFERENCES game(id) ON DELETE CASCADE,
-  credentials    JSONB        NOT NULL,       -- e.g. { "username": "...", "password": "..." }
-  session_token  TEXT         NOT NULL,       -- in-memory/session token
-  session_data   JSONB        DEFAULT '{}'::JSONB,
+  credentials    JSONB        NOT NULL,      -- e.g. { "username": "...", "password": "..." }
+  session_token  TEXT         NOT NULL,      -- in-memory/session token
+  session_data   JSONB        DEFAULT '{}'::JSONB, -- Playwright storage state (cookies only)
+  expires_at     TIMESTAMPTZ,                -- when the session expires (from cookies)
   is_active      BOOLEAN      DEFAULT TRUE,
-  created_at     TIMESTAMPTZ  DEFAULT now(),
-  last_used_at   TIMESTAMPTZ,
-  expires_at     TIMESTAMPTZ
+  created_at     TIMESTAMPTZ  DEFAULT now()
 );
 
 CREATE INDEX ON session(user_id);

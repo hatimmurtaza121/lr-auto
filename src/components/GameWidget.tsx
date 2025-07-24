@@ -4,42 +4,142 @@ import { useState, lazy, Suspense, useEffect } from 'react';
 import { runPlaywrightScript } from '@/utils/playwright';
 import { createClient } from '@/lib/supabase/client';
 
+const supabase = createClient();
+
 const GameDashboard = lazy(() => import('./GameDashboard'));
+
+interface Game {
+  id: number;
+  name: string;
+  login_url: string;
+  created_at: string;
+}
+
+interface GameCredential {
+  id: number;
+  team_id: number;
+  game_id: number;
+  username: string;
+  password: string;
+  created_at: string;
+  game: Game;
+}
 
 interface GameWidgetProps {
   gameName: string;
   displayName: string;
+  hasCredentials?: boolean;
+  credential?: GameCredential;
 }
 
-export default function GameWidget({ gameName, displayName }: GameWidgetProps) {
+export default function GameWidget({ gameName, displayName, hasCredentials = false, credential }: GameWidgetProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState(credential?.username || '');
+  const [password, setPassword] = useState(credential?.password || '');
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
+  // Check for existing session when component mounts
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
+
+  // Update username/password when credential changes
+  useEffect(() => {
+    if (credential) {
+      setUsername(credential.username);
+      setPassword(credential.password);
+    }
+  }, [credential]);
+
+  const checkExistingSession = async () => {
+    try {
+      // Get team ID from localStorage
+      const teamId = localStorage.getItem('selectedTeamId');
+      if (!teamId) {
+        setIsCheckingSession(false);
+        return;
+      }
+
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setIsCheckingSession(false);
+        return;
+      }
+
+      const response = await fetch(`/api/check-session?gameName=${gameName}`, {
+        method: 'GET',
+        headers: {
+          'x-team-id': teamId,
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasSession) {
+          setSessionToken(data.sessionToken);
+          setIsLoggedIn(true);
+          console.log('Found existing session:', data);
+        } else if (data.hasCredentials) {
+          // No session but credentials exist - pre-fill the form
+          setUsername(data.username || '');
+          setPassword(data.password || '');
+          console.log('No session but credentials found, pre-filled form');
+        }
+      } else {
+        // Handle error response
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Check session failed:', errorData);
+        // Don't show error to user for session check failures
+      }
+    } catch (error) {
+      console.error('Error checking session:', error);
+    } finally {
+      setIsCheckingSession(false);
+    }
+  };
 
   const handleLogin = async () => {
     setIsLoading(true);
     setErrorMessage(''); // Clear any previous errors
     
     try {
-      const response = await fetch('/api/login', {
+      // Get team ID from localStorage
+      const teamId = localStorage.getItem('selectedTeamId');
+      if (!teamId) {
+        throw new Error('No team selected. Please select a team first.');
+      }
+
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await fetch('/api/login-with-session', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-team-id': teamId,
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ username, password, gameName }),
       });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Login failed');
+        throw new Error(errorData.error || errorData.message || 'Login failed');
       }
       
       const data = await response.json();
       setSessionToken(data.sessionToken);
       setIsLoggedIn(true);
+      console.log('Login successful:', data);
     } catch (error) {
       console.error('Login failed:', error);
       
@@ -47,14 +147,18 @@ export default function GameWidget({ gameName, displayName }: GameWidgetProps) {
       let userFriendlyMessage = 'Login failed. Please try again.';
       
       if (error instanceof Error) {
-        if (error.message.includes('Invalid login credentials')) {
+        if (error.message.includes('Captcha detected')) {
+          userFriendlyMessage = 'Captcha detected. Please use manual login.';
+        } else if (error.message.includes('Invalid login credentials')) {
           userFriendlyMessage = 'Invalid username or password.';
         } else if (error.message.includes('User not found')) {
           userFriendlyMessage = 'Account not found.';
         } else if (error.message.includes('Network')) {
           userFriendlyMessage = 'Network error. Check connection.';
+        } else if (error.message.includes('No team selected')) {
+          userFriendlyMessage = 'Please select a team first.';
         } else {
-          userFriendlyMessage = 'Login failed. Please try again.';
+          userFriendlyMessage = error.message || 'Login failed. Please try again.';
         }
       }
       
@@ -64,14 +168,67 @@ export default function GameWidget({ gameName, displayName }: GameWidgetProps) {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      // Get team ID from localStorage
+      const teamId = localStorage.getItem('selectedTeamId');
+      if (!teamId) {
+        return;
+      }
+
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        return;
+      }
+
+      // Invalidate the session in the database
+      const response = await fetch('/api/logout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-team-id': teamId,
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ gameName }),
+      });
+
+      if (response.ok) {
+        console.log('Session logged out successfully');
+      }
+    } catch (error) {
+      console.error('Error logging out session:', error);
+    } finally {
+      // Clear local state regardless of API success
+      setSessionToken(null);
+      setIsLoggedIn(false);
+      setUsername('');
+      setPassword('');
+    }
+  };
+
   return (
     <div 
       className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:shadow-blue-600/50 transition-all duration-200 p-6 cursor-pointer mb-6 break-inside-avoid"
-      onClick={() => !isLoggedIn && setIsExpanded(!isExpanded)}
+      onClick={() => !isLoggedIn && !isCheckingSession && setIsExpanded(!isExpanded)}
     >
-      {(!isExpanded && !isLoggedIn) ? (
+      {isCheckingSession ? (
         <div className="flex items-center justify-center h-32">
-          <span className="text-3xl font-bold text-gray-900">{displayName}</span>
+          <div className="flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="text-lg text-gray-600">Checking session...</span>
+          </div>
+        </div>
+      ) : (!isExpanded && !isLoggedIn) ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="text-center">
+            <span className="text-3xl font-bold text-gray-900">{displayName}</span>
+            {hasCredentials && (
+              <div className="mt-2 text-sm text-gray-500">
+                Credentials saved • Click to login
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <>
@@ -79,7 +236,9 @@ export default function GameWidget({ gameName, displayName }: GameWidgetProps) {
             <h2 className="text-xl font-semibold text-gray-900">{displayName}</h2>
             <div className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${isLoggedIn ? 'bg-green-500' : 'bg-gray-300'}`} />
-              {!isLoggedIn && (
+              {isLoggedIn ? (
+                <div></div> // Hidden logout button for now
+              ) : (
                 <svg 
                   className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                   fill="none" 

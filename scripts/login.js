@@ -199,7 +199,11 @@ async function checkForCaptchaError(page) {
     'please re_enter',
     'captcha is incorrect',
     'verification code',
-    'validation code'
+    'validation code',
+    'incorrect',
+    'wrong',
+    'error',
+    'failed'
   ];
   
   // Check for captcha error messages in various elements
@@ -209,12 +213,36 @@ async function checkForCaptchaError(page) {
     'div[role="alert"]',
     'div#mb_msg',
     'div.layui-layer-content',
-    'div.layui-layer'
+    'div.layui-layer',
+    'div.alert',
+    'div.error',
+    'span.error',
+    'p.error',
+    'div[class*="error"]',
+    'span[class*="error"]',
+    'p[class*="error"]'
   ];
+  
+  // First, let's log all visible text on the page to see what error messages are present
+  console.log('=== DEBUGGING: Checking all visible text for errors ===');
+  try {
+    const allText = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('*'))
+        .filter(el => el.offsetParent !== null) // Only visible elements
+        .map(el => el.textContent?.trim())
+        .filter(text => text && text.length > 0)
+        .join(' | ');
+    });
+    console.log('All visible text on page:', allText);
+  } catch (error) {
+    console.log('Error getting all text:', error.message);
+  }
   
   for (const selector of errorSelectors) {
     try {
       const errorElements = await page.locator(selector).all();
+      console.log(`Checking selector "${selector}": found ${errorElements.length} elements`);
+      
       for (const errorElement of errorElements) {
         if (await errorElement.isVisible()) {
           const errorText = await errorElement.textContent();
@@ -232,7 +260,7 @@ async function checkForCaptchaError(page) {
         }
       }
     } catch (error) {
-      // Continue checking other selectors
+      console.log(`Error checking selector "${selector}":`, error.message);
     }
   }
   
@@ -293,6 +321,63 @@ async function logCaptchaToSupabase(imagePath, apiResponse, apiStatus) {
     }
   } catch (error) {
     console.log('Error logging captcha to Supabase:', error.message);
+  }
+}
+
+// Function to save session to Supabase
+async function saveSessionToSupabase(username, password, loginUrl, sessionData) {
+  try {
+    console.log('Saving session data to Supabase...');
+    
+    // Determine game name from URL
+    let gameName = 'Unknown Game';
+    if (loginUrl.includes('gamevault999.com')) {
+      gameName = 'Game Vault';
+    } else if (loginUrl.includes('orionstars.vip')) {
+      gameName = 'Orion Stars';
+    } else if (loginUrl.includes('juwa777.com')) {
+      gameName = 'Juwa City';
+    } else if (loginUrl.includes('yolo777.game')) {
+      gameName = 'Yolo';
+    } else if (loginUrl.includes('mrallinone777.com')) {
+      gameName = 'Mr. All In One';
+    } else if (loginUrl.includes('orionstrike777.com')) {
+      gameName = 'Orion Strike';
+    }
+
+    console.log(`Detected game: ${gameName}`);
+
+    // For now, using hardcoded values - you can modify these as needed
+    const userId = 'default-user-id'; // You might want to pass this as a parameter
+    const teamId = 1; // You might want to pass this as a parameter
+
+    const response = await fetch('http://localhost:3000/api/save-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userId,
+        teamId: teamId,
+        gameName: gameName,
+        username: username,
+        password: password,
+        loginUrl: loginUrl,
+        sessionData: sessionData
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API call failed: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const result = await response.json();
+    console.log('Supabase save result:', result);
+    
+  } catch (error) {
+    console.error('Error saving to Supabase:', error);
+    throw error;
   }
 }
 
@@ -539,6 +624,19 @@ async function loginAndSaveState() {
         const credentials = { username, password };
         fs.writeFileSync(credentialsFile, JSON.stringify(credentials, null, 2));
         console.log(`Credentials saved to: ${credentialsFile}`);
+        
+        // Capture session data for Supabase
+        const sessionData = await context.storageState();
+        console.log('Session data captured for Supabase');
+        
+        // Save session to Supabase
+        try {
+          await saveSessionToSupabase(username, password, gameurl, sessionData);
+          console.log('Session saved to Supabase successfully!');
+        } catch (error) {
+          console.error('Failed to save session to Supabase:', error);
+        }
+        
         console.log('You can now run account creation without logging in again!');
         
         // Close the browser after successful login and state saving
@@ -548,7 +646,9 @@ async function loginAndSaveState() {
         
       } else if (result === 'captcha_error') {
         console.log(`Captcha error on attempt ${attempt} - will retry with fresh page`);
+        console.log('Closing browser due to captcha error...');
         await browser.close();
+        console.log('Browser closed successfully after captcha error');
         
         if (attempt < maxRetries) {
           console.log(`Retrying in 3 seconds...`);
