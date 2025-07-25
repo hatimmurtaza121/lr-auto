@@ -1,11 +1,39 @@
 import { executeWithSession } from './session-manager';
 import { Page, BrowserContext } from 'playwright';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+async function getGameInfoFromCredentialId(gameCredentialId: number) {
+  const { data: gameCredential, error } = await supabase
+    .from('game_credential')
+    .select(`
+      *,
+      game:game_id (*)
+    `)
+    .eq('id', gameCredentialId)
+    .single();
+
+  if (error || !gameCredential) {
+    throw new Error(`Game credential not found: ${gameCredentialId}`);
+  }
+
+  return {
+    name: gameCredential.game.name,
+    username: gameCredential.username,
+    password: gameCredential.password
+  };
+}
 
 export interface ActionParams {
   newAccountName?: string;
   newPassword?: string;
   targetUsername?: string;
   amount?: number;
+  remark?: string;
   // Add other parameters as needed
 }
 
@@ -16,81 +44,58 @@ export async function createNewAccountWithSession(
   userId: string,
   gameCredentialId: number,
   params: ActionParams
-): Promise<{ success: boolean; message: string; accountName?: string }> {
-  return executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+): Promise<{ success: boolean; message: string; accountName?: string; needsLogin?: boolean; gameInfo?: any; logs?: string[] }> {
+  const logs: string[] = [];
+  
+  // Override console.log to capture logs
+  const originalLog = console.log;
+  console.log = (...args) => {
+    const logMessage = args.join(' ');
+    logs.push(logMessage);
+    originalLog(...args);
+  };
+
+  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
     const { newAccountName = "testing07", newPassword = "Hatim121" } = params;
     
     console.log('Starting account creation process...');
 
     try {
-      // Navigate through the menu
-      await page.getByText('Game User').click();
-      await page.getByText('User Management').click();
-
-      // Search for the account
-      const searchFrame = await page.locator('iframe').nth(1).contentFrame();
-      if (!searchFrame) throw new Error('Search frame not found');
+      // Get game info to determine script path
+      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
-      await searchFrame.getByRole('textbox', { name: 'Please enter Username' }).fill(newAccountName);
-      await searchFrame.getByRole('button', { name: 'Search' }).click();
-
-      // Check if the account exists
-      let accountExists = false;
-      try {
-        const resultRow = searchFrame.locator('tbody > tr').first();
-        await resultRow.waitFor({ timeout: 5000 });
-        const foundName = (await resultRow.locator('td').nth(3).textContent())?.trim();
-        if (foundName === newAccountName) {
-          accountExists = true;
-        }
-      } catch {
-        // no results → accountExists remains false
-      }
-
-      if (accountExists) {
-        return {
-          success: false,
-          message: 'Account already exists',
-          accountName: newAccountName
-        };
-      }
-
-      await searchFrame.getByRole('button', { name: 'Add user' }).click();
+      // Import and execute the script function with authenticated page
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/newAccount.js`);
+      const result = await scriptModule.createNewAccount(page, context, {
+        newAccountName,
+        newPassword
+      });
       
-      const addUserFrame = searchFrame.locator('iframe[name="layui-layer-iframe1"]').contentFrame();
-      if (!addUserFrame) throw new Error('Add user frame not found');
-      
-      await addUserFrame.getByRole('textbox', { name: 'Please enter Username' }).fill(newAccountName);
-      await addUserFrame.getByRole('textbox', { name: 'Please enter Recharge Balance' }).fill("0");
-      await addUserFrame.getByRole('textbox', { name: 'Please enter Login password' }).fill(newPassword);
-      await addUserFrame.getByRole('textbox', { name: 'Please enter Confirm password' }).fill(newPassword);
-      await addUserFrame.getByRole('button', { name: 'Submit' }).click();
-
-      // Check result
-      await addUserFrame.locator('.layui-layer-content').waitFor({ state: 'visible' });
-      const popupText = await addUserFrame.locator('.layui-layer-content').textContent();
-      
-      if (popupText === 'Insert successful') {
-        return {
-          success: true,
-          message: `Successfully created user "${newAccountName}"`,
-          accountName: newAccountName
-        };
-      } else {
-        return {
-          success: false,
-          message: `Failed to create account. Popup says: "${popupText}"`,
-          accountName: newAccountName
-        };
-      }
+      return { ...result, logs };
     } catch (error) {
       return {
         success: false,
         message: `Error creating account: ${error}`,
-        accountName: newAccountName
+        accountName: newAccountName,
+        logs
       };
     }
   });
+
+  // Restore original console.log
+  console.log = originalLog;
+
+  // Check if result indicates needsLogin
+  if (result && typeof result === 'object' && 'needsLogin' in result) {
+    return {
+      success: false,
+      message: 'Session expired. Please login first.',
+      needsLogin: true,
+      gameInfo: (result as any).gameInfo
+    };
+  }
+
+  return result as { success: boolean; message: string; accountName?: string };
 }
 
 /**
@@ -100,8 +105,8 @@ export async function resetPasswordWithSession(
   userId: string,
   gameCredentialId: number,
   params: ActionParams
-): Promise<{ success: boolean; message: string; username?: string }> {
-  return executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+): Promise<{ success: boolean; message: string; username?: string; needsLogin?: boolean; gameInfo?: any }> {
+  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
     const { targetUsername, newPassword = "NewPassword123" } = params;
     
     if (!targetUsername) {
@@ -114,65 +119,17 @@ export async function resetPasswordWithSession(
     console.log(`Starting password reset for user: ${targetUsername}`);
 
     try {
-      // Navigate to user management
-      await page.getByText('Game User').click();
-      await page.getByText('User Management').click();
-
-      const searchFrame = await page.locator('iframe').nth(1).contentFrame();
-      if (!searchFrame) throw new Error('Search frame not found');
-
-      // Search for the user
-      await searchFrame.getByRole('textbox', { name: 'Please enter Username' }).fill(targetUsername);
-      await searchFrame.getByRole('button', { name: 'Search' }).click();
-
-      // Check if user exists
-      try {
-        const resultRow = searchFrame.locator('tbody > tr').first();
-        await resultRow.waitFor({ timeout: 5000 });
-        const foundName = (await resultRow.locator('td').nth(3).textContent())?.trim();
-        if (foundName !== targetUsername) {
-          return {
-            success: false,
-            message: 'User not found',
-            username: targetUsername
-          };
-        }
-      } catch {
-        return {
-          success: false,
-          message: 'User not found',
-          username: targetUsername
-        };
-      }
-
-      // Click edit button (assuming there's an edit button)
-      await searchFrame.locator('button:has-text("Edit")').first().click();
-
-      const editFrame = searchFrame.locator('iframe[name="layui-layer-iframe1"]').contentFrame();
-      if (!editFrame) throw new Error('Edit frame not found');
-
-      // Update password
-      await editFrame.getByRole('textbox', { name: 'Please enter Login password' }).fill(newPassword);
-      await editFrame.getByRole('textbox', { name: 'Please enter Confirm password' }).fill(newPassword);
-      await editFrame.getByRole('button', { name: 'Submit' }).click();
-
-      // Check result
-      await editFrame.locator('.layui-layer-content').waitFor({ state: 'visible' });
-      const popupText = await editFrame.locator('.layui-layer-content').textContent();
-
-      if (popupText?.includes('successful') || popupText?.includes('updated')) {
-        return {
-          success: true,
-          message: `Successfully reset password for user "${targetUsername}"`,
-          username: targetUsername
-        };
-      } else {
-        return {
-          success: false,
-          message: `Failed to reset password. Popup says: "${popupText}"`,
-          username: targetUsername
-        };
-      }
+      // Get game info to determine script path
+      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      
+      // Import and execute the script function with authenticated page
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/passwordReset.js`);
+      const result = await scriptModule.resetAccountPassword(page, context, {
+        targetUsername,
+        newPassword
+      });
+      
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -181,6 +138,18 @@ export async function resetPasswordWithSession(
       };
     }
   });
+
+  // Check if result indicates needsLogin
+  if (result && typeof result === 'object' && 'needsLogin' in result) {
+    return {
+      success: false,
+      message: 'Session expired. Please login first.',
+      needsLogin: true,
+      gameInfo: (result as any).gameInfo
+    };
+  }
+
+  return result as { success: boolean; message: string; username?: string };
 }
 
 /**
@@ -190,9 +159,9 @@ export async function rechargeWithSession(
   userId: string,
   gameCredentialId: number,
   params: ActionParams
-): Promise<{ success: boolean; message: string; username?: string; amount?: number }> {
-  return executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
-    const { targetUsername, amount = 0 } = params;
+): Promise<{ success: boolean; message: string; username?: string; amount?: number; needsLogin?: boolean; gameInfo?: any }> {
+  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+    const { targetUsername, amount = 0, remark = "test remarks" } = params;
     
     if (!targetUsername) {
       return {
@@ -211,37 +180,18 @@ export async function rechargeWithSession(
     console.log(`Starting recharge for user: ${targetUsername}, amount: ${amount}`);
 
     try {
-      // Navigate to recharge section
-      await page.getByText('Game User').click();
-      await page.getByText('Recharge').click();
-
-      const rechargeFrame = await page.locator('iframe').nth(1).contentFrame();
-      if (!rechargeFrame) throw new Error('Recharge frame not found');
-
-      // Fill recharge form
-      await rechargeFrame.getByRole('textbox', { name: 'Please enter Username' }).fill(targetUsername);
-      await rechargeFrame.getByRole('textbox', { name: 'Please enter Amount' }).fill(amount.toString());
-      await rechargeFrame.getByRole('button', { name: 'Submit' }).click();
-
-      // Check result
-      await rechargeFrame.locator('.layui-layer-content').waitFor({ state: 'visible' });
-      const popupText = await rechargeFrame.locator('.layui-layer-content').textContent();
-
-      if (popupText?.includes('successful') || popupText?.includes('recharged')) {
-        return {
-          success: true,
-          message: `Successfully recharged ${amount} for user "${targetUsername}"`,
-          username: targetUsername,
-          amount
-        };
-      } else {
-        return {
-          success: false,
-          message: `Failed to recharge. Popup says: "${popupText}"`,
-          username: targetUsername,
-          amount
-        };
-      }
+      // Get game info to determine script path
+      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      
+      // Import and execute the script function with authenticated page
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/recharge.js`);
+      const result = await scriptModule.recharge(page, context, {
+        accountName: targetUsername,
+        rechargeAmount: amount.toString(),
+        remarks: remark
+      });
+      
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -251,6 +201,18 @@ export async function rechargeWithSession(
       };
     }
   });
+
+  // Check if result indicates needsLogin
+  if (result && typeof result === 'object' && 'needsLogin' in result) {
+    return {
+      success: false,
+      message: 'Session expired. Please login first.',
+      needsLogin: true,
+      gameInfo: (result as any).gameInfo
+    };
+  }
+
+  return result as { success: boolean; message: string; username?: string; amount?: number };
 }
 
 /**
@@ -260,9 +222,9 @@ export async function redeemWithSession(
   userId: string,
   gameCredentialId: number,
   params: ActionParams
-): Promise<{ success: boolean; message: string; username?: string; amount?: number }> {
-  return executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
-    const { targetUsername, amount = 0 } = params;
+): Promise<{ success: boolean; message: string; username?: string; amount?: number; needsLogin?: boolean; gameInfo?: any }> {
+  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+    const { targetUsername, amount = 0, remark = "test remarks" } = params;
     
     if (!targetUsername) {
       return {
@@ -281,37 +243,18 @@ export async function redeemWithSession(
     console.log(`Starting redeem for user: ${targetUsername}, amount: ${amount}`);
 
     try {
-      // Navigate to redeem section
-      await page.getByText('Game User').click();
-      await page.getByText('Redeem').click();
-
-      const redeemFrame = await page.locator('iframe').nth(1).contentFrame();
-      if (!redeemFrame) throw new Error('Redeem frame not found');
-
-      // Fill redeem form
-      await redeemFrame.getByRole('textbox', { name: 'Please enter Username' }).fill(targetUsername);
-      await redeemFrame.getByRole('textbox', { name: 'Please enter Amount' }).fill(amount.toString());
-      await redeemFrame.getByRole('button', { name: 'Submit' }).click();
-
-      // Check result
-      await redeemFrame.locator('.layui-layer-content').waitFor({ state: 'visible' });
-      const popupText = await redeemFrame.locator('.layui-layer-content').textContent();
-
-      if (popupText?.includes('successful') || popupText?.includes('redeemed')) {
-        return {
-          success: true,
-          message: `Successfully redeemed ${amount} for user "${targetUsername}"`,
-          username: targetUsername,
-          amount
-        };
-      } else {
-        return {
-          success: false,
-          message: `Failed to redeem. Popup says: "${popupText}"`,
-          username: targetUsername,
-          amount
-        };
-      }
+      // Get game info to determine script path
+      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      
+      // Import and execute the script function with authenticated page
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/redeem.js`);
+      const result = await scriptModule.redeem(page, context, {
+        accountName: targetUsername,
+        redeemAmount: amount.toString(),
+        remarks: remark
+      });
+      
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -321,4 +264,16 @@ export async function redeemWithSession(
       };
     }
   });
+
+  // Check if result indicates needsLogin
+  if (result && typeof result === 'object' && 'needsLogin' in result) {
+    return {
+      success: false,
+      message: 'Session expired. Please login first.',
+      needsLogin: true,
+      gameInfo: (result as any).gameInfo
+    };
+  }
+
+  return result as { success: boolean; message: string; username?: string; amount?: number };
 } 

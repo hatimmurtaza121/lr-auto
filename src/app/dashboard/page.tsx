@@ -101,11 +101,17 @@ export default function Dashboard() {
     // Find if this team has credentials for this game
     const credential = gameCredentials.find(c => c.game_id === game.id);
 
+    // Format display name: remove "scripts_" prefix and replace underscores with spaces
+    const displayName = game.name
+      .replace(/^scripts_/, '') // Remove "scripts_" prefix
+      .replace(/_/g, ' ') // Replace underscores with spaces
+      .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
+
     return (
       <GameWidget
         key={game.id}
-        gameName={game.name} // Use database name directly
-        displayName={game.name}
+        gameName={game.name} // Use database name directly for API calls
+        displayName={displayName} // Use formatted name for display
         hasCredentials={!!credential}
         credential={credential}
       />

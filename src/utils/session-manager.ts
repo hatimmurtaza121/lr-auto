@@ -63,15 +63,32 @@ export class SessionManager {
     sessionData: SessionData;
     credentials: GameCredentials;
     gameInfo: GameInfo;
+    needsLogin: boolean;
   }> {
     // First, try to get existing session
     const existingSession = await this.getExistingSession(userId, gameCredentialId);
     if (existingSession) {
-      return existingSession;
+      return { ...existingSession, needsLogin: false };
     }
 
-    // If no session exists, create a new one
-    return await this.createNewSession(userId, gameCredentialId);
+    // If no session exists, return credentials for manual login
+    const gameCredential = await this.getGameCredentialInfo(gameCredentialId);
+    return {
+      sessionData: { cookies: [] },
+      credentials: {
+        username: gameCredential.username,
+        password: gameCredential.password
+      },
+      gameInfo: {
+        id: gameCredential.game.id,
+        name: gameCredential.game.name,
+        login_url: gameCredential.game.login_url,
+        dashboard_url: gameCredential.game.dashboard_url,
+        username: gameCredential.username,
+        password: gameCredential.password
+      },
+      needsLogin: true
+    };
   }
 
   /**
@@ -143,10 +160,9 @@ export class SessionManager {
   }
 
   /**
-   * Create new session by performing login
+   * Get game credential info
    */
-  private async createNewSession(userId: string, gameCredentialId: number) {
-    // Get game credential info
+  private async getGameCredentialInfo(gameCredentialId: number) {
     const { data: gameCredential, error: credentialError } = await supabase
       .from('game_credential')
       .select(`
@@ -159,6 +175,15 @@ export class SessionManager {
     if (credentialError || !gameCredential) {
       throw new Error(`Game credential not found: ${gameCredentialId}`);
     }
+
+    return gameCredential;
+  }
+
+  /**
+   * Create new session by performing login
+   */
+  private async createNewSession(userId: string, gameCredentialId: number) {
+    const gameCredential = await this.getGameCredentialInfo(gameCredentialId);
 
     // Perform login and capture session
     const { sessionData, credentials } = await this.performLogin({
@@ -392,7 +417,8 @@ export class SessionManager {
     try {
       if (!this.browser) {
         this.browser = await chromium.launch({ 
-          headless: true,
+          headless: false, // Show the browser
+          slowMo: 1000, // Slow down actions so you can see what's happening
           args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
       }
@@ -536,12 +562,16 @@ export async function executeWithSession<T>(
   userId: string,
   gameCredentialId: number,
   actionFunction: (page: Page, context: BrowserContext) => Promise<T>
-): Promise<T> {
+): Promise<T | { needsLogin: boolean; gameInfo: any }> {
   const sessionManager = new SessionManager();
   
   try {
     // Get or create session
-    const { sessionData, gameInfo } = await sessionManager.getOrCreateSession(userId, gameCredentialId);
+    const { sessionData, gameInfo, needsLogin } = await sessionManager.getOrCreateSession(userId, gameCredentialId);
+    
+    if (needsLogin) {
+      return { needsLogin: true, gameInfo };
+    }
     
     // Create authenticated browser context
     const context = await sessionManager.createAuthenticatedContext(sessionData);
@@ -558,6 +588,9 @@ export async function executeWithSession<T>(
     
     // Execute the action function
     const result = await actionFunction(page, context);
+    
+    // Wait a bit so you can see the final state
+    await page.waitForTimeout(3000);
     
     return result;
     

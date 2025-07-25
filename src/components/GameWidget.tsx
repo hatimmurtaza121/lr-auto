@@ -41,6 +41,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
   const [errorMessage, setErrorMessage] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   // Check for existing session when component mounts
   useEffect(() => {
@@ -139,6 +140,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       const data = await response.json();
       setSessionToken(data.sessionToken);
       setIsLoggedIn(true);
+      setNeedsLogin(false); // Reset needsLogin state
       console.log('Login successful:', data);
     } catch (error) {
       console.error('Login failed:', error);
@@ -209,7 +211,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
   return (
     <div 
-      className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:shadow-blue-600/50 transition-all duration-200 p-6 cursor-pointer mb-6 break-inside-avoid"
+      className="bg-white rounded-3xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 cursor-pointer mb-6 break-inside-avoid"
       onClick={() => !isLoggedIn && !isCheckingSession && setIsExpanded(!isExpanded)}
     >
       {isCheckingSession ? (
@@ -304,8 +306,65 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             }>
-              <GameDashboard gameName={gameName} />
+              <GameDashboard 
+                gameName={gameName} 
+                onNeedsLogin={() => {
+                  setIsLoggedIn(false);
+                  setNeedsLogin(true);
+                  setIsExpanded(true);
+                }}
+              />
             </Suspense>
+          ) : needsLogin ? (
+            <div 
+              className="space-y-4 animate-in slide-in-from-top-2 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-700 text-sm font-medium">
+                Session expired. Please login again to continue.
+              </div>
+              <input
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={e => {
+                  setUsername(e.target.value);
+                  setErrorMessage('');
+                }}
+                className="w-full border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-700"
+                disabled={isLoading}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => {
+                  setPassword(e.target.value);
+                  setErrorMessage('');
+                }}
+                className="w-full border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-700"
+                disabled={isLoading}
+              />
+              {errorMessage && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm font-medium">
+                  {errorMessage}
+                </div>
+              )}
+              <button
+                onClick={handleLogin}
+                disabled={isLoading || !username || !password}
+                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-300 text-white font-medium py-3 px-4 rounded-2xl transition-all duration-150 active:scale-95 disabled:cursor-not-allowed shadow"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span className="ml-2">Reconnecting...</span>
+                  </div>
+                ) : (
+                  'Reconnect'
+                )}
+              </button>
+            </div>
           ) : null}
         </>
       )}

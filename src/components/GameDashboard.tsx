@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { getSelectedTeamId } from '@/utils/team';
+import { createClient } from '@/lib/supabase/client';
 
 interface GameDashboardProps {
   gameName: string;
   scriptPath?: string;
+  onNeedsLogin?: () => void;
 }
 
 interface FormInputs {
@@ -26,7 +28,8 @@ const getActionType = (actionId: number): 'newAccount' | 'passwordReset' | 'rech
 // Import game mapping utility
 import { getGameId } from '@/utils/game-mapping';
 
-export default function GameDashboard({ gameName, scriptPath }: GameDashboardProps) {
+export default function GameDashboard({ gameName, scriptPath, onNeedsLogin }: GameDashboardProps) {
+  const supabase = createClient();
   const [selectedAction, setSelectedAction] = useState<number>(1);
   const [formInputs, setFormInputs] = useState<FormInputs>({
     accountName: '',
@@ -37,6 +40,9 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
   });
   const [output, setOutput] = useState<string>('');
   const [isExecuting, setIsExecuting] = useState(false);
+  const [resultMessage, setResultMessage] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [currentLog, setCurrentLog] = useState<string>('');
+  const [allLogs, setAllLogs] = useState<string[]>([]);
 
   const handleInputChange = (key: string, value: string) => {
     setFormInputs(prev => ({
@@ -48,11 +54,46 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
   const handleSubmit = async () => {
     setIsExecuting(true);
     setOutput('');
+    setResultMessage(null);
+    setCurrentLog('Starting action...');
+    setAllLogs(['Starting action...']);
+    
+    // Simulate real-time log updates
+    const logSteps = [
+      'Starting account creation process...',
+      'Page loaded successfully',
+      'Clicked Player Management',
+      'Clicked Player List',
+      'Clicked Player List link',
+      'Iframe found',
+      'Dialog create button found',
+      'Clicked dialog create button',
+      'Filled account name',
+      'Filled password',
+      'Clicked submit button'
+    ];
+    
+    let currentStep = 0;
+    const logInterval = setInterval(() => {
+      if (currentStep < logSteps.length) {
+        setCurrentLog(logSteps[currentStep]);
+        setAllLogs(prev => [...prev, logSteps[currentStep]]);
+        currentStep++;
+      } else {
+        clearInterval(logInterval);
+      }
+    }, 1000); // Update every second
     
     try {
       const teamId = getSelectedTeamId();
       if (!teamId) {
         throw new Error('No team selected');
+      }
+
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('User not authenticated');
       }
 
       const actionType = getActionType(selectedAction);
@@ -76,13 +117,15 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
         case 'recharge':
           params = {
             targetUsername: formInputs.accountName,
-            amount: parseFloat(formInputs.rechargeAmount) || 0
+            amount: parseFloat(formInputs.rechargeAmount) || 0,
+            remark: formInputs.remark
           };
           break;
         case 'redeem':
           params = {
             targetUsername: formInputs.accountName,
-            amount: parseFloat(formInputs.redeemAmount) || 0
+            amount: parseFloat(formInputs.redeemAmount) || 0,
+            remark: formInputs.remark
           };
           break;
       }
@@ -92,6 +135,7 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
         headers: {
           'Content-Type': 'application/json',
           'x-team-id': teamId.toString(),
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           action: actionType,
@@ -106,12 +150,52 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
       }
 
       const result = await response.json();
+      
+      // Check if action needs login
+      if (result.needsLogin) {
+        setResultMessage({
+          type: 'error',
+          message: 'Session expired. Please login first.'
+        });
+        setOutput(`Session expired. Please login first.\nGame Info: ${JSON.stringify(result.gameInfo, null, 2)}`);
+        // Trigger login callback if provided
+        if (onNeedsLogin) {
+          onNeedsLogin();
+        }
+        return;
+      }
+      
+      // Set result message based on success/failure
+      if (result.success) {
+        setResultMessage({
+          type: 'success',
+          message: result.message || 'Action completed successfully!'
+        });
+      } else {
+        setResultMessage({
+          type: 'error',
+          message: result.message || 'Action failed!'
+        });
+      }
+      
+      // Display logs if available
+      if (result.logs && result.logs.length > 0) {
+        setAllLogs(result.logs);
+        setCurrentLog(result.logs[result.logs.length - 1]); // Show the last log
+      }
+      
       setOutput(JSON.stringify(result, null, 2));
-    } catch (error) {
-      setOutput(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsExecuting(false);
-    }
+          } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        setResultMessage({
+          type: 'error',
+          message: `Error: ${errorMessage}`
+        });
+        setOutput(`Error: ${errorMessage}`);
+      } finally {
+        clearInterval(logInterval);
+        setIsExecuting(false);
+      }
   };
 
   const actions = [
@@ -196,6 +280,52 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
         </div>
       </div>
 
+      {/* Live Log Display */}
+      {isExecuting && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+          <div className="flex items-center mb-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-3"></div>
+            <span className="text-blue-800 font-medium">Executing...</span>
+          </div>
+          {currentLog && (
+            <div className="text-blue-700 text-sm">
+              Current Step: {currentLog}
+            </div>
+          )}
+          {allLogs.length > 1 && (
+            <div className="mt-2 max-h-32 overflow-y-auto">
+              <div className="text-xs text-blue-600 space-y-1">
+                {allLogs.slice(-4).map((log, index) => (
+                  <div key={index} className="opacity-70">• {log}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Result Message */}
+      {resultMessage && (
+        <div className={`p-4 rounded-2xl border-2 ${
+          resultMessage.type === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800' 
+            : resultMessage.type === 'error'
+            ? 'bg-red-50 border-red-200 text-red-800'
+            : 'bg-blue-50 border-blue-200 text-blue-800'
+        }`}>
+          <div className="flex items-center">
+            <div className={`w-5 h-5 rounded-full mr-3 ${
+              resultMessage.type === 'success' 
+                ? 'bg-green-500' 
+                : resultMessage.type === 'error'
+                ? 'bg-red-500'
+                : 'bg-blue-500'
+            }`}></div>
+            <span className="font-medium">{resultMessage.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* Submit Button */}
       <button
         onClick={handleSubmit}
@@ -212,13 +342,13 @@ export default function GameDashboard({ gameName, scriptPath }: GameDashboardPro
         )}
       </button>
 
-      {/* Output */}
-      {output && (
+      {/* Output - Hidden */}
+      {/* {output && (
         <div className="bg-surface-secondary border border-border-primary rounded-2xl p-4">
           <h4 className="text-sm font-medium text-content-secondary mb-2">Output:</h4>
           <pre className="text-sm text-content-tertiary whitespace-pre-wrap">{output}</pre>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
