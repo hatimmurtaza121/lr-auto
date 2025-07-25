@@ -8,6 +8,18 @@ async function redeem(page, context, params = {}) {
     console.log(`Redeem amount: ${redeemAmount}`);
     console.log(`Remarks: ${remarks}`);
 
+             // Start screenshot capture
+         const screenshotInterval = setInterval(async () => {
+             try {
+                 // Use process.cwd() to get the project root directory
+                 const screenshotPath = path.join(process.cwd(), 'public', 'latest.png');
+                 await page.screenshot({ path: screenshotPath });
+                 console.log('Screenshot taken:', new Date().toISOString(), 'to:', screenshotPath);
+             } catch (error) {
+                 console.log('Screenshot error:', error);
+             }
+         }, 500);
+
     try {
         // From here
         await page.waitForLoadState('networkidle');
@@ -86,13 +98,20 @@ async function redeem(page, context, params = {}) {
         
     } catch (error) {
         console.error('Error during recharging amount:', error);
+        clearInterval(screenshotInterval);
         return {
             success: false,
             message: `Error during redeem: ${error}`,
+            error,
             username: accountName,
             amount: parseFloat(redeemAmount)
         };
-    }
+             } finally {
+             // Stop screenshot capture
+             clearInterval(screenshotInterval);
+             
+
+         }
 }
 
 // Export the function for external use

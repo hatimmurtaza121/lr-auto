@@ -8,6 +8,18 @@ async function recharge(page, context, params = {}) {
     console.log(`Recharge amount: ${rechargeAmount}`);
     console.log(`Remarks: ${remarks}`);
 
+             // Start screenshot capture
+         const screenshotInterval = setInterval(async () => {
+             try {
+                 // Use process.cwd() to get the project root directory
+                 const screenshotPath = path.join(process.cwd(), 'public', 'latest.png');
+                 await page.screenshot({ path: screenshotPath });
+                 console.log('Screenshot taken:', new Date().toISOString(), 'to:', screenshotPath);
+             } catch (error) {
+                 console.log('Screenshot error:', error);
+             }
+         }, 500);
+
     try {
         // From here
         await page.waitForLoadState('networkidle');
@@ -86,13 +98,19 @@ async function recharge(page, context, params = {}) {
 
     } catch (error) {
         console.error('Error during recharging amount:', error);
+        clearInterval(screenshotInterval);
         return {
             success: false,
             message: `Error during recharge: ${error}`,
             username: accountName,
             amount: parseFloat(rechargeAmount)
         };
-    }
+             } finally {
+             // Stop screenshot capture
+             clearInterval(screenshotInterval);
+             
+
+         }
 }
 
 // Export the function for external use

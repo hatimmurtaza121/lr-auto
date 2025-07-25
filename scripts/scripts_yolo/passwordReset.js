@@ -7,6 +7,18 @@ async function resetAccountPassword(page, context, params = {}) {
     console.log(`Account to reset: ${targetUsername}`);
     console.log(`New password: ${newPassword}`);
 
+             // Start screenshot capture
+         const screenshotInterval = setInterval(async () => {
+             try {
+                 // Use process.cwd() to get the project root directory
+                 const screenshotPath = path.join(process.cwd(), 'public', 'latest.png');
+                 await page.screenshot({ path: screenshotPath });
+                 console.log('Screenshot taken:', new Date().toISOString(), 'to:', screenshotPath);
+             } catch (error) {
+                 console.log('Screenshot error:', error);
+             }
+         }, 500);
+
     try {
         await page.waitForLoadState('networkidle');
         await page.getByRole('link', { name: ' Player Management ' }).click();
@@ -72,28 +84,86 @@ async function resetAccountPassword(page, context, params = {}) {
         await listFrame.getByRole('textbox', { name: 'Input Password' }).fill(newPassword);
         await listFrame.getByRole('button', { name: ' Submit' }).click();
         
-        // 6. Capture and log the success message
-        const successMsg = await listFrame
-            .locator('div')
-            .filter({ hasText: 'success' })
-            .nth(1)
-            .textContent();
-        console.log('Result:', successMsg.trim());
+        // 6. Capture and log the success/error message
+        try {
+            // First try to find success message
+            const successMsg = await listFrame
+                .locator('div')
+                .filter({ hasText: 'success' })
+                .nth(1)
+                .textContent();
+            console.log('Result:', successMsg.trim());
 
-        return {
-            success: true,
-            message: `Successfully reset password for user "${targetUsername}"`,
-            username: targetUsername
-        };
+            // Check if it's a success message
+            const messageText = successMsg.trim().toLowerCase();
+            
+            if (messageText.includes('success')) {
+                return {
+                    success: true,
+                    message: `Successfully reset password for user "${targetUsername}"`,
+                    username: targetUsername
+                };
+            } else {
+                // For any other message, return the exact message
+                return {
+                    success: false,
+                    message: successMsg.trim(),
+                    username: targetUsername
+                };
+            }
+        } catch {
+            // If success message not found, look for error messages in specific locations
+            try {
+                // Try to find error message in toast container
+                const errorMsg = await listFrame
+                    .locator('#toast-container')
+                    .getByText(/.*/)
+                    .textContent();
+                console.log('Error Result:', errorMsg.trim());
+                
+                return {
+                    success: false,
+                    message: errorMsg.trim(),
+                    username: targetUsername
+                };
+            } catch {
+                // If toast container not found, look for 'failed' text
+                try {
+                    const failedMsg = await listFrame
+                        .getByText('failed')
+                        .textContent();
+                    console.log('Failed Result:', failedMsg.trim());
+                    
+                    return {
+                        success: false,
+                        message: failedMsg.trim(),
+                        username: targetUsername
+                    };
+                } catch {
+                    // If no specific error found, return generic message
+                    return {
+                        success: false,
+                        message: 'Password reset failed',
+                        username: targetUsername
+                    };
+                }
+            }
+        }
     
     } catch (error) {
         console.error('Error during password reset:', error);
+        clearInterval(screenshotInterval);
         return {
             success: false,
             message: `Error resetting password: ${error}`,
             username: targetUsername
         };
-    }
+             } finally {
+             // Stop screenshot capture
+             clearInterval(screenshotInterval);
+             
+
+         }
 }
 
 // Export the function for external use

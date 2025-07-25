@@ -30,9 +30,12 @@ interface GameWidgetProps {
   displayName: string;
   hasCredentials?: boolean;
   credential?: GameCredential;
+  onExecutionStart?: () => void;
+  onExecutionEnd?: () => void;
+  onLogUpdate?: (currentLog: string, allLogs: string[]) => void;
 }
 
-export default function GameWidget({ gameName, displayName, hasCredentials = false, credential }: GameWidgetProps) {
+export default function GameWidget({ gameName, displayName, hasCredentials = false, credential, onExecutionStart, onExecutionEnd, onLogUpdate }: GameWidgetProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState(credential?.username || '');
@@ -313,6 +316,9 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                   setNeedsLogin(true);
                   setIsExpanded(true);
                 }}
+                onExecutionStart={onExecutionStart}
+                onExecutionEnd={onExecutionEnd}
+                onLogUpdate={onLogUpdate}
               />
             </Suspense>
           ) : needsLogin ? (

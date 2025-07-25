@@ -8,6 +8,9 @@ interface GameDashboardProps {
   gameName: string;
   scriptPath?: string;
   onNeedsLogin?: () => void;
+  onExecutionStart?: () => void;
+  onExecutionEnd?: () => void;
+  onLogUpdate?: (currentLog: string, allLogs: string[]) => void;
 }
 
 interface FormInputs {
@@ -28,7 +31,7 @@ const getActionType = (actionId: number): 'newAccount' | 'passwordReset' | 'rech
 // Import game mapping utility
 import { getGameId } from '@/utils/game-mapping';
 
-export default function GameDashboard({ gameName, scriptPath, onNeedsLogin }: GameDashboardProps) {
+export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onExecutionStart, onExecutionEnd, onLogUpdate }: GameDashboardProps) {
   const supabase = createClient();
   const [selectedAction, setSelectedAction] = useState<number>(1);
   const [formInputs, setFormInputs] = useState<FormInputs>({
@@ -58,6 +61,9 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin }: Ga
     setCurrentLog('Starting action...');
     setAllLogs(['Starting action...']);
     
+    // Notify parent that execution started
+    onExecutionStart?.();
+    
     // Simulate real-time log updates
     const logSteps = [
       'Starting account creation process...',
@@ -76,8 +82,11 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin }: Ga
     let currentStep = 0;
     const logInterval = setInterval(() => {
       if (currentStep < logSteps.length) {
-        setCurrentLog(logSteps[currentStep]);
-        setAllLogs(prev => [...prev, logSteps[currentStep]]);
+        const newCurrentLog = logSteps[currentStep];
+        const newAllLogs = [...allLogs, logSteps[currentStep]];
+        setCurrentLog(newCurrentLog);
+        setAllLogs(newAllLogs);
+        onLogUpdate?.(newCurrentLog, newAllLogs);
         currentStep++;
       } else {
         clearInterval(logInterval);
@@ -195,6 +204,9 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin }: Ga
       } finally {
         clearInterval(logInterval);
         setIsExecuting(false);
+        
+        // Notify parent that execution ended
+        onExecutionEnd?.();
       }
   };
 
@@ -280,29 +292,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin }: Ga
         </div>
       </div>
 
-      {/* Live Log Display */}
-      {isExecuting && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-          <div className="flex items-center mb-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-3"></div>
-            <span className="text-blue-800 font-medium">Executing...</span>
-          </div>
-          {currentLog && (
-            <div className="text-blue-700 text-sm">
-              Current Step: {currentLog}
-            </div>
-          )}
-          {allLogs.length > 1 && (
-            <div className="mt-2 max-h-32 overflow-y-auto">
-              <div className="text-xs text-blue-600 space-y-1">
-                {allLogs.slice(-4).map((log, index) => (
-                  <div key={index} className="opacity-70">• {log}</div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+
 
       {/* Result Message */}
       {resultMessage && (

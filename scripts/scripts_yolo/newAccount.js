@@ -8,6 +8,18 @@ async function createNewAccount(page, context, params = {}) {
     console.log(`Account Name: ${newAccountName}`);
     console.log(`Password: ${newPassword}`);
     
+               // Start screenshot capture
+           const screenshotInterval = setInterval(async () => {
+               try {
+                   // Use process.cwd() to get the project root directory
+                   const screenshotPath = path.join(process.cwd(), 'public', 'latest.png');
+                   await page.screenshot({ path: screenshotPath });
+                   console.log('Screenshot taken:', new Date().toISOString(), 'to:', screenshotPath);
+               } catch (error) {
+                   console.log('Screenshot error:', error);
+               }
+           }, 500);
+    
     try {
         await page.waitForLoadState('networkidle');
         console.log('Page loaded successfully');
@@ -68,12 +80,18 @@ async function createNewAccount(page, context, params = {}) {
         }
     } catch (error) {
         console.error('Error during account creation:', error);
+        clearInterval(screenshotInterval);
         return {
             success: false,
             message: `Error creating account: ${error.message || error}`,
             accountName: newAccountName
         };
-    }
+             } finally {
+             // Stop screenshot capture
+             clearInterval(screenshotInterval);
+             
+
+         }
 }
 
 // Export the function for external use

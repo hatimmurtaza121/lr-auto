@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import GameWidget from '@/components/GameWidget';
+import BrowserView from '@/components/BrowserView';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@mui/material';
@@ -33,6 +34,9 @@ export default function Dashboard() {
   const [games, setGames] = useState<Game[]>([]);
   const [gameCredentials, setGameCredentials] = useState<GameCredential[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [currentLog, setCurrentLog] = useState<string>('');
+  const [allLogs, setAllLogs] = useState<string[]>([]);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -78,6 +82,11 @@ export default function Dashboard() {
     router.replace('/main_login');
   };
 
+  const handleLogUpdate = (currentLog: string, allLogs: string[]) => {
+    setCurrentLog(currentLog);
+    setAllLogs(allLogs);
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
@@ -107,23 +116,48 @@ export default function Dashboard() {
       .replace(/_/g, ' ') // Replace underscores with spaces
       .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
 
-    return (
-      <GameWidget
-        key={game.id}
-        gameName={game.name} // Use database name directly for API calls
-        displayName={displayName} // Use formatted name for display
-        hasCredentials={!!credential}
-        credential={credential}
-      />
-    );
+            return (
+                      <GameWidget
+              key={game.id}
+              gameName={game.name} // Use database name directly for API calls
+              displayName={displayName} // Use formatted name for display
+              hasCredentials={!!credential}
+              credential={credential}
+              onExecutionStart={() => {
+                console.log('Dashboard: Execution started');
+                setIsExecuting(true);
+                setCurrentLog('');
+                setAllLogs([]);
+              }}
+              onExecutionEnd={() => {
+                console.log('Dashboard: Execution ended');
+                setIsExecuting(false);
+              }}
+              onLogUpdate={handleLogUpdate}
+            />
+        );
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 font-system">
+    <div className="min-h-screen bg-gray-300 font-system">
       <Navbar />
-      <div className="container mx-auto px-4 pt-20 pb-8">
-        <div className="columns-1 sm:columns-2 gap-6 space-y-6">
-          {gameWidgets}
+      <div className="w-full px-4 pt-20 pb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-120px)]">
+          {/* Left Column - Game Widgets */}
+          <div className="overflow-y-auto px-4">
+            <div className="space-y-6 max-w-4xl mx-auto">
+              {gameWidgets}
+            </div>
+          </div>
+          
+          {/* Right Column - Browser View */}
+          <div className="h-full">
+            <BrowserView 
+              isExecuting={isExecuting} 
+              currentLog={currentLog}
+              allLogs={allLogs}
+            />
+          </div>
         </div>
       </div>
     </div>
