@@ -6,139 +6,24 @@ import { createClient } from '@/lib/supabase/client';
 import Navbar from '@/components/Navbar';
 import { getSelectedTeamId } from '@/utils/team';
 
-// Hardcoded status data as requested - each team has different games
-const statusData = [
-  // Team 1 - Game Vault (All Operational)
-  {
-    teamid: 1,
-    game_id: 'GV',
-    api_url: 'https://gamevault-api.example.com',
-    status: 'operational',
-    functions: {
-      account_creation: 'operational',
-      pass_reset: 'operational',
-      redeem: 'operational',
-      recharge: 'operational'
-    }
-  },
-  // Team 1 - Orion Stars (Mixed Status)
-  {
-    teamid: 1,
-    game_id: 'OS',
-    api_url: 'https://orionstars-api.example.com',
-    status: 'degraded',
-    functions: {
-      account_creation: 'operational',
-      pass_reset: 'degraded',
-      redeem: 'operational',
-      recharge: 'outage'
-    }
-  },
-  // Team 1 - Orion Strike (Major Issues)
-  {
-    teamid: 1,
-    game_id: 'ST',
-    api_url: 'https://orionstrike-api.example.com',
-    status: 'outage',
-    functions: {
-      account_creation: 'outage',
-      pass_reset: 'degraded',
-      redeem: 'outage',
-      recharge: 'outage'
-    }
-  },
-  // Team 2 - Mr. All In One (All Operational)
-  {
-    teamid: 2,
-    game_id: 'A1',
-    api_url: 'https://mrao-api.example.com',
-    status: 'operational',
-    functions: {
-      account_creation: 'operational',
-      pass_reset: 'operational',
-      redeem: 'operational',
-      recharge: 'operational'
-    }
-  },
-  // Team 2 - Yolo (Degraded Performance)
-  {
-    teamid: 2,
-    game_id: 'YL',
-    api_url: 'https://yolo-api.example.com',
-    status: 'degraded',
-    functions: {
-      account_creation: 'operational',
-      pass_reset: 'degraded',
-      redeem: 'degraded',
-      recharge: 'operational'
-    }
-  },
-  // Team 2 - Juwa City (Minor Issues)
-  {
-    teamid: 2,
-    game_id: 'JW',
-    api_url: 'https://juwacity-api.example.com',
-    status: 'degraded',
-    functions: {
-      account_creation: 'operational',
-      pass_reset: 'operational',
-      redeem: 'degraded',
-      recharge: 'operational'
-    }
-  },
-  // Team 3 - Game Vault (Mixed Status)
-  {
-    teamid: 3,
-    game_id: 'GV',
-    api_url: 'https://gamevault-api.example.com',
-    status: 'degraded',
-    functions: {
-      account_creation: 'operational',
-      pass_reset: 'operational',
-      redeem: 'degraded',
-      recharge: 'outage'
-    }
-  },
-  // Team 3 - Orion Stars (All Operational)
-  {
-    teamid: 3,
-    game_id: 'OS',
-    api_url: 'https://orionstars-api.example.com',
-    status: 'operational',
-    functions: {
-      account_creation: 'operational',
-      pass_reset: 'operational',
-      redeem: 'operational',
-      recharge: 'operational'
-    }
-  },
-  // Team 3 - Mr. All In One (Major Outage)
-  {
-    teamid: 3,
-    game_id: 'A1',
-    api_url: 'https://mrao-api.example.com',
-    status: 'outage',
-    functions: {
-      account_creation: 'outage',
-      pass_reset: 'outage',
-      redeem: 'outage',
-      recharge: 'outage'
-    }
-  }
-];
+interface GameStatus {
+  game_id: number;
+  game_name: string;
+  login_url: string;
+  actions: {
+    [key: string]: {
+      status: 'success' | 'fail' | 'unknown';
+      updated_at: string;
+    };
+  };
+}
 
-const gameDisplayNames = {
-  'GV': 'Game Vault',
-  'OS': 'Orion Stars',
-  'ST': 'Orion Strike',
-  'A1': 'Mr. All In One',
-  'YL': 'Yolo',
-  'JW': 'Juwa City'
-};
+// Status configuration for different status types
+
+
 
 const statusConfig = {
-  operational: {
-    label: 'Operational',
+  success: {
     color: 'bg-success-500',
     textColor: 'text-success-700',
     bgColor: 'bg-success-50',
@@ -149,20 +34,7 @@ const statusConfig = {
       </svg>
     )
   },
-  degraded: {
-    label: 'Degraded Performance',
-    color: 'bg-warning-500',
-    textColor: 'text-warning-700',
-    bgColor: 'bg-warning-50',
-    borderColor: 'border-warning-200',
-    icon: (
-      <svg className="w-5 h-5 text-warning-500" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-      </svg>
-    )
-  },
-  outage: {
-    label: 'Major Outage',
+  fail: {
     color: 'bg-error-500',
     textColor: 'text-error-700',
     bgColor: 'bg-error-50',
@@ -170,6 +42,17 @@ const statusConfig = {
     icon: (
       <svg className="w-5 h-5 text-error-500" fill="currentColor" viewBox="0 0 20 20">
         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+      </svg>
+    )
+  },
+  unknown: {
+    color: 'bg-gray-500',
+    textColor: 'text-gray-700',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    icon: (
+      <svg className="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
       </svg>
     )
   }
@@ -180,6 +63,8 @@ export default function StatusPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [gameStatuses, setGameStatuses] = useState<GameStatus[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -192,16 +77,106 @@ export default function StatusPage() {
           router.replace('/choose-team');
         } else {
           setLoading(false);
+          fetchGameStatus(selectedTeamId);
         }
       }
     });
   }, [router, supabase.auth]);
 
-  // Simulate real-time updates
+  const fetchGameStatus = async (teamId: number) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('User not authenticated');
+      }
+
+      // First, get all games available for this team
+      const gamesResponse = await fetch(`/api/teams?teamId=${teamId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!gamesResponse.ok) {
+        throw new Error('Failed to fetch games');
+      }
+
+      const gamesResult = await gamesResponse.json();
+      const allGames = gamesResult.games || [];
+
+      // Then, get the status data
+      const statusResponse = await fetch(`/api/update-game-status?teamId=${teamId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      let statusData: GameStatus[] = [];
+      if (statusResponse.ok) {
+        const statusResult = await statusResponse.json();
+        statusData = statusResult.data || [];
+      }
+
+      // Create a map of existing status data
+      const statusMap = new Map();
+      statusData.forEach(gameStatus => {
+        statusMap.set(gameStatus.game_id, gameStatus);
+      });
+
+      // Create complete game status list with unknown status for missing actions
+      const completeGameStatuses = allGames.map((game: any) => {
+        const existingStatus = statusMap.get(game.id);
+        
+        if (existingStatus) {
+          // Ensure all 5 actions are present, fill missing ones with unknown
+          const allActions = {
+            login: { status: 'unknown', updated_at: new Date().toISOString() },
+            newaccount: { status: 'unknown', updated_at: new Date().toISOString() },
+            passwordreset: { status: 'unknown', updated_at: new Date().toISOString() },
+            recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+            redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+          };
+          
+          // Merge existing status with default unknown status
+          Object.assign(allActions, existingStatus.actions);
+          
+          return {
+            ...existingStatus,
+            actions: allActions
+          };
+        } else {
+          // Create new game status with unknown for all actions
+          return {
+            game_id: game.id,
+            game_name: game.name,
+            login_url: game.login_url,
+            actions: {
+              login: { status: 'unknown', updated_at: new Date().toISOString() },
+              newaccount: { status: 'unknown', updated_at: new Date().toISOString() },
+              passwordreset: { status: 'unknown', updated_at: new Date().toISOString() },
+              recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+              redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+            }
+          };
+        }
+      });
+
+      setGameStatuses(completeGameStatuses);
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Error fetching game status:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch status');
+    }
+  };
+
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      setLastUpdated(new Date());
-    }, 30000); // Update every 30 seconds
+      const teamId = getSelectedTeamId();
+      if (teamId) {
+        fetchGameStatus(teamId);
+      }
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -216,20 +191,10 @@ export default function StatusPage() {
     );
   }
 
-  // Get current team ID and filter data
+  // Get current team ID
   const currentTeamId = getSelectedTeamId();
   console.log('Current Team ID:', currentTeamId);
-  console.log('All Status Data:', statusData);
-  
-  // For now, show all data to ensure cards are visible
-  const teamStatusData = statusData.filter(item => item.teamid === (currentTeamId || 1));
-  console.log('Filtered Team Status Data:', teamStatusData);
-  
-  const overallStatus = teamStatusData.every(item => item.status === 'operational') 
-    ? 'operational' 
-    : teamStatusData.some(item => item.status === 'outage') 
-    ? 'outage' 
-    : 'degraded';
+  console.log('Game Statuses:', gameStatuses);
 
   return (
     <div className="min-h-screen bg-gray-50 font-system">
@@ -244,28 +209,25 @@ export default function StatusPage() {
               <span className="font-mono">{lastUpdated.toLocaleTimeString()}</span>
             </div>
           </div>
-          
-          {/* Overall Status Card */}
-          <div className={`card-elevated p-6 border-l-4 ${statusConfig[overallStatus].borderColor}`}>
-            <div className="flex items-center gap-3">
-              {statusConfig[overallStatus].icon}
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Overall System Status
-                </h2>
-                <p className={`text-sm font-medium ${statusConfig[overallStatus].textColor}`}>
-                  {statusConfig[overallStatus].label}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700">Error: {error}</p>
+          </div>
+        )}
 
         {/* Status Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Temporarily show all data to ensure cards are visible */}
-          {statusData.map((item, index) => {
-            const config = statusConfig[item.status as keyof typeof statusConfig];
+          {gameStatuses.map((gameStatus, index) => {
+            // Determine overall status based on actions
+            const actions = gameStatus.actions;
+            const hasFail = Object.values(actions).some(action => action.status === 'fail');
+            const hasSuccess = Object.values(actions).some(action => action.status === 'success');
+            const overallStatus = hasFail ? 'fail' : hasSuccess ? 'success' : 'unknown';
+            
+            const config = statusConfig[overallStatus as keyof typeof statusConfig];
+            
             return (
               <div 
                 key={index}
@@ -274,36 +236,30 @@ export default function StatusPage() {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
-                      {gameDisplayNames[item.game_id as keyof typeof gameDisplayNames]}
+                      {gameStatus.game_name}
                     </h3>
                     <p className="text-sm text-gray-500 font-mono truncate">
-                      {item.api_url}
+                      {gameStatus.login_url}
                     </p>
                   </div>
                   <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${config.bgColor}`}>
                     {config.icon}
-                    <span className={`text-xs font-medium ${config.textColor}`}>
-                      {config.label}
-                    </span>
                   </div>
                 </div>
                 
                 {/* Function Status Grid */}
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Function Status</h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Actions status</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(item.functions).map(([functionName, functionStatus]) => {
-                      const functionConfig = statusConfig[functionStatus as keyof typeof statusConfig];
+                    {Object.entries(actions).map(([actionName, actionData]) => {
+                      const actionConfig = statusConfig[actionData.status as keyof typeof statusConfig];
                       return (
-                        <div key={functionName} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                        <div key={actionName} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
                           <span className="text-xs text-gray-600 capitalize">
-                            {functionName.replace('_', ' ')}
+                            {actionName.replace('_', ' ')}
                           </span>
                           <div className="flex items-center gap-1">
-                            {functionConfig.icon}
-                            <span className={`text-xs font-medium ${functionConfig.textColor}`}>
-                              {functionConfig.label}
-                            </span>
+                            {actionConfig.icon}
                           </div>
                         </div>
                       );
@@ -313,12 +269,8 @@ export default function StatusPage() {
                 
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Team ID:</span>
-                    <span className="font-mono text-gray-900">{item.teamid}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Game ID:</span>
-                    <span className="font-mono text-gray-900">{item.game_id}</span>
+                    <span className="font-mono text-gray-900">{gameStatus.game_id}</span>
                   </div>
                 </div>
               </div>
@@ -326,15 +278,7 @@ export default function StatusPage() {
           })}
         </div>
 
-        {/* Footer */}
-        <div className="mt-12 text-center">
-          <p className="text-sm text-gray-500">
-            Status updates are automatically refreshed every 30 seconds
-          </p>
-          <p className="text-xs text-gray-400 mt-2">
-            For immediate assistance, contact support
-          </p>
-        </div>
+
       </div>
     </div>
   );

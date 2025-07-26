@@ -1,0 +1,172 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { getUserSession } from '@/utils/api-helpers';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(request: NextRequest) {
+  try {
+    // Get authenticated user
+    const user = await getUserSession(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Parse request body
+    const body = await request.json();
+    const { teamId, gameId, action, status } = body;
+
+    // Validate required fields
+    if (!teamId || !gameId || !action || !status) {
+      return NextResponse.json({ 
+        error: 'Missing required fields: teamId, gameId, action, status' 
+      }, { status: 400 });
+    }
+
+    // Validate action
+    const validActions = ['login', 'newaccount', 'passwordreset', 'recharge', 'redeem'];
+    if (!validActions.includes(action)) {
+      return NextResponse.json({ 
+        error: `Invalid action. Must be one of: ${validActions.join(', ')}` 
+      }, { status: 400 });
+    }
+
+    // Validate status
+    const validStatuses = ['success', 'fail', 'unknown'];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ 
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` 
+      }, { status: 400 });
+    }
+
+    console.log(`Updating game status: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
+
+    // Insert new status record
+    const { data, error } = await supabase
+      .from('game_action_status')
+      .insert({
+        team_id: teamId,
+        game_id: gameId,
+        action: action,
+        status: status,
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating game status:', error);
+      return NextResponse.json({ 
+        error: 'Failed to update game status',
+        details: error.message 
+      }, { status: 500 });
+    }
+
+    console.log('Game status updated successfully:', data);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Game status updated successfully',
+      data: data
+    });
+
+  } catch (error) {
+    console.error('Error in update-game-status API:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Get authenticated user
+    const user = await getUserSession(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get team ID from query params
+    const { searchParams } = new URL(request.url);
+    const teamId = searchParams.get('teamId');
+
+    if (!teamId) {
+      return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
+    }
+
+    console.log(`Fetching game status for team: ${teamId}`);
+
+    // Get the latest status for each game and action for this team
+    const { data, error } = await supabase
+      .from('game_action_status')
+      .select(`
+        id,
+        team_id,
+        game_id,
+        action,
+        status,
+        updated_at,
+        game:game_id (
+          id,
+          name,
+          login_url
+        )
+      `)
+      .eq('team_id', teamId)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching game status:', error);
+      return NextResponse.json({ 
+        error: 'Failed to fetch game status',
+        details: error.message 
+      }, { status: 500 });
+    }
+
+    // Group by game and get the latest status for each action
+    const gameStatusMap = new Map();
+    
+    data?.forEach((record: any) => {
+      const gameId = record.game_id;
+      const action = record.action;
+      
+      if (!gameStatusMap.has(gameId)) {
+        gameStatusMap.set(gameId, {
+          game_id: gameId,
+          game_name: record.game.name,
+          login_url: record.game.login_url,
+          actions: {}
+        });
+      }
+      
+      const gameStatus = gameStatusMap.get(gameId);
+      if (!gameStatus.actions[action] || 
+          new Date(record.updated_at) > new Date(gameStatus.actions[action].updated_at)) {
+        gameStatus.actions[action] = {
+          status: record.status,
+          updated_at: record.updated_at
+        };
+      }
+    });
+
+    const gameStatuses = Array.from(gameStatusMap.values());
+
+    console.log('Game statuses fetched successfully:', gameStatuses);
+
+    return NextResponse.json({
+      success: true,
+      data: gameStatuses
+    });
+
+  } catch (error) {
+    console.error('Error in update-game-status GET API:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+} 

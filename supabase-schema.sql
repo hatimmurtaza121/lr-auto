@@ -1,9 +1,10 @@
 -- Drop tables if they exist (in dependency order)
-DROP TABLE IF EXISTS captcha_log      CASCADE;
-DROP TABLE IF EXISTS session          CASCADE;
-DROP TABLE IF EXISTS game_credential  CASCADE;
-DROP TABLE IF EXISTS game             CASCADE;
-DROP TABLE IF EXISTS team             CASCADE;
+DROP TABLE IF EXISTS captcha_log        CASCADE;
+DROP TABLE IF EXISTS game_action_status CASCADE;
+DROP TABLE IF EXISTS session            CASCADE;
+DROP TABLE IF EXISTS game_credential    CASCADE;
+DROP TABLE IF EXISTS game               CASCADE;
+DROP TABLE IF EXISTS team               CASCADE;
 
 -- 1) team
 CREATE TABLE team (
@@ -53,9 +54,21 @@ CREATE TABLE session (
   created_at           TIMESTAMPTZ  DEFAULT now()
 );
 
+CREATE TABLE game_action_status (
+  id         SERIAL PRIMARY KEY,
+  team_id    INTEGER NOT NULL REFERENCES team(id) ON DELETE CASCADE,
+  game_id    INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
+  action     TEXT    NOT NULL CHECK (action IN ('login', 'new_account', 'password_reset', 'recharge', 'redeem')),
+  status     TEXT    NOT NULL DEFAULT 'unknown' CHECK (status IN ('success', 'fail', 'unknown')),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE INDEX ON session(user_id);
 CREATE INDEX ON session(game_credential_id);
 CREATE INDEX ON session(is_active);
+
+CREATE INDEX ON game_action_status(team_id, game_id);
+CREATE INDEX ON game_action_status(updated_at);
 
 -- 4) captcha_log
 CREATE TABLE captcha_log (
@@ -66,6 +79,7 @@ CREATE TABLE captcha_log (
                                         CHECK (api_status IN ('success','fail')),
   solved_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+
 
 
 INSERT INTO public.team (code, name) VALUES

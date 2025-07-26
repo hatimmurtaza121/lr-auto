@@ -2,6 +2,7 @@ import { executeWithSession } from './session-manager';
 import { Page, BrowserContext } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import { screenshotWebSocketServer } from './websocket-server';
+import { updateGameStatus } from './game-status';
 
 // Initialize WebSocket server immediately
 screenshotWebSocketServer.initialize(8080);
@@ -15,7 +16,9 @@ async function getGameInfoFromCredentialId(gameCredentialId: number) {
   const { data: gameCredential, error } = await supabase
     .from('game_credential')
     .select(`
-      *,
+      team_id,
+      username,
+      password,
       game:game_id (*)
     `)
     .eq('id', gameCredentialId)
@@ -26,9 +29,11 @@ async function getGameInfoFromCredentialId(gameCredentialId: number) {
   }
 
   return {
-    name: gameCredential.game.name,
+    team_id: gameCredential.team_id,
+    name: (gameCredential.game as any).name,
     username: gameCredential.username,
-    password: gameCredential.password
+    password: gameCredential.password,
+    game: gameCredential.game as any
   };
 }
 
@@ -92,6 +97,21 @@ export async function createNewAccountWithSession(
   // Restore original console.log
   console.log = originalLog;
 
+  // Update game status based on result
+  try {
+    const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+    const status = result.success ? 'success' : 'fail';
+    
+    await updateGameStatus({
+      teamId: gameInfo.team_id,
+      gameId: gameInfo.game.id,
+      action: 'newaccount',
+      status: status
+    });
+  } catch (error) {
+    console.error('Failed to update game status:', error);
+  }
+
   // Check if result indicates needsLogin
   if (result && typeof result === 'object' && 'needsLogin' in result) {
     return {
@@ -148,6 +168,21 @@ export async function resetPasswordWithSession(
       };
     }
   });
+
+  // Update game status based on result
+  try {
+    const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+    const status = result.success ? 'success' : 'fail';
+    
+    await updateGameStatus({
+      teamId: gameInfo.team_id,
+      gameId: gameInfo.game.id,
+      action: 'passwordreset',
+      status: status
+    });
+  } catch (error) {
+    console.error('Failed to update game status:', error);
+  }
 
   // Check if result indicates needsLogin
   if (result && typeof result === 'object' && 'needsLogin' in result) {
@@ -214,6 +249,36 @@ export async function rechargeWithSession(
       };
     }
   });
+
+  // Update game status based on result
+  try {
+    const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+    const status = result.success ? 'success' : 'fail';
+    
+    await updateGameStatus({
+      teamId: gameInfo.team_id,
+      gameId: gameInfo.game.id,
+      action: 'recharge',
+      status: status
+    });
+  } catch (error) {
+    console.error('Failed to update game status:', error);
+  }
+
+  // Update game status based on result
+  try {
+    const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+    const status = result.success ? 'success' : 'fail';
+    
+    await updateGameStatus({
+      teamId: gameInfo.team_id,
+      gameId: gameInfo.game.id,
+      action: 'redeem',
+      status: status
+    });
+  } catch (error) {
+    console.error('Failed to update game status:', error);
+  }
 
   // Check if result indicates needsLogin
   if (result && typeof result === 'object' && 'needsLogin' in result) {
