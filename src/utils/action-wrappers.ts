@@ -1,6 +1,10 @@
 import { executeWithSession } from './session-manager';
 import { Page, BrowserContext } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
+import { screenshotWebSocketServer } from './websocket-server';
+
+// Initialize WebSocket server immediately
+screenshotWebSocketServer.initialize(8080);
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,8 +68,11 @@ export async function createNewAccountWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
+      // Make WebSocket server available to the script
+      (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      
       // Import and execute the script function with authenticated page
-      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/newAccount.js`);
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/newAccount.js`);
       const result = await scriptModule.createNewAccount(page, context, {
         newAccountName,
         newPassword
@@ -122,8 +129,11 @@ export async function resetPasswordWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
+      // Make WebSocket server available to the script
+      (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      
       // Import and execute the script function with authenticated page
-      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/passwordReset.js`);
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/passwordReset.js`);
       const result = await scriptModule.resetAccountPassword(page, context, {
         targetUsername,
         newPassword
@@ -183,8 +193,11 @@ export async function rechargeWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
+      // Make WebSocket server available to the script
+      (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      
       // Import and execute the script function with authenticated page
-      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/recharge.js`);
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/recharge.js`);
       const result = await scriptModule.recharge(page, context, {
         accountName: targetUsername,
         rechargeAmount: amount.toString(),
@@ -246,8 +259,11 @@ export async function redeemWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
+      // Make WebSocket server available to the script
+      (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      
       // Import and execute the script function with authenticated page
-      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase()}/redeem.js`);
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/redeem.js`);
       const result = await scriptModule.redeem(page, context, {
         accountName: targetUsername,
         redeemAmount: amount.toString(),

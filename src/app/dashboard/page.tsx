@@ -54,6 +54,8 @@ export default function Dashboard() {
           return;
         }
 
+        // WebSocket server is now initialized in action-wrappers.ts
+
         // Fetch all available games
         const allGames = await getAllGames();
         if (allGames.length === 0) {

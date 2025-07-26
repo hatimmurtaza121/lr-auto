@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface BrowserViewProps {
   isExecuting: boolean;
@@ -10,29 +10,86 @@ interface BrowserViewProps {
 
 export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: BrowserViewProps) {
   const [imageSrc, setImageSrc] = useState<string>('');
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     console.log('BrowserView: isExecuting changed to:', isExecuting);
     
     if (!isExecuting) {
       setImageSrc('');
+      if (wsConnection) {
+        wsConnection.close();
+        setWsConnection(null);
+      }
+      setConnectionStatus('disconnected');
       return;
     }
 
-    // Auto-refresh image every 500ms when executing
-    const interval = setInterval(() => {
-      const newSrc = `/latest.png?ts=${Date.now()}`;
-      console.log('BrowserView: Setting image src to:', newSrc);
-      setImageSrc(newSrc);
-    }, 500);
+    // Initialize WebSocket connection
+    const ws = new WebSocket('ws://localhost:8080');
+    setWsConnection(ws);
+    setConnectionStatus('connecting');
 
-    // Also set initial image immediately
-    const initialSrc = `/latest.png?ts=${Date.now()}`;
-    console.log('BrowserView: Setting initial image src to:', initialSrc);
-    setImageSrc(initialSrc);
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      setConnectionStatus('connected');
+      
+      // Send authentication message
+      ws.send(JSON.stringify({
+        type: 'auth',
+        userId: 'current-user', // You can get this from your auth context
+        teamId: 'current-team'  // You can get this from your team context
+      }));
+    };
 
-    return () => clearInterval(interval);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'screenshot') {
+          // Convert base64 to blob URL
+          const byteCharacters = atob(data.data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/png' });
+          const url = URL.createObjectURL(blob);
+          
+          setImageSrc(url);
+          console.log('WebSocket screenshot received:', data.timestamp);
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      setConnectionStatus('disconnected');
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setConnectionStatus('disconnected');
+    };
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
   }, [isExecuting]);
+
+  // Auto-scroll to bottom when new logs arrive
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [allLogs, currentLog]);
 
   return (
     <div className="h-full bg-gray-100 rounded-2xl p-4 flex flex-col">
@@ -42,6 +99,14 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
           <div className="flex items-center space-x-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
             <span className="text-sm text-blue-600">Live</span>
+            <div className={`w-2 h-2 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-500' : 
+              connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+            }`}></div>
+            <span className="text-xs text-gray-500">
+              {connectionStatus === 'connected' ? 'WS Connected' : 
+               connectionStatus === 'connecting' ? 'WS Connecting' : 'WS Disconnected'}
+            </span>
           </div>
         )}
       </div>
@@ -72,23 +137,27 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
 
       {/* Log Display Area */}
       {isExecuting && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 h-40 overflow-y-auto">
+        <div ref={logContainerRef} className="bg-blue-50 border border-blue-200 rounded-xl p-4 h-40 overflow-y-auto">
           <div className="flex items-center mb-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-3"></div>
             <span className="text-blue-800 font-medium text-sm">Execution Logs</span>
           </div>
-          {currentLog && (
-            <div className="text-blue-700 text-sm mb-2 font-medium">
-              Current: {currentLog}
-            </div>
-          )}
-          {allLogs.length > 0 && (
-            <div className="text-xs text-blue-600 space-y-1">
-              {allLogs.slice(-3).map((log, index) => (
-                <div key={index} className="opacity-80">• {log}</div>
-              ))}
-            </div>
-          )}
+          <div className="text-xs text-blue-600 space-y-1 font-mono">
+            {/* Show only the latest log */}
+            {allLogs.length > 0 && (
+              <div className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span className="flex-1">{allLogs[allLogs.length - 1]}</span>
+              </div>
+            )}
+            {/* Optionally, show currentLog if it's not already the last log */}
+            {currentLog && currentLog !== allLogs[allLogs.length - 1] && (
+              <div className="flex items-start bg-blue-100 p-1 rounded">
+                <span className="text-blue-600 mr-2 font-bold">→</span>
+                <span className="flex-1 font-medium">{currentLog}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

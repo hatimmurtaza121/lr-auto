@@ -1,23 +1,44 @@
 const { chromium } = require('playwright');
 const path = require('path');
 
+// WebSocket screenshot capture function
+function createWebSocketScreenshotCapture(page, gameName, action, interval = 500) {
+    console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
+    
+    const screenshotInterval = setInterval(async () => {
+        try {
+            // Take screenshot as buffer
+            const screenshotBuffer = await page.screenshot();
+            
+            // Convert to base64 for WebSocket transmission
+            const base64Image = screenshotBuffer.toString('base64');
+            
+            // Send via WebSocket (this will be handled by the parent process)
+            console.log(`WebSocket screenshot ready: ${new Date().toISOString()}`);
+            
+            // Emit custom event that parent can listen to
+            if (global.screenshotWebSocketServer) {
+                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
+            }
+        } catch (error) {
+            console.log('WebSocket screenshot error:', error);
+        }
+    }, interval);
+
+    return () => {
+        console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action}`);
+        clearInterval(screenshotInterval);
+    };
+}
+
 async function resetAccountPassword(page, context, params = {}) {
     const { targetUsername = 'testing01', newPassword = 'NewPassword123' } = params;
     
     console.log(`Account to reset: ${targetUsername}`);
     console.log(`New password: ${newPassword}`);
 
-             // Start screenshot capture
-         const screenshotInterval = setInterval(async () => {
-             try {
-                 // Use process.cwd() to get the project root directory
-                 const screenshotPath = path.join(process.cwd(), 'public', 'latest.png');
-                 await page.screenshot({ path: screenshotPath });
-                 console.log('Screenshot taken:', new Date().toISOString(), 'to:', screenshotPath);
-             } catch (error) {
-                 console.log('Screenshot error:', error);
-             }
-         }, 500);
+             // Start WebSocket screenshot capture
+         const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'passwordReset', 500);
 
     try {
         await page.waitForLoadState('networkidle');
@@ -152,18 +173,16 @@ async function resetAccountPassword(page, context, params = {}) {
     
     } catch (error) {
         console.error('Error during password reset:', error);
-        clearInterval(screenshotInterval);
+        stopScreenshotCapture();
         return {
             success: false,
             message: `Error resetting password: ${error}`,
             username: targetUsername
         };
-             } finally {
-             // Stop screenshot capture
-             clearInterval(screenshotInterval);
-             
-
-         }
+    } finally {
+        // Stop WebSocket screenshot capture
+        stopScreenshotCapture();
+    }
 }
 
 // Export the function for external use
