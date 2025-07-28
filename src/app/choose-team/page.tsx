@@ -17,8 +17,6 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
-import Image from 'next/image';
-import lrlogo from '../../../assets/images/lrlogo.png';
 import { setSelectedTeamId as saveTeamId } from '@/utils/team';
 import Navbar from '@/components/Navbar';
 
@@ -132,24 +130,24 @@ export default function ChooseTeamPage() {
   return (
     <div className="min-h-screen bg-gray-50 font-system">
       <Navbar />
-      <div className="flex flex-col h-screen items-center justify-center px-4 overflow-hidden">
+      <div className="flex flex-col h-screen items-center justify-center overflow-hidden">
 
       {/* Form */}
-      <div className="max-w-7xl space-y-10 px-16 z-10">
+      <div className="w-full max-w-md space-y-8 px-6 z-10">
         <Card
           className="backdrop-blur-xl border border-white/20 w-full"
           sx={{
             background: "rgba(255,255,255,0.95)",
             backdropFilter: "blur(20px)",
-            borderRadius: "24px",
-            boxShadow: "0 25px 60px rgba(0, 0, 0, 0.2), 0 12px 24px rgba(0, 0, 0, 0.25)",
+            borderRadius: "20px",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1)",
             width: '100%',
             maxWidth: '100%',
-            minHeight: '400px',
+            minHeight: '380px',
           }}
         >
           <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-8 py-12 px-12">
+            <CardContent className="space-y-8 py-10 px-8">
               <Box textAlign="center" mb={3}>
                 <Typography
                   variant="h5"
@@ -205,7 +203,7 @@ export default function ChooseTeamPage() {
               </FormControl>
             </CardContent>
 
-            <Box className="flex flex-col items-center gap-6 py-8 w-full px-12">
+            <Box className="flex flex-col items-center gap-5 py-8 w-full px-8">
               {/* Error Message - Positioned between dropdown and continue button */}
               {error && (
                 <Alert
@@ -244,17 +242,17 @@ export default function ChooseTeamPage() {
                 sx={{
                   backgroundColor: "#000",
                   color: "#fff",
-                  height: 50,
-                  width: '80%',
-                  maxWidth: '400px',
+                  height: 48,
+                  width: '100%',
+                  maxWidth: '480px',
                   fontWeight: 600,
-                  fontSize: "1.1rem",
+                  fontSize: "1rem",
                   textTransform: "none",
-                  borderRadius: "25px",
-                  boxShadow: "0 8px 20px -5px rgba(0,0,0,0.3)",
+                  borderRadius: "22px",
+                  boxShadow: "0 6px 16px -4px rgba(0,0,0,0.25)",
                   "&:hover": {
                     backgroundColor: "#1a1a1a",
-                    boxShadow: "0 12px 28px -5px rgba(0,0,0,0.4)",
+                    boxShadow: "0 8px 20px -4px rgba(0,0,0,0.3)",
                   },
                   "&:disabled": {
                     backgroundColor: "#666",

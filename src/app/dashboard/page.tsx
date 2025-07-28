@@ -146,14 +146,14 @@ export default function Dashboard() {
       <div className="w-full px-4 pt-20 pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-120px)]">
           {/* Left Column - Game Widgets */}
-          <div className="overflow-y-auto px-4">
+          <div className="overflow-y-auto px-4 lg:pr-4 pr-0">
             <div className="space-y-6 max-w-4xl mx-auto">
               {gameWidgets}
             </div>
           </div>
           
-          {/* Right Column - Browser View */}
-          <div className="h-full">
+          {/* Right Column - Browser View (Hidden below lg) */}
+          <div className="hidden lg:block h-full">
             <BrowserView 
               isExecuting={isExecuting} 
               currentLog={currentLog}
