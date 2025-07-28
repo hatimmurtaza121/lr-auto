@@ -80,32 +80,46 @@ async function createNewAccount(page, context, params = {}) {
           .locator('iframe')
           .contentFrame();
 
-        const errorLocator = playerFrame.getByText('The Accounts has already been', { exact: false });
         try {
-          await errorLocator.waitFor({ state: 'visible', timeout: 3000 });
-          const errMsg = (await errorLocator.textContent()).trim();
-          console.log(`Error: ${errMsg}`);
-          return {
-            success: false,
-            message: `Account already exists: ${errMsg}`,
-            accountName: newAccountName
-          };
-        } catch {
-          // We assume no error and treat as success
-          console.log(`Successfully created user "${newAccountName}".`);
+          // Check for success dialog
+          const successDialog = playerFrame.getByRole('dialog', { name: 'Successfully! You can Copy' });
+          await successDialog.waitFor({ state: 'visible', timeout: 3000 });
+          await successDialog.click();
+          console.log('Account created successfully');
           return {
             success: true,
-            message: `Successfully created user "${newAccountName}"`,
+            message: 'Account created successfully',
             accountName: newAccountName
           };
+        } catch (successError) {
+          try {
+            // Check for "already exists" error
+            const alreadyExistsError = playerFrame.getByText('The Accounts has already been');
+            await alreadyExistsError.waitFor({ state: 'visible', timeout: 3000 });
+            await alreadyExistsError.click();
+            console.log('Account has already been created');
+            return {
+              success: false,
+              message: 'Account has already been created',
+              accountName: newAccountName
+            };
+          } catch (errorError) {
+            // If neither success nor specific error found, return generic error
+            console.log('Try again');
+            return {
+              success: false,
+              message: 'Try again',
+              accountName: newAccountName
+            };
+          }
         }
     } catch (error) {
         console.error('Error during account creation:', error);
         stopScreenshotCapture();
         return {
-            success: false,
-            message: `Error creating account: ${error.message || error}`,
-            accountName: newAccountName
+          success: false,
+          message: `Error creating account: ${error.message || error}`,
+          accountName: newAccountName
         };
     } finally {
         // Stop WebSocket screenshot capture

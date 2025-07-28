@@ -66,7 +66,7 @@ async function redeem(page, context, params = {}) {
             console.log('No user exists. Aborting.');
             return {
                 success: false,
-                message: 'No user exists',
+                message: 'No account found',
                 username: accountName
             };
         }
@@ -82,7 +82,7 @@ async function redeem(page, context, params = {}) {
               console.log('Account in row does not match. Aborting.');
               return {
                 success: false,
-                message: 'Account in row does not match',
+                message: 'No account found',
                 username: accountName
               };
             }
@@ -90,32 +90,81 @@ async function redeem(page, context, params = {}) {
           console.log('No rows found. Aborting.');
           return {
             success: false,
-            message: 'No rows found',
+            message: 'No account found',
             username: accountName
           };
         }
 
         await listFrame.getByRole('button', { name: 'editor' }).click();
-        await listFrame.locator('a').filter({ hasText: 'Recharge' }).click();
+        await listFrame.locator('a').filter({ hasText: 'Redeem' }).click();
 
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByPlaceholder('Input score').fill(redeemAmount);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input remark' }).fill(remarks);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('button', { name: ' Submit' }).click();
         
-        // 6. Capture and log the success message
-        const successMsg = await listFrame
-            .locator('div')
-            .filter({ hasText: 'success' })
-            .nth(1)
-            .textContent();
-        console.log('Result:', successMsg.trim());
-
-        return {
-            success: true,
-            message: `Successfully redeemed ${redeemAmount} for user "${accountName}"`,
-            username: accountName,
-            amount: parseFloat(redeemAmount)
-        };
+        // 6. Capture and log the success/error message
+        try {
+            // Check for success message
+            const successElement = listFrame
+                .locator('div')
+                .filter({ hasText: 'success' })
+                .nth(1);
+            await successElement.waitFor({ state: 'visible', timeout: 3000 });
+            await successElement.click();
+            console.log('Redeem successful');
+            return {
+                success: true,
+                message: 'Redeem successful',
+                username: accountName,
+                amount: parseFloat(redeemAmount)
+            };
+        } catch (successError) {
+            try {
+                // Check for "Amount should be greater than 0" error
+                const zeroAmountError = listFrame
+                    .locator('div')
+                    .filter({ hasText: /^The score must be greater than 0\.$/ })
+                    .nth(1);
+                await zeroAmountError.waitFor({ state: 'visible', timeout: 3000 });
+                await zeroAmountError.click();
+                console.log('Amount should be greater than 0');
+                return {
+                    success: false,
+                    message: 'Amount should be greater than 0',
+                    username: accountName,
+                    amount: parseFloat(redeemAmount)
+                };
+            } catch (zeroError) {
+                try {
+                    // Check for "Amount is insufficient" error
+                    const insufficientError = page
+                        .getByRole('tabpanel', { name: ' Player List' })
+                        .locator('iframe')
+                        .contentFrame()
+                        .locator('div')
+                        .filter({ hasText: 'The score is insufficient' })
+                        .nth(1);
+                    await insufficientError.waitFor({ state: 'visible', timeout: 3000 });
+                    // await insufficientError.click();
+                    console.log('Amount is insufficient');
+                    return {
+                        success: false,
+                        message: 'Amount is insufficient',
+                        username: accountName,
+                        amount: parseFloat(redeemAmount)
+                    };
+                } catch (insufficientError) {
+                    // If neither success nor specific error found, return generic error
+                    console.log('Try again');
+                    return {
+                        success: false,
+                        message: 'Try again, maybe the amount is insufficient',
+                        username: accountName,
+                        amount: parseFloat(redeemAmount)
+                    };
+                }
+            }
+        }
         
     } catch (error) {
         console.error('Error during recharging amount:', error);

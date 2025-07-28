@@ -60,37 +60,33 @@ async function resetAccountPassword(page, context, params = {}) {
             .locator('tbody > tr > td[colspan="16"] span.help-block')
             .filter({ hasText: 'No data.' });
 
+        // Validate account exists and is accessible
+        let accountValidationError = null;
+        
         if (await noData.count() > 0) {
             console.log('No user exists. Aborting.');
-            return {
-                success: false,
-                message: 'No user exists',
-                username: targetUsername
-            };
+            accountValidationError = 'No account found';
+        } else {
+            // 3.5b. Now safely grab the first data row
+            const firstRow = listFrame.locator('tbody > tr').first();
+            try {
+                await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
+                const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
+                const foundName = (await accountCell.textContent()).trim();
+                console.log(foundName, '---', targetUsername);
+                if (foundName !== targetUsername) {
+                    console.log('Account in row does not match. Aborting.');
+                    accountValidationError = 'No account found';
+                }
+            } catch {
+                console.log('No rows found. Aborting.');
+                accountValidationError = 'No account found';
+            }
         }
 
-        // 3.5b. Now safely grab the first data row
-        const firstRow = listFrame.locator('tbody > tr').first();
-        try {
-            await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
-            const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
-            const foundName = (await accountCell.textContent()).trim();
-            console.log(foundName, '---', targetUsername);
-            if (foundName !== targetUsername) {
-            console.log('Account in row does not match. Aborting.');
-            return {
-                success: false,
-                message: 'Account in row does not match',
-                username: targetUsername
-            };
-            }
-        } catch {
-            console.log('No rows found. Aborting.');
-            return {
-                success: false,
-                message: 'No rows found',
-                username: targetUsername
-            };
+        // Early return if validation failed
+        if (accountValidationError) {
+            return { success: false, message: accountValidationError, username: targetUsername };
         }
 
         
@@ -107,67 +103,42 @@ async function resetAccountPassword(page, context, params = {}) {
         
         // 6. Capture and log the success/error message
         try {
-            // First try to find success message
-            const successMsg = await listFrame
+            // Check for success message
+            const successElement = listFrame
                 .locator('div')
                 .filter({ hasText: 'success' })
-                .nth(1)
-                .textContent();
-            console.log('Result:', successMsg.trim());
-
-            // Check if it's a success message
-            const messageText = successMsg.trim().toLowerCase();
-            
-            if (messageText.includes('success')) {
-                return {
-                    success: true,
-                    message: `Successfully reset password for user "${targetUsername}"`,
-                    username: targetUsername
-                };
-            } else {
-                // For any other message, return the exact message
-                return {
-                    success: false,
-                    message: successMsg.trim(),
-                    username: targetUsername
-                };
-            }
-        } catch {
-            // If success message not found, look for error messages in specific locations
+                .nth(1);
+            await successElement.waitFor({ state: 'visible', timeout: 3000 });
+            await successElement.click();
+            console.log('Password reset successful');
+            return {
+                success: true,
+                message: 'Password reset successful',
+                username: targetUsername
+            };
+        } catch (successError) {
             try {
-                // Try to find error message in toast container
-                const errorMsg = await listFrame
-                    .locator('#toast-container')
-                    .getByText(/.*/)
-                    .textContent();
-                console.log('Error Result:', errorMsg.trim());
-                
+                // Check for failed message
+                const failedElement = listFrame
+                    .locator('div')
+                    .filter({ hasText: 'failed' })
+                    .nth(1);
+                await failedElement.waitFor({ state: 'visible', timeout: 3000 });
+                await failedElement.click();
+                console.log('Old password cannot be the new password');
                 return {
                     success: false,
-                    message: errorMsg.trim(),
+                    message: 'Old password cannot be the new password',
                     username: targetUsername
                 };
-            } catch {
-                // If toast container not found, look for 'failed' text
-                try {
-                    const failedMsg = await listFrame
-                        .getByText('failed')
-                        .textContent();
-                    console.log('Failed Result:', failedMsg.trim());
-                    
-                    return {
-                        success: false,
-                        message: failedMsg.trim(),
-                        username: targetUsername
-                    };
-                } catch {
-                    // If no specific error found, return generic message
-                    return {
-                        success: false,
-                        message: 'Password reset failed',
-                        username: targetUsername
-                    };
-                }
+            } catch (errorError) {
+                // If neither success nor specific error found, return generic error
+                console.log('Try again');
+                return {
+                    success: false,
+                    message: 'Try again',
+                    username: targetUsername
+                };
             }
         }
     

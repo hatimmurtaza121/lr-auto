@@ -218,7 +218,7 @@ export async function rechargeWithSession(
     if (amount <= 0) {
       return {
         success: false,
-        message: 'Amount must be greater than 0'
+        message: 'Amount should be greater than 0'
       };
     }
 
@@ -314,7 +314,7 @@ export async function redeemWithSession(
     if (amount <= 0) {
       return {
         success: false,
-        message: 'Amount must be greater than 0'
+        message: 'Amount should be greater than 0'
       };
     }
 
