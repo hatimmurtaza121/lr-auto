@@ -1,14 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required');
+  }
+  if (!supabaseKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+  }
+  
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 export interface GameStatusUpdate {
   teamId: number;
   gameId: number;
-  action: 'login' | 'newaccount' | 'passwordreset' | 'recharge' | 'redeem';
+  action: 'login' | 'new_account' | 'password_reset' | 'recharge' | 'redeem';
   status: 'success' | 'fail' | 'unknown';
 }
 
@@ -19,6 +28,7 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
   try {
     console.log(`Updating game status:`, update);
 
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('game_action_status')
       .insert({
@@ -46,6 +56,7 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
  */
 export async function getGameStatus(teamId: number) {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('game_action_status')
       .select(`

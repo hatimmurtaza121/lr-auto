@@ -4,11 +4,14 @@ const path = require('path');
 // WebSocket screenshot capture function
 function createWebSocketScreenshotCapture(page, gameName, action, interval = 500) {
     console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
+    console.log('WebSocket server available:', !!global.screenshotWebSocketServer);
     
     const screenshotInterval = setInterval(async () => {
         try {
+            console.log(`Taking screenshot for ${gameName} - ${action}...`);
             // Take screenshot as buffer
             const screenshotBuffer = await page.screenshot();
+            console.log(`Screenshot taken, size: ${screenshotBuffer.length} bytes`);
             
             // Convert to base64 for WebSocket transmission
             const base64Image = screenshotBuffer.toString('base64');
@@ -18,7 +21,10 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
             
             // Emit custom event that parent can listen to
             if (global.screenshotWebSocketServer) {
+                console.log('Broadcasting screenshot via WebSocket...');
                 global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
+            } else {
+                console.log('WebSocket server not available for screenshot broadcast');
             }
         } catch (error) {
             console.log('WebSocket screenshot error:', error);

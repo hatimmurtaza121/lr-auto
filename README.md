@@ -1,176 +1,96 @@
-# Game Automation Dashboard
-
-A comprehensive automation platform for managing game scripts with advanced features including AI-powered captcha solving.
-
-## Features
-
-- **Multi-Game Support**: Manage automation scripts for multiple games
-- **Team Management**: Multi-tenant support with team-based access control
-- **AI Captcha Solving**: Automatic captcha detection and solving using Google Gemini Flash 2.0
-- **Secure Authentication**: Automated login with state persistence
-- **Dashboard Interface**: Modern React-based UI for script management
-- **Real-time Execution**: Run scripts directly from the dashboard
-- **Configurable**: Easy configuration for different games and settings
+# Game Automation Scaffold
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
+
+1. **Redis Server** - Required for job queue management
+   - Install Redis on your system
+   - On Windows, you can use:
+     - Windows Subsystem for Linux (WSL)
+     - Redis for Windows: https://github.com/microsoftarchive/redis/releases
+     - Docker: `docker run -d -p 6379:6379 redis:alpine`
+
+2. **Node.js** - Version 18 or higher
+3. **npm** - Package manager
+
+### Installation
+
 ```bash
 npm install
 ```
 
-### 2. Set Up Gemini API (for captcha solving)
-1. Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Create a `.env` file in the project root:
-   ```
-   GEMINI_API_KEY=your-actual-api-key-here
-   ```
+### Starting the Project
 
-### 3. Test the Setup
+#### Option 1: Automatic Start (Recommended)
 ```bash
-npm run test:gemini
+npm start
 ```
+This will:
+- Check if all required ports are available
+- Start both the Next.js dev server and global worker
+- Show real-time status of all services
 
-### 4. Start the Development Server
+#### Option 2: Manual Start
+If you prefer to start services manually:
+
+**Terminal 1:**
 ```bash
 npm run dev
 ```
 
-## Team Management
-
-The platform now supports multi-tenant team management:
-
-### How It Works
-1. **Team Selection**: After login, users must select a team to continue
-2. **Session Persistence**: Selected team is stored in localStorage for the session
-3. **API Integration**: All session-inserting APIs use the selected team as default
-4. **Team Context**: Dashboard displays the currently selected team
-
-### Team Selection Flow
-1. User logs in successfully
-2. Redirected to `/choose-team` page
-3. Selects a team from the dropdown
-4. Team selection is saved and user is redirected to dashboard
-5. Dashboard shows selected team name in the navbar
-
-### API Endpoints
-- `GET /api/teams` - Fetch all available teams
-- `GET /api/team-selection?teamId={id}` - Get team details
-- `POST /api/team-selection` - Validate team selection
-
-## Captcha Solving
-
-The platform includes advanced captcha solving capabilities:
-
-### How It Works
-1. **Automatic Detection**: Scans login pages for captcha elements
-2. **Screenshot Capture**: Takes high-quality screenshots of captcha images
-3. **AI Processing**: Uses Gemini Flash 2.0 for text recognition
-4. **Auto-fill**: Automatically fills captcha input fields
-5. **Cleanup**: Removes temporary files after processing
-
-### Supported Captcha Types
-- Text-based captchas
-- Image captchas
-- Canvas-based captchas
-- Various input field formats
-
-## Script Management
-
-### Available Games
-- Game Vault
-- Orion Stars
-- Orion Strike
-- Mr. All In One
-- Yolo
-- Juwa City
-
-### Script Actions
-- New Account Creation
-- Password Reset
-- Recharge Operations
-- Redeem Operations
-
-## Configuration
-
-Edit `scripts/config.js` to customize:
-- API keys and credentials
-- Timeout settings
-- Browser behavior
-- Screenshot paths
-
-## Usage
-
-### Command Line
+**Terminal 2:**
 ```bash
-# Basic login
-npm run login
-
-# Login with custom credentials
-node scripts/login.js username password
+npm run global-worker
 ```
 
-### Dashboard
-1. Open the web interface
-2. Select a game
-3. Choose an action
-4. Fill in required parameters
-5. Execute the script
+### Ports Used
 
-## Development
+- **3000** - Next.js development server
+- **8080** - WebSocket server for real-time screenshots
+- **6379** - Redis server (must be running)
 
-### Project Structure
+### How It Works
+
+1. **Queue System**: Actions are added to a Redis-based queue using BullMQ
+2. **Worker Processing**: The global worker processes one job at a time
+3. **WebSocket Communication**: Real-time screenshots and logs are broadcast via WebSocket
+4. **Browser View**: Live screenshots and execution logs are displayed in the browser
+
+### Error Handling
+
+- **No Retries**: Failed jobs are not retried (as per requirements)
+- **Unexpected Errors**: Jobs that fail due to unexpected errors are marked as failed with "Unexpected error" message
+- **WebSocket Reconnection**: Automatic reconnection with exponential backoff
+- **Robust Connection**: Improved WebSocket server with better error handling
+
+### Troubleshooting
+
+1. **Redis not running**: Install and start Redis server
+2. **Port conflicts**: Ensure ports 3000, 8080, and 6379 are available
+3. **WebSocket connection issues**: The system will automatically attempt to reconnect
+4. **Job failures**: Check the logs for specific error messages
+
+## Project Structure
+
 ```
-├── app/                 # Next.js app directory
-├── components/          # React components
-├── scripts/            # Automation scripts
-│   ├── config.js       # Configuration
-│   ├── login.js        # Login with captcha solving
-│   └── README.md       # Script documentation
-├── src/                # Source files
-└── package.json        # Dependencies and scripts
+src/
+├── app/                    # Next.js app router
+├── components/             # React components
+├── queue/                  # Job queue system
+│   ├── config/            # Queue configuration
+│   ├── producers/         # Job producers
+│   └── workers/           # Job workers
+├── utils/                  # Utility functions
+└── lib/                   # Library configurations
 ```
 
-### Adding New Games
-1. Create a new directory in `scripts/` (e.g., `scripts/game-name/`)
-2. Add action scripts (action1.js, action2.js, etc.)
-3. Update the games list in `app/page.tsx`
-4. Configure game-specific settings in `scripts/config.js`
+## Features
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Gemini API Errors**
-   - Verify your API key is correct
-   - Check your API quota
-   - Ensure the key has proper permissions
-
-2. **Captcha Detection Issues**
-   - Update selectors in `login.js` if website structure changes
-   - Check browser console for errors
-   - Verify captcha elements are visible
-
-3. **Login Failures**
-   - Check credentials in `scripts/config.js`
-   - Verify website is accessible
-   - Review browser automation logs
-
-## Security
-
-- API keys are stored in environment variables
-- Temporary files are automatically cleaned up
-- No sensitive data is logged or stored
-- Use HTTPS for production deployments
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is for educational and automation purposes. Please ensure compliance with target websites' terms of service. 
+- ✅ Real-time screenshot broadcasting
+- ✅ Job queue with no retries on failure
+- ✅ Robust WebSocket connections
+- ✅ Live execution logs
+- ✅ Multiple action types (new account, password reset, recharge, redeem)
+- ✅ Session management
+- ✅ Team-based access control 

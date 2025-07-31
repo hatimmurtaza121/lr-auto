@@ -214,7 +214,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
   return (
     <div 
-      className="bg-white rounded-3xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 cursor-pointer mb-6 break-inside-avoid"
+              className="bg-white rounded-2xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 cursor-pointer mb-6 break-inside-avoid"
       onClick={() => !isLoggedIn && !isCheckingSession && setIsExpanded(!isExpanded)}
     >
       {isCheckingSession ? (
@@ -284,7 +284,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
               />
               {/* Error Message - Positioned between password and login button */}
               {errorMessage && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm font-medium">
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-red-700 text-sm font-medium">
                   {errorMessage}
                 </div>
               )}
@@ -326,7 +326,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
               className="space-y-4 animate-in slide-in-from-top-2 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-700 text-sm font-medium">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 text-yellow-700 text-sm font-medium">
                 Session expired. Please login again to continue.
               </div>
               <input
@@ -352,7 +352,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 disabled={isLoading}
               />
               {errorMessage && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm font-medium">
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-red-700 text-sm font-medium">
                   {errorMessage}
                 </div>
               )}

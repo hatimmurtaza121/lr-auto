@@ -4,15 +4,41 @@ import { createClient } from '@supabase/supabase-js';
 import { screenshotWebSocketServer } from './websocket-server';
 import { updateGameStatus } from './game-status';
 
-// Initialize WebSocket server immediately
-screenshotWebSocketServer.initialize(8080);
+// Initialize WebSocket server for screenshot broadcasting
+// This ensures screenshots can be sent even if no clients are connected yet
+let wsServerInitialized = false;
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function ensureWebSocketServerInitialized() {
+  if (!screenshotWebSocketServer.isServerInitialized()) {
+    console.log('Initializing WebSocket server for screenshot broadcasting...');
+    screenshotWebSocketServer.initialize(8080);
+    wsServerInitialized = true;
+    console.log('WebSocket server initialized on port 8080');
+  } else {
+    console.log('WebSocket server already initialized');
+  }
+}
+
+// Initialize immediately when this module is loaded
+console.log('Action wrappers module loaded - ensuring WebSocket server is initialized...');
+ensureWebSocketServerInitialized();
+
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required');
+  }
+  if (!supabaseKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+  }
+  
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 async function getGameInfoFromCredentialId(gameCredentialId: number) {
+  const supabase = getSupabaseClient();
   const { data: gameCredential, error } = await supabase
     .from('game_credential')
     .select(`
@@ -73,8 +99,10 @@ export async function createNewAccountWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
-      // Make WebSocket server available to the script
+      // Ensure WebSocket server is initialized and make it available to the script
+      ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/newAccount.js`);
@@ -105,7 +133,7 @@ export async function createNewAccountWithSession(
     await updateGameStatus({
       teamId: gameInfo.team_id,
       gameId: gameInfo.game.id,
-      action: 'newaccount',
+      action: 'new_account',
       status: status
     });
   } catch (error) {
@@ -149,8 +177,10 @@ export async function resetPasswordWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
-      // Make WebSocket server available to the script
+      // Ensure WebSocket server is initialized and make it available to the script
+      ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/passwordReset.js`);
@@ -177,7 +207,7 @@ export async function resetPasswordWithSession(
     await updateGameStatus({
       teamId: gameInfo.team_id,
       gameId: gameInfo.game.id,
-      action: 'passwordreset',
+      action: 'password_reset',
       status: status
     });
   } catch (error) {
@@ -228,8 +258,10 @@ export async function rechargeWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
-      // Make WebSocket server available to the script
+      // Ensure WebSocket server is initialized and make it available to the script
+      ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/recharge.js`);
@@ -324,8 +356,10 @@ export async function redeemWithSession(
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
       
-      // Make WebSocket server available to the script
+      // Ensure WebSocket server is initialized and make it available to the script
+      ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/redeem.js`);

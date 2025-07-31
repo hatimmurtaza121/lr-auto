@@ -43,7 +43,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
   });
   const [output, setOutput] = useState<string>('');
   const [isExecuting, setIsExecuting] = useState(false);
-  const [resultMessage, setResultMessage] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
   const [currentLog, setCurrentLog] = useState<string>('');
   const [allLogs, setAllLogs] = useState<string[]>([]);
 
@@ -57,7 +57,6 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
   const handleSubmit = async () => {
     setIsExecuting(true);
     setOutput('');
-    setResultMessage(null);
     setCurrentLog('Starting action...');
     setAllLogs(['Starting action...']);
     
@@ -147,44 +146,46 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          action: actionType,
           gameName: gameName,
+          action: actionType,
           params: params
-        }),
+        })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Action execution failed');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const result = await response.json();
+      console.log('Job submission response:', result);
       
-      // Check if action needs login
-      if (result.needsLogin) {
-        setResultMessage({
-          type: 'error',
-          message: 'Session expired. Please login first.'
+      // Check if this is a queued job response
+      if (result.jobId) {
+        // Dispatch event for ActionStatus component to track this job
+        const newJobEvent = new CustomEvent('new-job', {
+          detail: {
+            jobId: result.jobId,
+            gameName: gameName,
+            action: actionType
+          }
         });
+        window.dispatchEvent(newJobEvent);
+        
+        // Re-enable the execute button immediately after job is queued
+        // The ActionStatus component will handle job monitoring
+        setIsExecuting(false);
+        
+        return;
+      }
+      
+      // Handle immediate responses (fallback)
+      if (result.needsLogin) {
         setOutput(`Session expired. Please login first.\nGame Info: ${JSON.stringify(result.gameInfo, null, 2)}`);
         // Trigger login callback if provided
         if (onNeedsLogin) {
           onNeedsLogin();
         }
         return;
-      }
-      
-      // Set result message based on success/failure
-      if (result.success) {
-        setResultMessage({
-          type: 'success',
-          message: result.message || 'Action completed successfully!'
-        });
-      } else {
-        setResultMessage({
-          type: 'error',
-          message: result.message || 'Action failed!'
-        });
       }
       
       // Display logs if available
@@ -196,17 +197,18 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
       setOutput(JSON.stringify(result, null, 2));
           } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setResultMessage({
-          type: 'error',
-          message: `Error: ${errorMessage}`
-        });
         setOutput(`Error: ${errorMessage}`);
       } finally {
         clearInterval(logInterval);
-        setIsExecuting(false);
         
-        // Notify parent that execution ended
-        onExecutionEnd?.();
+        // Cleanup polling timeout
+        if ((window as any).__pollCleanup) {
+          (window as any).__pollCleanup();
+          delete (window as any).__pollCleanup;
+        }
+        
+        // Note: setIsExecuting(false) is now handled in the polling logic
+        // when the job actually completes or fails
       }
   };
 
@@ -294,27 +296,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
 
 
 
-      {/* Result Message */}
-      {resultMessage && (
-        <div className={`p-4 rounded-2xl border-2 ${
-          resultMessage.type === 'success' 
-            ? 'bg-green-50 border-green-200 text-green-800' 
-            : resultMessage.type === 'error'
-            ? 'bg-red-50 border-red-200 text-red-800'
-            : 'bg-blue-50 border-blue-200 text-blue-800'
-        }`}>
-          <div className="flex items-center">
-            <div className={`w-5 h-5 rounded-full mr-3 ${
-              resultMessage.type === 'success' 
-                ? 'bg-green-500' 
-                : resultMessage.type === 'error'
-                ? 'bg-red-500'
-                : 'bg-blue-500'
-            }`}></div>
-            <span className="font-medium">{resultMessage.message}</span>
-          </div>
-        </div>
-      )}
+
 
       {/* Submit Button */}
       <button

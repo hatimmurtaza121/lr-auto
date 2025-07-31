@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import GameWidget from '@/components/GameWidget';
 import BrowserView from '@/components/BrowserView';
+import ActionStatus from '@/components/ActionStatus';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@mui/material';
@@ -30,13 +31,73 @@ interface GameCredential {
 export default function Dashboard() {
   const supabase = createClient();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [games, setGames] = useState<Game[]>([]);
   const [gameCredentials, setGameCredentials] = useState<GameCredential[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // UI state for execute button
   const [isExecuting, setIsExecuting] = useState(false);
-  const [currentLog, setCurrentLog] = useState<string>('');
+  
+  // Worker execution state for BrowserView (independent of UI)
+  const [workerExecuting, setWorkerExecuting] = useState(false);
+  
+  const [currentLog, setCurrentLog] = useState('');
   const [allLogs, setAllLogs] = useState<string[]>([]);
+  
+  // Action Status widget state
+  const [isActionStatusExpanded, setIsActionStatusExpanded] = useState(false);
+
+  // WebSocket connection for worker status
+  useEffect(() => {
+    console.log('Dashboard: Setting up WebSocket connection...');
+    const ws = new WebSocket('ws://localhost:8080');
+    
+    ws.onopen = () => {
+      console.log('Dashboard WebSocket connected');
+      // Send authentication
+      ws.send(JSON.stringify({
+        type: 'auth',
+        userId: 'dashboard',
+        teamId: 'dashboard'
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('Dashboard WebSocket message received:', data.type, data);
+        
+        if (data.type === 'worker_status') {
+          // Worker status updates
+          console.log('Dashboard: Updating worker status:', data.isExecuting, data.currentLog);
+          setWorkerExecuting(data.isExecuting || false);
+          if (data.currentLog) {
+            setCurrentLog(data.currentLog);
+          }
+          if (data.allLogs) {
+            setAllLogs(data.allLogs);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('Dashboard WebSocket disconnected');
+    };
+
+    ws.onerror = (error) => {
+      console.error('Dashboard WebSocket error:', error);
+    };
+
+    return () => {
+      console.log('Dashboard: Closing WebSocket connection...');
+      ws.close();
+    };
+  }, []);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -148,6 +209,13 @@ export default function Dashboard() {
           {/* Left Column - Game Widgets */}
           <div className="overflow-y-auto px-4 lg:pr-4 pr-0">
             <div className="space-y-6 max-w-4xl mx-auto">
+              {/* Action Status Widget */}
+              <ActionStatus 
+                isExpanded={isActionStatusExpanded}
+                onToggle={() => setIsActionStatusExpanded(!isActionStatusExpanded)}
+              />
+              
+              {/* Game Widgets */}
               {gameWidgets}
             </div>
           </div>
@@ -155,7 +223,7 @@ export default function Dashboard() {
           {/* Right Column - Browser View (Hidden below lg) */}
           <div className="hidden lg:block h-full">
             <BrowserView 
-              isExecuting={isExecuting} 
+              isExecuting={workerExecuting} 
               currentLog={currentLog}
               allLogs={allLogs}
             />

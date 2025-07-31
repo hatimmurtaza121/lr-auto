@@ -2,10 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import crypto from 'crypto';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required');
+  }
+  if (!supabaseKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+  }
+  
+  return createClient(supabaseUrl, supabaseKey);
+}
 
 export interface SessionData {
   cookies: Array<{
@@ -95,6 +104,7 @@ export class SessionManager {
    * Get existing session from database (most recent active session)
    */
   private async getExistingSession(userId: string, gameCredentialId: number) {
+    const supabase = getSupabaseClient();
     const { data: session, error } = await supabase
       .from('session')
       .select(`
@@ -133,6 +143,7 @@ export class SessionManager {
       
       if (now > expiresAt) {
         // Mark session as inactive
+        const supabase = getSupabaseClient();
         await supabase
           .from('session')
           .update({ is_active: false })
@@ -163,6 +174,7 @@ export class SessionManager {
    * Get game credential info
    */
   private async getGameCredentialInfo(gameCredentialId: number) {
+    const supabase = getSupabaseClient();
     const { data: gameCredential, error: credentialError } = await supabase
       .from('game_credential')
       .select(`
@@ -194,6 +206,7 @@ export class SessionManager {
 
     // Save session to database
     const sessionToken = crypto.randomBytes(32).toString('hex');
+    const supabase = getSupabaseClient();
     const { data: newSession, error: saveError } = await supabase
       .from('session')
       .insert({
@@ -491,6 +504,7 @@ export class SessionManager {
       return;
     }
 
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('session')
       .update({ is_active: false })
@@ -505,6 +519,7 @@ export class SessionManager {
    * Get session statistics for a user and game
    */
   async getSessionStats(userId: string, gameId: number) {
+    const supabase = getSupabaseClient();
     const { data: sessions, error } = await supabase
       .from('session')
       .select('id, created_at, is_active')
@@ -531,6 +546,7 @@ export class SessionManager {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('session')
       .delete()

@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "next lint",
     "test:gemini": "node scripts/test-gemini.js",
-    "login": "node scripts/login.js"
+    "login": "node scripts/login.js",
+    "global-worker": "tsx src/queue/start-global-worker.ts",
+    "start-all": "concurrently \"npm run dev\" \"npm run global-worker\"",
+    "start": "node start-project.js"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -21,7 +24,9 @@
     "@supabase/supabase-js": "^2.52.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
+    "bullmq": "^5.56.8",
     "dotenv": "^17.2.0",
+    "ioredis": "^5.6.1",
     "next": "^14.0.0",
     "playwright": "^1.54.1",
     "react": "^18.0.0",
@@ -33,11 +38,13 @@
     "@types/node": "^24.0.15",
     "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.0.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }

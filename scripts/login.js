@@ -241,18 +241,15 @@ async function checkForCaptchaError(page) {
   for (const selector of errorSelectors) {
     try {
       const errorElements = await page.locator(selector).all();
-      console.log(`Checking selector "${selector}": found ${errorElements.length} elements`);
       
       for (const errorElement of errorElements) {
         if (await errorElement.isVisible()) {
           const errorText = await errorElement.textContent();
-          console.log(`Checking captcha error element: "${errorText}"`);
           
           if (errorText) {
             const lowerText = errorText.toLowerCase();
             for (const keyword of captchaKeywords) {
               if (lowerText.includes(keyword)) {
-                console.log(`Captcha error detected: "${errorText}"`);
                 return true;
               }
             }
@@ -260,7 +257,7 @@ async function checkForCaptchaError(page) {
         }
       }
     } catch (error) {
-      console.log(`Error checking selector "${selector}":`, error.message);
+      // Error silently ignored
     }
   }
   
