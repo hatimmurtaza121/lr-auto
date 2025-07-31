@@ -25,6 +25,9 @@ export interface JobProgress {
   message: string;
   result?: JobResult;
   error?: string;
+  startTime?: number; // When job started processing (from BullMQ processedOn)
+  endTime?: number; // When job completed/failed (from BullMQ finishedOn)
+  duration?: number; // Total execution time in milliseconds
 }
 
 export type ActionType = 'login' | 'newAccount' | 'passwordReset' | 'recharge' | 'redeem';

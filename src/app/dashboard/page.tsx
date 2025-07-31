@@ -204,11 +204,11 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-300 font-system">
       <Navbar />
-      <div className="w-full px-4 pt-20 pb-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-120px)]">
+      <div className="w-full px-2 sm:px-4 pt-20 h-[100vh] lg:h-[calc(100vh)]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 h-full">
           {/* Left Column - Game Widgets */}
-          <div className="overflow-y-auto px-4 lg:pr-4 pr-0">
-            <div className="space-y-6 max-w-4xl mx-auto">
+          <div className="overflow-y-auto px-2 sm:px-4 lg:pr-4 scrollbar-hide">
+            <div className="space-y-4 lg:space-y-6 max-w-4xl mx-auto">
               {/* Action Status Widget */}
               <ActionStatus 
                 isExpanded={isActionStatusExpanded}
@@ -221,7 +221,7 @@ export default function Dashboard() {
           </div>
           
           {/* Right Column - Browser View (Hidden below lg) */}
-          <div className="hidden lg:block h-full">
+          <div className="hidden lg:block h-[calc(100vh-100px)]">
             <BrowserView 
               isExecuting={workerExecuting} 
               currentLog={currentLog}

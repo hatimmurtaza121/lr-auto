@@ -12,6 +12,9 @@ interface JobStatus {
   timestamp: string;
   result?: any;
   error?: string;
+  startTime?: number;
+  endTime?: number;
+  duration?: number;
 }
 
 interface ActionStatusProps {
@@ -42,7 +45,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
   };
 
   // Update job status with improved message handling
-  const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string) => {
+  const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string, timing?: { startTime?: number; endTime?: number; duration?: number }) => {
     setJobs(prev => prev.map(job => {
       if (job.jobId === jobId) {
         // Determine the final message to display
@@ -66,7 +69,8 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           message: finalMessage,
           result,
           error,
-          timestamp: new Date().toLocaleTimeString()
+          timestamp: new Date().toLocaleTimeString(),
+          ...timing, // Include timing information
         };
       }
       return job;
@@ -79,6 +83,19 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         newSet.delete(jobId);
         return newSet;
       });
+    }
+  };
+
+  // Format duration for display
+  const formatDuration = (durationMs: number): string => {
+    if (durationMs < 1000) {
+      return `${durationMs}ms`;
+    } else if (durationMs < 60000) {
+      return `${(durationMs / 1000).toFixed(1)}s`;
+    } else {
+      const minutes = Math.floor(durationMs / 60000);
+      const seconds = ((durationMs % 60000) / 1000).toFixed(0);
+      return `${minutes}m ${seconds}s`;
     }
   };
 
@@ -134,7 +151,10 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                 status: status.status,
                 message: status.message,
                 result: status.result,
-                error: status.error
+                error: status.error,
+                startTime: status.startTime,
+                endTime: status.endTime,
+                duration: status.duration
               });
 
               switch (status.status) {
@@ -169,7 +189,11 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                   break;
               }
 
-              updateJobStatus(jobId, jobStatus, message, status.result, status.error);
+              updateJobStatus(jobId, jobStatus, message, status.result, status.error, {
+                startTime: status.startTime,
+                endTime: status.endTime,
+                duration: status.duration
+              });
             }
           }
         } catch (error) {
@@ -189,7 +213,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
     };
 
     const handleJobUpdate = (event: CustomEvent) => {
-      const { jobId, status, message, result, error } = event.detail;
+      const { jobId, status, message, result, error, startTime, endTime, duration } = event.detail;
       
       // Use the message from the result object if available, otherwise use the event message
       let finalMessage = message;
@@ -203,10 +227,13 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         status,
         message,
         result,
-        finalMessage
+        finalMessage,
+        startTime,
+        endTime,
+        duration
       });
       
-      updateJobStatus(jobId, status, finalMessage, result, error);
+      updateJobStatus(jobId, status, finalMessage, result, error, { startTime, endTime, duration });
     };
 
     window.addEventListener('new-job', handleNewJob as EventListener);
@@ -348,9 +375,16 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(job.status)}`}>
                           {getStatusText(job.status)}
                         </span>
-                        <span className="text-xs text-gray-400">
-                          {job.timestamp}
-                        </span>
+                        {/* Display duration for completed/failed jobs, show nothing for active/waiting jobs */}
+                        {(job.status === 'completed' || job.status === 'failed') && job.duration ? (
+                          <span className="text-xs text-gray-500 font-medium">
+                            {formatDuration(job.duration)}
+                          </span>
+                        ) : job.status === 'completed' ? (
+                          <span className="text-xs text-red-400">
+                            Debug: No duration
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>

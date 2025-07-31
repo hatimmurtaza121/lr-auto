@@ -165,6 +165,19 @@ export class ActionProducer {
           statusMessage = 'Unknown status';
       }
 
+      // Use BullMQ's built-in timing information
+      const timestamp = job.timestamp; // When job was created
+      const processedOn = job.processedOn; // When job started processing
+      const finishedOn = job.finishedOn; // When job finished
+      
+      let duration: number | undefined;
+      if (processedOn && finishedOn) {
+        duration = finishedOn - processedOn;
+      } else if (processedOn && (stateString === 'completed' || stateString === 'failed')) {
+        // If job is completed/failed but no finishedOn, calculate from current time
+        duration = Date.now() - processedOn;
+      }
+
       return {
         jobId,
         status: state as 'waiting' | 'active' | 'completed' | 'failed' | 'cancelled',
@@ -172,6 +185,9 @@ export class ActionProducer {
         message: statusMessage,
         result: result || undefined,
         error: failedReason || undefined,
+        startTime: processedOn,
+        endTime: finishedOn,
+        duration,
       };
     } catch (error) {
       console.error('Error getting job status:', error);

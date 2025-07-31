@@ -245,7 +245,7 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
         </div>
       </div>
       
-              <div className="flex-1 bg-white rounded-2xl border-2 border-gray-200 overflow-hidden flex items-center justify-center mb-4">
+              <div className="flex-1 bg-white rounded-2xl border-2 border-gray-200 overflow-hidden flex items-center justify-center">
         {imageSrc ? (
           <img 
             src={imageSrc} 
