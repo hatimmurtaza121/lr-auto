@@ -58,7 +58,12 @@ export class GlobalWorker {
     const data = job.data;
     let result: any;
 
+    console.log(`=== WORKER PICKING UP JOB ${job.id} ===`);
     console.log(`Processing ${data.action} job for user ${data.userId}`);
+    console.log(`Job ${job.id} state:`, await job.getState());
+    console.log(`Job ${job.id} data:`, data);
+    console.log(`Job ${job.id} timestamp:`, job.timestamp);
+    console.log(`Job ${job.id} name:`, job.name);
     
     // Broadcast that worker is starting execution
     this.broadcastWorkerStatus(true, `Starting ${data.action}...`, [`Starting ${data.action}...`]);

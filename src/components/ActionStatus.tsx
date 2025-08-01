@@ -7,7 +7,7 @@ interface JobStatus {
   jobId: string;
   gameName: string;
   action: string;
-  status: 'waiting' | 'active' | 'completed' | 'failed' | 'cancelled';
+  status: 'waiting' | 'prioritized' | 'active' | 'completed' | 'failed' | 'cancelled';
   message: string;
   timestamp: string;
   result?: any;
@@ -15,6 +15,7 @@ interface JobStatus {
   startTime?: number;
   endTime?: number;
   duration?: number;
+  params?: any; // Job parameters
 }
 
 interface ActionStatusProps {
@@ -45,7 +46,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
   };
 
   // Update job status with improved message handling
-  const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string, timing?: { startTime?: number; endTime?: number; duration?: number }) => {
+  const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string, timing?: { startTime?: number; endTime?: number; duration?: number }, params?: any) => {
     setJobs(prev => prev.map(job => {
       if (job.jobId === jobId) {
         // Determine the final message to display
@@ -63,6 +64,18 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           finalMessage = error;
         }
 
+        // Check if the message indicates session expiration
+        if (finalMessage.includes('Session expired. Please login first.')) {
+          // Dispatch event to trigger login screen for this game
+          const sessionExpiredEvent = new CustomEvent('session-expired', {
+            detail: {
+              gameName: job.gameName,
+              jobId: jobId
+            }
+          });
+          window.dispatchEvent(sessionExpiredEvent);
+        }
+
         return {
           ...job,
           status,
@@ -71,6 +84,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           error,
           timestamp: new Date().toLocaleTimeString(),
           ...timing, // Include timing information
+          params, // Include parameters
         };
       }
       return job;
@@ -99,12 +113,57 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
     }
   };
 
+  // Format parameters for display
+  const formatParams = (params: any): string => {
+    if (!params) return '';
+    
+    const paramStrings: string[] = [];
+    
+    // Add accountName if present
+    if (params.accountName) {
+      paramStrings.push(params.accountName);
+    }
+    
+    // Add password if present
+    if (params.password) {
+      paramStrings.push(params.password);
+    }
+    
+    // Add amount if present
+    if (params.amount) {
+      paramStrings.push(`$${params.amount}`);
+    }
+    
+    // Add remark if present
+    if (params.remark) {
+      paramStrings.push(params.remark);
+    }
+    
+    // Add any other string parameters
+    Object.keys(params).forEach(key => {
+      if (typeof params[key] === 'string' && 
+          !['accountName', 'password', 'amount', 'remark'].includes(key)) {
+        paramStrings.push(params[key]);
+      }
+    });
+    
+    return paramStrings.join(' | ');
+  };
+
   // Cancel a job
   const cancelJob = async (jobId: string) => {
     try {
+      console.log(`=== FRONTEND CANCEL CALLED ===`);
+      console.log(`Cancelling jobId:`, jobId);
+      
       // Find the job to get the action type
       const job = jobs.find(j => j.jobId === jobId);
-      if (!job) return;
+      if (!job) {
+        console.log(`❌ Job not found in local state:`, jobId);
+        return;
+      }
+
+      console.log(`✅ Found job in local state:`, job);
 
       const response = await fetch(`/api/queue/cancel-job`, {
         method: 'POST',
@@ -117,13 +176,18 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         })
       });
 
+      console.log(`Cancel response status:`, response.status);
+      console.log(`Cancel response ok:`, response.ok);
+
       if (response.ok) {
+        console.log(`✅ Job cancelled successfully`);
         updateJobStatus(jobId, 'cancelled', 'Job cancelled by user');
       } else {
-        console.error('Failed to cancel job:', response.statusText);
+        const errorText = await response.text();
+        console.error('❌ Failed to cancel job:', response.statusText, errorText);
       }
     } catch (error) {
-      console.error('Error cancelling job:', error);
+      console.error('❌ Error cancelling job:', error);
     }
   };
 
@@ -193,7 +257,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                 startTime: status.startTime,
                 endTime: status.endTime,
                 duration: status.duration
-              });
+              }, status.params);
             }
           }
         } catch (error) {
@@ -253,6 +317,8 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         return 'text-blue-600 bg-blue-100';
       case 'waiting':
         return 'text-yellow-600 bg-yellow-100';
+      case 'prioritized':
+        return 'text-orange-600 bg-orange-100';
       case 'failed':
         return 'text-red-600 bg-red-100';
       case 'cancelled':
@@ -270,6 +336,8 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         return 'In Progress';
       case 'waiting':
         return 'Queued';
+      case 'prioritized':
+        return 'Prioritized';
       case 'failed':
         return 'Failed';
       case 'cancelled':
@@ -335,33 +403,26 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                               <span className="text-gray-700">
                                 {job.action}
                               </span>
+                              {job.params && (
+                                <>
+                                  <span className="text-gray-400">-</span>
+                                  <span className="text-xs text-gray-500">
+                                    {formatParams(job.params)}
+                                  </span>
+                                </>
+                              )}
                             </div>
                             {/* Display the script result message prominently */}
                             <p className={`text-sm font-medium mt-1 ${getMessageColor(job)}`}>
                               {job.message}
                             </p>
-                            {/* Show additional result details if available */}
-                            {job.result && job.status === 'completed' && (
-                              <div className="mt-1">
-                                {job.result.accountName && (
-                                  <p className="text-xs text-gray-500">
-                                    Account: {job.result.accountName}
-                                  </p>
-                                )}
-                                {job.result.logs && job.result.logs.length > 0 && (
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    {job.result.logs.length} log entries
-                                  </p>
-                                )}
-                              </div>
-                            )}
 
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-3">
-                        {/* Cancel button for active jobs */}
-                        {(job.status === 'waiting' || job.status === 'active') && (
+                        {/* Cancel button for waiting and prioritized jobs */}
+                        {(job.status === 'waiting' || job.status === 'prioritized') && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -376,15 +437,11 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                           {getStatusText(job.status)}
                         </span>
                         {/* Display duration for completed/failed jobs, show nothing for active/waiting jobs */}
-                        {(job.status === 'completed' || job.status === 'failed') && job.duration ? (
+                        {(job.status === 'completed' || job.status === 'failed') && job.duration && (
                           <span className="text-xs text-gray-500 font-medium">
                             {formatDuration(job.duration)}
                           </span>
-                        ) : job.status === 'completed' ? (
-                          <span className="text-xs text-red-400">
-                            Debug: No duration
-                          </span>
-                        ) : null}
+                        )}
                       </div>
                     </div>
                   </div>

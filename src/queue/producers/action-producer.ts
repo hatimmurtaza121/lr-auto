@@ -143,26 +143,34 @@ export class ActionProducer {
 
       // Generate status message inline
       let statusMessage: string;
-      switch (stateString) {
-        case 'waiting':
-          statusMessage = 'Job is waiting in queue...';
-          break;
-        case 'active':
-          statusMessage = 'Processing...';
-          break;
-        case 'completed':
-          statusMessage = result?.message || 'Job completed successfully';
-          console.log(`Job ${jobId} completed status message:`, statusMessage);
-          console.log(`Job ${jobId} result object:`, result);
-          break;
-        case 'failed':
-          statusMessage = failedReason || 'Job failed';
-          break;
-        case 'cancelled':
-          statusMessage = 'Job cancelled by user';
-          break;
-        default:
-          statusMessage = 'Unknown status';
+      let finalStatus = state as 'waiting' | 'active' | 'completed' | 'failed' | 'cancelled';
+      
+      // Check if job was cancelled (even if it's in completed state)
+      if (job.data && job.data.cancelled) {
+        finalStatus = 'cancelled';
+        statusMessage = 'Job cancelled by user';
+      } else {
+        switch (stateString) {
+          case 'waiting':
+            statusMessage = 'Job is waiting in queue...';
+            break;
+          case 'active':
+            statusMessage = 'Processing...';
+            break;
+          case 'completed':
+            statusMessage = result?.message || 'Job completed successfully';
+            console.log(`Job ${jobId} completed status message:`, statusMessage);
+            console.log(`Job ${jobId} result object:`, result);
+            break;
+          case 'failed':
+            statusMessage = failedReason || 'Job failed';
+            break;
+          case 'cancelled':
+            statusMessage = 'Job cancelled by user';
+            break;
+          default:
+            statusMessage = 'Unknown status';
+        }
       }
 
       // Use BullMQ's built-in timing information
@@ -180,7 +188,7 @@ export class ActionProducer {
 
       return {
         jobId,
-        status: state as 'waiting' | 'active' | 'completed' | 'failed' | 'cancelled',
+        status: finalStatus,
         progress: progressNumber,
         message: statusMessage,
         result: result || undefined,
@@ -188,6 +196,7 @@ export class ActionProducer {
         startTime: processedOn,
         endTime: finishedOn,
         duration,
+        params: job.data?.params, // Include job parameters
       };
     } catch (error) {
       console.error('Error getting job status:', error);
@@ -210,6 +219,62 @@ export class ActionProducer {
         return 'Job failed';
       default:
         return 'Unknown status';
+    }
+  }
+
+  /**
+   * Cancel a specific job by ID
+   */
+  static async cancelJob(jobId: string): Promise<boolean> {
+    try {
+      console.log(`=== CANCELLING JOB ${jobId} ===`);
+      
+      // Use global queue for job cancellation
+      const { createQueue } = await import('../config/queues');
+      const queue = createQueue('global-queue');
+      
+      console.log(`Got global queue, looking for job ${jobId}`);
+      
+      // Get the specific job by ID
+      const job = await queue.getJob(jobId);
+      
+      if (!job) {
+        console.log(`❌ Job ${jobId} not found in global-queue`);
+        return false;
+      }
+
+      console.log(`✅ Found job ${jobId} in global-queue`);
+      console.log(`Job data:`, job.data);
+      console.log(`Job ID:`, job.id);
+      console.log(`Job name:`, job.name);
+
+      // Check if job can be cancelled (waiting, prioritized, or active jobs)
+      const state = await job.getState();
+      console.log(`Job ${jobId} state:`, state);
+      
+      if (state !== 'waiting' && state !== 'prioritized' && state !== 'active') {
+        console.log(`❌ Job ${jobId} cannot be cancelled - it is in ${state} state`);
+        return false;
+      }
+
+      if (state === 'waiting' || state === 'prioritized') {
+        console.log(`✅ Job ${jobId} is in ${state} state, removing from queue`);
+        // Remove the specific job from the global queue
+        console.log(`🗑️ Removing job ${jobId} from global-queue...`);
+        await job.remove();
+      } else if (state === 'active') {
+        console.log(`✅ Job ${jobId} is in active state, marking as cancelled`);
+        // Mark job as cancelled so worker can check and skip processing
+        const jobData = { ...job.data, cancelled: true, cancelledAt: Date.now() };
+        console.log(`Marking job ${jobId} as cancelled:`, jobData);
+        await job.updateData(jobData);
+      }
+      
+      console.log(`✅ Job ${jobId} cancelled successfully`);
+      return true;
+    } catch (error) {
+      console.error('❌ Error cancelling job:', error);
+      return false;
     }
   }
 

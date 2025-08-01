@@ -6,6 +6,8 @@ export interface JobData {
   teamId: number;
   gameName: string;
   result?: JobResult; // Store the job result in the job data
+  cancelled?: boolean; // Flag to mark job as cancelled
+  cancelledAt?: number; // Timestamp when job was cancelled
 }
 
 export interface JobResult {
@@ -28,6 +30,7 @@ export interface JobProgress {
   startTime?: number; // When job started processing (from BullMQ processedOn)
   endTime?: number; // When job completed/failed (from BullMQ finishedOn)
   duration?: number; // Total execution time in milliseconds
+  params?: any; // Job parameters
 }
 
 export type ActionType = 'login' | 'newAccount' | 'passwordReset' | 'recharge' | 'redeem';

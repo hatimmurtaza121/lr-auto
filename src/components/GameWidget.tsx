@@ -59,6 +59,27 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
     }
   }, [credential]);
 
+  // Listen for session expired events from ActionStatus
+  useEffect(() => {
+    const handleSessionExpired = (event: CustomEvent) => {
+      const { gameName: expiredGameName } = event.detail;
+      
+      // Only trigger login screen if this event is for this specific game widget
+      if (expiredGameName === gameName) {
+        console.log(`Session expired for ${gameName}, triggering login screen`);
+        setIsLoggedIn(false);
+        setNeedsLogin(true);
+        setIsExpanded(true);
+      }
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired as EventListener);
+
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired as EventListener);
+    };
+  }, [gameName]);
+
   const checkExistingSession = async () => {
     try {
       // Get team ID from localStorage

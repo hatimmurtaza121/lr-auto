@@ -1,40 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createQueue } from '@/queue/config/queues';
+import { ActionProducer } from '@/queue/producers/action-producer';
 
 export async function POST(request: NextRequest) {
   try {
     const { jobId, action } = await request.json();
 
+    console.log(`=== CANCEL API CALLED ===`);
+    console.log(`Request body:`, { jobId, action });
+
     if (!jobId || !action) {
+      console.log(`❌ Missing jobId or action`);
       return NextResponse.json({ 
         error: 'Job ID and action are required' 
       }, { status: 400 });
     }
 
-    // Get the queue
-    const queue = createQueue('global-queue');
-    
-    // Get the job
-    const job = await queue.getJob(jobId);
-    
-    if (!job) {
-      return NextResponse.json({ 
-        error: 'Job not found' 
-      }, { status: 404 });
-    }
+    console.log(`✅ Attempting to cancel job ${jobId} for action ${action}`);
 
-    // Check if job can be cancelled (only waiting or active jobs)
-    const state = await job.getState();
-    if (state !== 'waiting' && state !== 'active') {
+    // Use ActionProducer to cancel the job
+    const success = await ActionProducer.cancelJob(jobId);
+    
+    if (!success) {
       return NextResponse.json({ 
-        error: 'Job cannot be cancelled - it is not in waiting or active state' 
+        error: 'Failed to cancel job - job not found or cannot be cancelled' 
       }, { status: 400 });
     }
-
-    // Remove the job from the queue
-    await job.remove();
-    
-    console.log(`Job ${jobId} cancelled successfully`);
 
     return NextResponse.json({
       success: true,
