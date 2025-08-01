@@ -55,13 +55,16 @@ CREATE TABLE session (
 );
 
 CREATE TABLE game_action_status (
-  id         SERIAL PRIMARY KEY,
-  team_id    INTEGER NOT NULL REFERENCES team(id) ON DELETE CASCADE,
-  game_id    INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
-  action     TEXT    NOT NULL CHECK (action IN ('login', 'new_account', 'password_reset', 'recharge', 'redeem')),
-  status     TEXT    NOT NULL DEFAULT 'unknown' CHECK (status IN ('success', 'fail', 'unknown')),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                  SERIAL PRIMARY KEY,
+  team_id             INTEGER NOT NULL REFERENCES team(id) ON DELETE CASCADE,
+  game_id             INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
+  action              TEXT NOT NULL CHECK (action IN ('login', 'new_account', 'password_reset', 'recharge', 'redeem')),
+  status              TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('success', 'fail', 'unknown')),
+  inputs              JSONB,
+  execution_time_secs NUMERIC(10,2),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
 
 CREATE INDEX ON session(user_id);
 CREATE INDEX ON session(game_credential_id);
@@ -79,6 +82,9 @@ CREATE TABLE captcha_log (
                                         CHECK (api_status IN ('success','fail')),
   solved_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+
+
+
 
 
 

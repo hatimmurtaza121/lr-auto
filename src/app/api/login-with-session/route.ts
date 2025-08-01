@@ -86,16 +86,16 @@ export async function POST(request: NextRequest) {
     const loginResult = await runLoginScript('scripts', username, password, game.login_url);
     
     // Update login status
-    try {
-      await updateGameStatus({
-        teamId: teamId,
-        gameId: game.id,
-        action: 'login',
-        status: loginResult.success ? 'success' : 'fail'
-      });
-    } catch (error) {
-      console.error('Failed to update login status:', error);
-    }
+    // try {
+    //   await updateGameStatus({
+    //     teamId: teamId,
+    //     gameId: game.id,
+    //     action: 'login',
+    //     status: loginResult.success ? 'success' : 'fail'
+    //   });
+    // } catch (error) {
+    //   console.error('Failed to update login status:', error);
+    // }
     
     if (!loginResult.success) {
       throw new Error(loginResult.error || 'Login script failed');

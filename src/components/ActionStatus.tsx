@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
+import { createClient } from '@/lib/supabase/client';
 
 interface JobStatus {
   jobId: string;
@@ -30,6 +31,14 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
   // Track active jobs
   const [activeJobIds, setActiveJobIds] = useState<Set<string>>(new Set());
 
+  // Track processed jobs to avoid duplicates
+  const [processedJobs, setProcessedJobs] = useState<Set<string>>(new Set());
+
+  // Generate unique component ID for debugging
+  const componentId = useMemo(() => `ActionStatus-${Math.random().toString(36).substr(2, 9)}`, []);
+  
+  console.log(`ActionStatus component ${componentId} mounted at ${new Date().toISOString()}`);
+
   // Add a new job Monsanto tracking
   const addJob = (jobId: string, gameName: string, action: string) => {
     const newJob: JobStatus = {
@@ -46,7 +55,9 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
   };
 
   // Update job status with improved message handling
-  const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string, timing?: { startTime?: number; endTime?: number; duration?: number }, params?: any) => {
+  const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string, timing?: { startTime?: number; endTime?: number; duration?: number }, params?: any, source?: string) => {
+    console.log(`[${componentId}] updateJobStatus called for job ${jobId} from ${source || 'unknown source'}`);
+    
     setJobs(prev => prev.map(job => {
       if (job.jobId === jobId) {
         // Determine the final message to display
@@ -97,6 +108,136 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         newSet.delete(jobId);
         return newSet;
       });
+
+      console.log(`[${componentId}] Job finished, calling updateGameStatusInSupabase:`, {
+        jobId,
+        status,
+        result,
+        timing,
+        params
+      });
+
+      // Call API to update game status in Supabase when job finishes
+      updateGameStatusInSupabase(jobId, status, result, timing, params);
+    }
+  };
+
+  // Function to update game status in Supabase
+  const updateGameStatusInSupabase = async (jobId: string, status: JobStatus['status'], result?: any, timing?: { startTime?: number; endTime?: number; duration?: number }, params?: any) => {
+    console.log('updateGameStatusInSupabase called with:', {
+      jobId,
+      status,
+      result,
+      timing,
+      params
+    });
+
+    // Check if we've already processed this job
+    if (processedJobs.has(jobId)) {
+      console.log(`Job ${jobId} already processed, skipping`);
+      return;
+    }
+
+    try {
+      // Find the job to get game info
+      const job = jobs.find(j => j.jobId === jobId);
+      if (!job) {
+        console.error('Job not found for status update:', jobId);
+        return;
+      }
+
+      console.log('Found job:', job);
+
+      // Get team ID
+      const { getSelectedTeamId } = await import('@/utils/team');
+      const teamId = getSelectedTeamId();
+      if (!teamId) {
+        console.error('No team selected for status update');
+        return;
+      }
+
+      // Get game ID from game name
+      const { getGameId } = await import('@/utils/game-mapping');
+      const gameId = await getGameId(job.gameName);
+      if (!gameId) {
+        console.error(`Game not found: ${job.gameName}`);
+        return;
+      }
+
+      // Determine the final status for Supabase
+      let finalStatus: 'success' | 'fail' | 'unknown' = 'unknown';
+      if (status === 'completed' && result) {
+        finalStatus = result.success ? 'success' : 'fail';
+      } else if (status === 'failed') {
+        finalStatus = 'fail';
+      }
+
+      // Calculate execution time in seconds
+      const executionTimeSecs = timing?.duration ? timing.duration / 1000 : undefined;
+
+      // Prepare inputs data
+      const inputs = params ? {
+        account_name: params.accountName || params.newAccountName || params.targetUsername,
+        password: params.password || params.newPassword,
+        amount: params.amount,
+        remarks: params.remark || params.remarks
+      } : undefined;
+
+      // Map action names to match database format
+      const actionMap: { [key: string]: string } = {
+        'newAccount': 'new_account',
+        'passwordReset': 'password_reset',
+        'recharge': 'recharge',
+        'redeem': 'redeem',
+        // Add lowercase versions in case job actions are lowercase
+        'newaccount': 'new_account',
+        'passwordreset': 'password_reset'
+      };
+
+      console.log('Job action before mapping:', job.action);
+      const action = actionMap[job.action] || job.action;
+      console.log('Action after mapping:', action);
+
+      console.log('Updating game status in Supabase:', {
+        teamId,
+        gameId,
+        action,
+        status: finalStatus,
+        inputs,
+        execution_time_secs: executionTimeSecs
+      });
+
+      // Get session for authorization
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      // Call the API to update game status
+      console.log(`Making API call for job ${jobId} at ${new Date().toISOString()}`);
+      const response = await fetch('/api/update-game-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          teamId: teamId,
+          gameId: gameId,
+          action: action,
+          status: finalStatus,
+          inputs: inputs,
+          execution_time_secs: executionTimeSecs
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to update game status in Supabase:', response.statusText);
+      } else {
+        console.log(`API call successful for job ${jobId} at ${new Date().toISOString()}`);
+        // Mark this job as processed
+        setProcessedJobs(prev => new Set([...Array.from(prev), jobId]));
+      }
+    } catch (error) {
+      console.error('Error updating game status in Supabase:', error);
     }
   };
 
@@ -181,7 +322,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
 
       if (response.ok) {
         console.log(`✅ Job cancelled successfully`);
-        updateJobStatus(jobId, 'cancelled', 'Job cancelled by user');
+        updateJobStatus(jobId, 'cancelled', 'Job cancelled by user', undefined, undefined, undefined, undefined, 'frontend-cancel');
       } else {
         const errorText = await response.text();
         console.error('❌ Failed to cancel job:', response.statusText, errorText);
@@ -257,7 +398,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                 startTime: status.startTime,
                 endTime: status.endTime,
                 duration: status.duration
-              }, status.params);
+              }, status.params, 'polling');
             }
           }
         } catch (error) {
@@ -297,7 +438,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         duration
       });
       
-      updateJobStatus(jobId, status, finalMessage, result, error, { startTime, endTime, duration });
+      updateJobStatus(jobId, status, finalMessage, result, error, { startTime, endTime, duration }, undefined, 'event');
     };
 
     window.addEventListener('new-job', handleNewJob as EventListener);

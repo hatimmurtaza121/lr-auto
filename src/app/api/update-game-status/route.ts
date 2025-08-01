@@ -8,6 +8,8 @@ const supabase = createClient(
 );
 
 export async function POST(request: NextRequest) {
+  console.log(`API route called at ${new Date().toISOString()}`);
+  
   try {
     // Get authenticated user
     const user = await getUserSession(request);
@@ -17,7 +19,9 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { teamId, gameId, action, status } = body;
+    const { teamId, gameId, action, status, inputs, execution_time_secs } = body;
+
+    console.log(`Processing request: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
 
     // Validate required fields
     if (!teamId || !gameId || !action || !status) {
@@ -27,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate action
-    const validActions = ['login', 'newaccount', 'passwordreset', 'recharge', 'redeem'];
+    const validActions = ['login', 'new_account', 'password_reset', 'recharge', 'redeem'];
     if (!validActions.includes(action)) {
       return NextResponse.json({ 
         error: `Invalid action. Must be one of: ${validActions.join(', ')}` 
@@ -43,17 +47,31 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`Updating game status: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
+    if (inputs) console.log('Inputs:', inputs);
+    if (execution_time_secs) console.log('Execution time:', execution_time_secs, 'seconds');
+
+    // Prepare insert data
+    const insertData: any = {
+      team_id: teamId,
+      game_id: gameId,
+      action: action,
+      status: status,
+      updated_at: new Date().toISOString()
+    };
+
+    // Add optional fields if provided
+    if (inputs !== undefined) {
+      insertData.inputs = inputs;
+    }
+    
+    if (execution_time_secs !== undefined) {
+      insertData.execution_time_secs = execution_time_secs;
+    }
 
     // Insert new status record
     const { data, error } = await supabase
       .from('game_action_status')
-      .insert({
-        team_id: teamId,
-        game_id: gameId,
-        action: action,
-        status: status,
-        updated_at: new Date().toISOString()
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -109,6 +127,8 @@ export async function GET(request: NextRequest) {
         game_id,
         action,
         status,
+        inputs,
+        execution_time_secs,
         updated_at,
         game:game_id (
           id,
@@ -148,7 +168,9 @@ export async function GET(request: NextRequest) {
           new Date(record.updated_at) > new Date(gameStatus.actions[action].updated_at)) {
         gameStatus.actions[action] = {
           status: record.status,
-          updated_at: record.updated_at
+          updated_at: record.updated_at,
+          inputs: record.inputs,
+          execution_time_secs: record.execution_time_secs
         };
       }
     });
