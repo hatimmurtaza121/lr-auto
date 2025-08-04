@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
       console.log(`Created new game credential: ${gameCredentialId}`);
     }
 
-    // Run the existing login script
-    const loginResult = await runLoginScript('scripts', username, password, game.login_url);
+    // Run the existing login script (disable Supabase saving since we handle it here)
+    const loginResult = await runLoginScript('scripts', username, password, game.login_url, false);
     
     // Update login status
     // try {
@@ -104,29 +104,54 @@ export async function POST(request: NextRequest) {
     // Capture session data from the logged-in session using the auth state file
     const sessionData = await captureSessionDataFromAuthState(game.login_url);
 
-    // Deactivate any existing sessions for this credential
-    await supabase
+    // Check if session already exists for this user and game credential
+    const { data: existingSession } = await supabase
       .from('session')
-      .update({ is_active: false })
+      .select('id')
       .eq('user_id', user.id)
-      .eq('game_credential_id', gameCredentialId);
+      .eq('game_credential_id', gameCredentialId)
+      .single();
 
-    // Save session to database
-    const sessionToken = crypto.randomBytes(32).toString('hex');
-    const { error: sessionError } = await supabase
-      .from('session')
-      .insert({
-        user_id: user.id,
-        game_credential_id: gameCredentialId,
-        session_token: sessionToken,
-        session_data: sessionData,
-        expires_at: sessionData.earliestExpirationDate,
-        is_active: true,
-        created_at: new Date().toISOString(),
-      });
+    let sessionToken: string;
 
-    if (sessionError) {
-      throw new Error(`Failed to save session: ${sessionError.message}`);
+    if (existingSession) {
+      // Update existing session
+      sessionToken = crypto.randomBytes(32).toString('hex');
+      const { error: sessionError } = await supabase
+        .from('session')
+        .update({
+          session_token: sessionToken,
+          session_data: sessionData,
+          expires_at: sessionData.earliestExpirationDate,
+          is_active: true,
+        })
+        .eq('id', existingSession.id);
+
+      if (sessionError) {
+        throw new Error(`Failed to update session: ${sessionError.message}`);
+      }
+
+      console.log(`Updated existing session: ${existingSession.id}`);
+    } else {
+      // Create new session
+      sessionToken = crypto.randomBytes(32).toString('hex');
+      const { error: sessionError } = await supabase
+        .from('session')
+        .insert({
+          user_id: user.id,
+          game_credential_id: gameCredentialId,
+          session_token: sessionToken,
+          session_data: sessionData,
+          expires_at: sessionData.earliestExpirationDate,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        });
+
+      if (sessionError) {
+        throw new Error(`Failed to save session: ${sessionError.message}`);
+      }
+
+      console.log('Created new session');
     }
 
     console.log(`Session saved successfully for game credential ${gameCredentialId}`);
@@ -153,10 +178,10 @@ export async function POST(request: NextRequest) {
 /**
  * Run the existing login script
  */
-async function runLoginScript(scriptDir: string, username: string, password: string, loginUrl: string): Promise<{ success: boolean; error?: string }> {
+async function runLoginScript(scriptDir: string, username: string, password: string, loginUrl: string, saveToSupabase: boolean = true): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
     const scriptPath = path.join(process.cwd(), scriptDir, 'login.js');
-    const args = [username, password, loginUrl];
+    const args = [username, password, loginUrl, saveToSupabase.toString()];
     
     console.log(`Running login script: ${scriptPath} with args: ${args}`);
     console.log(`Current working directory: ${process.cwd()}`);

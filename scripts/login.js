@@ -11,6 +11,7 @@ const config = require('./config');
 const username = process.argv[2] || 'TestOstr';
 const password = process.argv[3] || 'Abcd123#';
 const gameurl = process.argv[4] || 'https://www.orionstrike777.com/admin/login';
+const saveToSupabase = process.argv[5] !== 'false'; // Default to true, but can be disabled
 const storageFile = path.join(__dirname, '../auth-state.json');
 
 // Initialize Supabase client with service role key for automation
@@ -626,12 +627,16 @@ async function loginAndSaveState() {
         const sessionData = await context.storageState();
         console.log('Session data captured for Supabase');
         
-        // Save session to Supabase
-        try {
-          await saveSessionToSupabase(username, password, gameurl, sessionData);
-          console.log('Session saved to Supabase successfully!');
-        } catch (error) {
-          console.error('Failed to save session to Supabase:', error);
+        // Save session to Supabase (only if enabled)
+        if (saveToSupabase) {
+          try {
+            await saveSessionToSupabase(username, password, gameurl, sessionData);
+            console.log('Session saved to Supabase successfully!');
+          } catch (error) {
+            console.error('Failed to save session to Supabase:', error);
+          }
+        } else {
+          console.log('Skipping Supabase save (disabled via parameter)');
         }
         
         console.log('You can now run account creation without logging in again!');

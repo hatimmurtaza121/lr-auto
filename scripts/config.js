@@ -2,11 +2,11 @@
 module.exports = {
   // Gemini API Key for captcha solving
   // Get your API key from: https://makersuite.google.com/app/apikey
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'AIzaSyDDKB9CL0EKezRBkrwRXBOOXqa3WAyuNYg',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   
   // Default credentials
-  DEFAULT_USERNAME: 'Test__os',
-  DEFAULT_PASSWORD: 'Abcd_test123#',
+  DEFAULT_USERNAME: 'default_username',
+  DEFAULT_PASSWORD: 'default_password',
   
   // Screenshot settings
   CAPTCHA_SCREENSHOT_PATH: 'captcha.png',
