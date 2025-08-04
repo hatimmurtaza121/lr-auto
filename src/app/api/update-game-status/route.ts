@@ -118,26 +118,9 @@ export async function GET(request: NextRequest) {
 
     console.log(`Fetching game status for team: ${teamId}`);
 
-    // Get the latest status for each game and action for this team
+    // Get the latest status for each game and action for this team using the stored function
     const { data, error } = await supabase
-      .from('game_action_status')
-      .select(`
-        id,
-        team_id,
-        game_id,
-        action,
-        status,
-        inputs,
-        execution_time_secs,
-        updated_at,
-        game:game_id (
-          id,
-          name,
-          login_url
-        )
-      `)
-      .eq('team_id', teamId)
-      .order('updated_at', { ascending: false });
+      .rpc('get_latest_game_action_status', { team_id_param: parseInt(teamId) });
 
     if (error) {
       console.error('Error fetching game status:', error);
@@ -157,22 +140,19 @@ export async function GET(request: NextRequest) {
       if (!gameStatusMap.has(gameId)) {
         gameStatusMap.set(gameId, {
           game_id: gameId,
-          game_name: record.game.name,
-          login_url: record.game.login_url,
+          game_name: record.game_name,
+          login_url: record.game_login_url,
           actions: {}
         });
       }
       
       const gameStatus = gameStatusMap.get(gameId);
-      if (!gameStatus.actions[action] || 
-          new Date(record.updated_at) > new Date(gameStatus.actions[action].updated_at)) {
-        gameStatus.actions[action] = {
-          status: record.status,
-          updated_at: record.updated_at,
-          inputs: record.inputs,
-          execution_time_secs: record.execution_time_secs
-        };
-      }
+      gameStatus.actions[action] = {
+        status: record.status,
+        updated_at: record.updated_at,
+        inputs: record.inputs,
+        execution_time_secs: record.execution_time_secs
+      };
     });
 
     const gameStatuses = Array.from(gameStatusMap.values());

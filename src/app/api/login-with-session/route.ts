@@ -87,17 +87,18 @@ export async function POST(request: NextRequest) {
     // Run the existing login script (disable Supabase saving since we handle it here)
     const loginResult = await runLoginScript('scripts', username, password, game.login_url, false);
     
-    // Update login status
-    // try {
-    //   await updateGameStatus({
-    //     teamId: teamId,
-    //     gameId: game.id,
-    //     action: 'login',
-    //     status: loginResult.success ? 'success' : 'fail'
-    //   });
-    // } catch (error) {
-    //   console.error('Failed to update login status:', error);
-    // }
+    // Update login status in game_action_status table
+    try {
+      await updateGameStatus({
+        teamId: teamId,
+        gameId: game.id,
+        action: 'login',
+        status: loginResult.success ? 'success' : 'fail'
+      });
+      console.log(`Login status updated: ${loginResult.success ? 'success' : 'fail'}`);
+    } catch (error) {
+      console.error('Failed to update login status:', error);
+    }
     
     if (!loginResult.success) {
       throw new Error(loginResult.error || 'Login script failed');

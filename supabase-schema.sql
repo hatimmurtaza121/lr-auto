@@ -73,6 +73,59 @@ CREATE INDEX ON session(is_active);
 CREATE INDEX ON game_action_status(team_id, game_id);
 CREATE INDEX ON game_action_status(updated_at);
 
+-- Function to get latest game action status for each team_id, game_id, action combination
+CREATE OR REPLACE FUNCTION get_latest_game_action_status(team_id_param INTEGER)
+RETURNS TABLE (
+  id INTEGER,
+  team_id INTEGER,
+  game_id INTEGER,
+  action TEXT,
+  status TEXT,
+  inputs JSONB,
+  execution_time_secs NUMERIC(10,2),
+  updated_at TIMESTAMPTZ,
+  game_name TEXT,
+  game_login_url TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH latest_records AS (
+    SELECT 
+      gas.id,
+      gas.team_id,
+      gas.game_id,
+      gas.action,
+      gas.status,
+      gas.inputs,
+      gas.execution_time_secs,
+      gas.updated_at,
+      g.name as game_name,
+      g.login_url as game_login_url,
+      ROW_NUMBER() OVER (
+        PARTITION BY gas.team_id, gas.game_id, gas.action 
+        ORDER BY gas.updated_at DESC
+      ) as rn
+    FROM game_action_status gas
+    JOIN game g ON gas.game_id = g.id
+    WHERE gas.team_id = team_id_param
+  )
+  SELECT 
+    lr.id,
+    lr.team_id,
+    lr.game_id,
+    lr.action,
+    lr.status,
+    lr.inputs,
+    lr.execution_time_secs,
+    lr.updated_at,
+    lr.game_name,
+    lr.game_login_url
+  FROM latest_records lr
+  WHERE lr.rn = 1
+  ORDER BY lr.game_id, lr.action;
+END;
+$$ LANGUAGE plpgsql;
+
 -- 4) captcha_log
 CREATE TABLE captcha_log (
   id           SERIAL       PRIMARY KEY,     -- auto-incrementing ID

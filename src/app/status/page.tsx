@@ -111,58 +111,61 @@ export default function StatusPage() {
         }
       });
 
-      let statusData: GameStatus[] = [];
-      if (statusResponse.ok) {
-        const statusResult = await statusResponse.json();
-        statusData = statusResult.data || [];
-      }
+             let statusData: GameStatus[] = [];
+       if (statusResponse.ok) {
+         const statusResult = await statusResponse.json();
+         statusData = statusResult.data || [];
+       }
 
-      // Create a map of existing status data
-      const statusMap = new Map();
-      statusData.forEach(gameStatus => {
-        statusMap.set(gameStatus.game_id, gameStatus);
-      });
+       console.log('Raw status data from API:', JSON.stringify(statusData, null, 2));
 
-      // Create complete game status list with unknown status for missing actions
-      const completeGameStatuses = allGames.map((game: any) => {
-        const existingStatus = statusMap.get(game.id);
+             // Create complete game status list with unknown status for missing actions
+       const completeGameStatuses = allGames.map((game: any) => {
+         const existingStatus = statusData.find((status: any) => status.game_id === game.id);
+         
+         if (existingStatus) {
+           // Ensure all 5 actions are present, fill missing ones with unknown
+           const allActions = {
+             login: { status: 'unknown', updated_at: new Date().toISOString() },
+             new_account: { status: 'unknown', updated_at: new Date().toISOString() },
+             password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
+             recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+             redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+           };
+           
+           // Merge existing status with default unknown status
+           Object.assign(allActions, existingStatus.actions);
+           
+           return {
+             ...existingStatus,
+             actions: allActions
+           };
+         } else {
+           // Create new game status with unknown for all actions
+           return {
+             game_id: game.id,
+             game_name: game.name,
+             login_url: game.login_url,
+             actions: {
+               login: { status: 'unknown', updated_at: new Date().toISOString() },
+               new_account: { status: 'unknown', updated_at: new Date().toISOString() },
+               password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
+               recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+               redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+             }
+           };
+         }
+       });
+
+                     console.log('Final game statuses:', JSON.stringify(completeGameStatuses, null, 2));
         
-        if (existingStatus) {
-          // Ensure all 5 actions are present, fill missing ones with unknown
-          const allActions = {
-            login: { status: 'unknown', updated_at: new Date().toISOString() },
-            newaccount: { status: 'unknown', updated_at: new Date().toISOString() },
-            passwordreset: { status: 'unknown', updated_at: new Date().toISOString() },
-            recharge: { status: 'unknown', updated_at: new Date().toISOString() },
-            redeem: { status: 'unknown', updated_at: new Date().toISOString() }
-          };
-          
-          // Merge existing status with default unknown status
-          Object.assign(allActions, existingStatus.actions);
-          
-          return {
-            ...existingStatus,
-            actions: allActions
-          };
-        } else {
-          // Create new game status with unknown for all actions
-          return {
-            game_id: game.id,
-            game_name: game.name,
-            login_url: game.login_url,
-            actions: {
-              login: { status: 'unknown', updated_at: new Date().toISOString() },
-              newaccount: { status: 'unknown', updated_at: new Date().toISOString() },
-              passwordreset: { status: 'unknown', updated_at: new Date().toISOString() },
-              recharge: { status: 'unknown', updated_at: new Date().toISOString() },
-              redeem: { status: 'unknown', updated_at: new Date().toISOString() }
-            }
-          };
-        }
-      });
-
-      setGameStatuses(completeGameStatuses);
-      setLastUpdated(new Date());
+        // Sort game statuses in descending order by game name
+        const sortedGameStatuses = completeGameStatuses.sort((a: GameStatus, b: GameStatus) => 
+          b.game_name.localeCompare(a.game_name)
+        );
+        
+        setGameStatuses(sortedGameStatuses);
+        setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching game status:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch status');
@@ -229,50 +232,40 @@ export default function StatusPage() {
             const config = statusConfig[overallStatus as keyof typeof statusConfig];
             
             return (
-              <div 
-                key={index}
-                className={`card-elevated p-6 border-l-4 ${config.borderColor} hover:shadow-ios-xl transition-all duration-200`}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {gameStatus.game_name}
-                    </h3>
-                    <p className="text-sm text-gray-500 font-mono truncate">
-                      {gameStatus.login_url}
-                    </p>
-                  </div>
-                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${config.bgColor}`}>
-                    {config.icon}
-                  </div>
-                </div>
+                             <div 
+                 key={index}
+                 className={`card-elevated p-6 hover:shadow-ios-xl transition-all duration-200`}
+               >
+                                 <div className="mb-4">
+                   <h3 className="text-lg font-semibold text-gray-900">
+                     {gameStatus.game_name}
+                   </h3>
+                 </div>
                 
                 {/* Function Status Grid */}
                 <div className="mt-4">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Actions status</h4>
                   <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(actions).map(([actionName, actionData]) => {
-                      const actionConfig = statusConfig[actionData.status as keyof typeof statusConfig];
-                      return (
-                        <div key={actionName} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                          <span className="text-xs text-gray-600 capitalize">
-                            {actionName.replace('_', ' ')}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {actionConfig.icon}
-                          </div>
-                        </div>
-                      );
-                    })}
+                                         {Object.entries(actions).map(([actionName, actionData]) => {
+                       console.log('Action display:', { actionName, status: actionData.status, statusType: typeof actionData.status });
+                       const actionConfig = statusConfig[actionData.status as keyof typeof statusConfig] || statusConfig.unknown;
+                       console.log('Action config found:', !!actionConfig, 'Using fallback:', !statusConfig[actionData.status as keyof typeof statusConfig]);
+                       const displayName = actionName === 'new_account' ? 'New Account' : 
+                                         actionName === 'password_reset' ? 'Password Reset' :
+                                         actionName.charAt(0).toUpperCase() + actionName.slice(1);
+                       return (
+                         <div key={actionName} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                           <span className="text-xs text-gray-600">
+                             {displayName}
+                           </span>
+                           <div className="flex items-center gap-1">
+                             {actionConfig.icon}
+                           </div>
+                         </div>
+                       );
+                     })}
                   </div>
-                </div>
-                
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Game ID:</span>
-                    <span className="font-mono text-gray-900">{gameStatus.game_id}</span>
-                  </div>
-                </div>
+                                 </div>
               </div>
             );
           })}
