@@ -57,29 +57,22 @@ async function solveCaptchaWithGemini(captchaImagePath) {
       throw new Error('Could not read captcha text from Gemini response');
     }
     
-    // Store captcha image and response for logging
-    global.captchaLogData = {
+    // Return captcha data for logging
+    return {
       imagePath: captchaImagePath,
       apiResponse: captchaText,
       apiStatus: 'pending' // Will be updated based on login success/failure
     };
     
-    console.log('Captcha image saved for logging to Supabase');
-    
-    return captchaText;
   } catch (error) {
     console.error('Error solving captcha with Gemini:', error);
     
-    // Store captcha log data even on error
-    global.captchaLogData = {
+    // Return captcha data even on error
+    return {
       imagePath: captchaImagePath,
       apiResponse: error.message,
       apiStatus: 'fail'
     };
-    
-    console.log('Captcha image saved for logging to Supabase (error case)');
-    
-    throw error;
   }
 }
 
@@ -130,7 +123,7 @@ async function findAndSolveCaptcha(page) {
   
   if (!captchaInput) {
     console.log('No captcha input field found, skipping captcha step.');
-    return false;
+    return { found: false, captchaData: null };
   }
   
   // Find captcha image/element to screenshot
@@ -163,13 +156,13 @@ async function findAndSolveCaptcha(page) {
       console.log(`Screenshot saved to: ${screenshotPath}`);
       
       // Solve captcha
-      const captchaText = await solveCaptchaWithGemini(screenshotPath);
+      const captchaData = await solveCaptchaWithGemini(screenshotPath);
       
       // Fill the captcha input
-      await captchaInput.fill(captchaText);
-      console.log(`Captcha text filled: ${captchaText}`);
+      await captchaInput.fill(captchaData.apiResponse);
+      console.log(`Captcha text filled: ${captchaData.apiResponse}`);
       
-      return true;
+      return { found: true, captchaData: captchaData };
     }
   } else {
     // Screenshot the specific captcha element
@@ -178,33 +171,35 @@ async function findAndSolveCaptcha(page) {
     console.log(`Captcha screenshot saved to: ${screenshotPath}`);
     
     // Solve captcha
-    const captchaText = await solveCaptchaWithGemini(screenshotPath);
+    const captchaData = await solveCaptchaWithGemini(screenshotPath);
     
     // Fill the captcha input
-    await captchaInput.fill(captchaText);
-    console.log(`Captcha text filled: ${captchaText}`);
+    await captchaInput.fill(captchaData.apiResponse);
+    console.log(`Captcha text filled: ${captchaData.apiResponse}`);
     
-    return true;
+    return { found: true, captchaData: captchaData };
   }
   
-  return false;
+  return { found: false, captchaData: null };
 }
 
 async function checkForCaptchaError(page) {
   console.log('Checking for captcha error messages...');
   
-  // Captcha-specific error messages
+  // Captcha-specific error messages (more specific to avoid false positives)
   const captchaKeywords = [
     'verification code is incorrect',
     'validation code you filled in is incorrect',
     'please re_enter',
     'captcha is incorrect',
-    'verification code',
-    'validation code',
-    'incorrect',
-    'wrong',
-    'error',
-    'failed'
+    'verification code error',
+    'validation code error',
+    'code is incorrect',
+    'verification failed',
+    'validation failed',
+    'captcha error',
+    'verification error',
+    'validation error'
   ];
   
   // Check for captcha error messages in various elements
@@ -249,8 +244,11 @@ async function checkForCaptchaError(page) {
           
           if (errorText) {
             const lowerText = errorText.toLowerCase();
+            console.log(`Checking error text: "${errorText}"`);
+            
             for (const keyword of captchaKeywords) {
               if (lowerText.includes(keyword)) {
+                console.log(`Found captcha error keyword: "${keyword}" in text: "${errorText}"`);
                 return true;
               }
             }
@@ -282,7 +280,7 @@ async function logCaptchaToSupabase(imagePath, apiResponse, apiStatus) {
     // Read the image file
     const imageBuffer = fs.readFileSync(imagePath);
     const fileName = path.basename(imagePath);
-    const storagePath = `captcha-images/${Date.now()}-${fileName}`;
+    const storagePath = `${Date.now()}-${fileName}`;
     
     console.log('Image file size:', imageBuffer.length, 'bytes');
     console.log('Storage path:', storagePath);
@@ -297,7 +295,9 @@ async function logCaptchaToSupabase(imagePath, apiResponse, apiStatus) {
     
     if (uploadError) {
       console.log('Failed to upload captcha image to storage:', uploadError.message);
-      return;
+      // Continue with logging even if image upload fails
+    } else {
+      console.log('Captcha image uploaded successfully to storage');
     }
     
     // Insert log entry directly into database
@@ -305,20 +305,24 @@ async function logCaptchaToSupabase(imagePath, apiResponse, apiStatus) {
       .from('captcha_log')
       .insert([
         {
-          image_path: storagePath,
-          api_response: apiResponse,
-          api_status: apiStatus
+          image_path: uploadError ? 'upload_failed' : storagePath, // Use placeholder if upload failed
+          api_response: apiResponse || '',
+          api_status: apiStatus,
+          solved_at: new Date().toISOString()
         }
       ])
       .select();
     
     if (logError) {
       console.log('Failed to log captcha attempt:', logError.message);
+      console.log('Error details:', logError);
     } else {
-      console.log('Captcha attempt logged successfully');
+      console.log('Captcha attempt logged successfully to database');
+      console.log('Log entry ID:', logData?.[0]?.id);
     }
   } catch (error) {
     console.log('Error logging captcha to Supabase:', error.message);
+    console.log('Full error:', error);
   }
 }
 
@@ -461,9 +465,9 @@ async function performLoginAttempt(page, username, password) {
   console.log('Login form filled successfully!');
   
   // Check if captcha is present
-  const captchaFound = await findAndSolveCaptcha(page);
+  const captchaResult = await findAndSolveCaptcha(page);
   
-  if (captchaFound) {
+  if (captchaResult.found) {
     console.log('Captcha found and solved automatically!');
   }
   
@@ -517,7 +521,7 @@ async function performLoginAttempt(page, username, password) {
   const captchaError = await checkForCaptchaError(page);
   if (captchaError) {
     console.log('Captcha error detected - will retry with new captcha');
-    return 'captcha_error';
+    return { result: 'captcha_error', captchaData: captchaResult.captchaData };
   }
   
   // Wait for login response and check URL for success indicators
@@ -537,7 +541,7 @@ async function performLoginAttempt(page, username, password) {
     
     if (isLoginSuccessful) {
       console.log('Login successful! URL contains success pattern.');
-      return 'success';
+      return { result: 'success', captchaData: captchaResult.captchaData };
     } else {
       console.log('Login not successful - URL does not contain success patterns.');
       
@@ -545,16 +549,16 @@ async function performLoginAttempt(page, username, password) {
       const captchaError = await checkForCaptchaError(page);
       if (captchaError) {
         console.log('Captcha error detected after redirect - will retry with new captcha');
-        return 'captcha_error';
+        return { result: 'captcha_error', captchaData: captchaResult.captchaData };
       } else {
         console.log('No captcha error found - login failed.');
-        return 'failed';
+        return { result: 'failed', captchaData: captchaResult.captchaData };
       }
     }
     
   } catch (error) {
     console.log('Error during login check:', error.message);
-    return 'failed';
+    return { result: 'failed', captchaData: captchaResult.captchaData };
   }
 }
 
@@ -589,22 +593,19 @@ async function loginAndSaveState() {
       await page.waitForLoadState('networkidle');
       
       // Perform the login attempt
-      const result = await performLoginAttempt(page, username, password);
+      const loginResult = await performLoginAttempt(page, username, password);
       
-      if (result === 'success') {
+      if (loginResult.result === 'success') {
         console.log(`\n🎉 Login successful on attempt ${attempt}!`);
         
         // Log successful captcha if we have captcha data
-        console.log('Login successful - checking for captcha data...');
-        console.log('global.captchaLogData:', global.captchaLogData);
-        
-        if (global.captchaLogData) {
-          global.captchaLogData.apiStatus = 'success';
-          console.log('Calling logCaptchaToSupabase for success...');
+        if (loginResult.captchaData) {
+          console.log('Login successful - logging captcha as SUCCESS');
+          loginResult.captchaData.apiStatus = 'success';
           await logCaptchaToSupabase(
-            global.captchaLogData.imagePath,
-            global.captchaLogData.apiResponse,
-            global.captchaLogData.apiStatus
+            loginResult.captchaData.imagePath,
+            loginResult.captchaData.apiResponse,
+            loginResult.captchaData.apiStatus
           );
         } else {
           console.log('No captcha data found for successful login');
@@ -646,8 +647,20 @@ async function loginAndSaveState() {
         console.log('Browser closed successfully.');
         return;
         
-      } else if (result === 'captcha_error') {
+      } else if (loginResult.result === 'captcha_error') {
         console.log(`Captcha error on attempt ${attempt} - will retry with fresh page`);
+        
+        // Log captcha as FAIL if we have captcha data
+        if (loginResult.captchaData) {
+          console.log('Captcha error detected - logging captcha as FAIL');
+          loginResult.captchaData.apiStatus = 'fail';
+          await logCaptchaToSupabase(
+            loginResult.captchaData.imagePath,
+            loginResult.captchaData.apiResponse,
+            loginResult.captchaData.apiStatus
+          );
+        }
+        
         console.log('Closing browser due to captcha error...');
         await browser.close();
         console.log('Browser closed successfully after captcha error');
@@ -664,14 +677,17 @@ async function loginAndSaveState() {
         
       } else {
         // Login failed for other reasons (e.g., credentials)
-        if (global.captchaLogData) {
-          global.captchaLogData.apiStatus = 'success'; // <-- always mark as success
+        // Log captcha as SUCCESS if we have captcha data (since it's not a captcha error)
+        if (loginResult.captchaData) {
+          console.log('Login failed for non-captcha reasons - logging captcha as SUCCESS');
+          loginResult.captchaData.apiStatus = 'success';
           await logCaptchaToSupabase(
-            global.captchaLogData.imagePath,
-            global.captchaLogData.apiResponse,
-            global.captchaLogData.apiStatus
+            loginResult.captchaData.imagePath,
+            loginResult.captchaData.apiResponse,
+            loginResult.captchaData.apiStatus
           );
         }
+        
         await browser.close();
         process.exit(1);
       }
