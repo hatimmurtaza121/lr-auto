@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
     // Get or create game credential
     let gameCredentialId: number;
     
+    console.log(`Looking for existing credential for team ${teamId} and game ${gameName}`);
+    
     // First check if credential already exists
     const existingCredential = await getGameCredential(gameName, teamId);
     

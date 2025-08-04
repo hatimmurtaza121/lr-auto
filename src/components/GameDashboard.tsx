@@ -54,7 +54,56 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
     }));
   };
 
+  // Function to check session status before executing actions
+  const checkSessionBeforeExecute = async () => {
+    try {
+      const teamId = getSelectedTeamId();
+      if (!teamId) {
+        throw new Error('No team selected');
+      }
+
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('User not authenticated');
+      }
+
+      const response = await fetch(`/api/check-session?gameName=${gameName}`, {
+        method: 'GET',
+        headers: {
+          'x-team-id': teamId.toString(),
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasSession) {
+          return true; // Session is valid, can proceed with execution
+        } else {
+          // No valid session - trigger login screen
+          onNeedsLogin?.();
+          return false;
+        }
+      } else {
+        // Session check failed - trigger login screen
+        onNeedsLogin?.();
+        return false;
+      }
+    } catch (error) {
+      console.error('Session check failed:', error);
+      onNeedsLogin?.();
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
+    // Check session before executing
+    const sessionValid = await checkSessionBeforeExecute();
+    if (!sessionValid) {
+      return; // Login screen will be shown by onNeedsLogin callback
+    }
+
     setIsExecuting(true);
     setOutput('');
     setCurrentLog('Starting action...');
@@ -143,10 +192,10 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
         headers: {
           'Content-Type': 'application/json',
           'x-team-id': teamId.toString(),
+          'x-game-name': gameName,
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          gameName: gameName,
           action: actionType,
           params: params
         })

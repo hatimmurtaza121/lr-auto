@@ -111,16 +111,19 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
           setIsLoggedIn(true);
           console.log('Found existing session:', data);
         } else if (data.hasCredentials) {
-          // No session but credentials exist - pre-fill the form
+          // No session but credentials exist - pre-fill the form but don't show login screen
           setUsername(data.username || '');
           setPassword(data.password || '');
           console.log('No session but credentials found, pre-filled form');
+        } else {
+          // No credentials found - don't show login screen
+          console.log('No credentials found');
         }
       } else {
         // Handle error response
         const errorData = await response.json().catch(() => ({}));
         console.error('Check session failed:', errorData);
-        // Don't show error to user for session check failures
+        // Don't show login screen on error
       }
     } catch (error) {
       console.error('Error checking session:', error);
@@ -245,17 +248,17 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
             <span className="text-lg text-gray-600">Checking session...</span>
           </div>
         </div>
-      ) : (!isExpanded && !isLoggedIn) ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="text-center">
-            <span className="text-3xl font-bold text-gray-900">{displayName}</span>
-            {hasCredentials && (
-              <div className="mt-2 text-sm text-gray-500">
-                Credentials saved • Click to login
-              </div>
-            )}
-          </div>
-        </div>
+             ) : (!isExpanded && !isLoggedIn) ? (
+         <div className="flex items-center justify-center h-32">
+           <div className="text-center">
+             <span className="text-3xl font-bold text-gray-900">{displayName}</span>
+             {(hasCredentials || (username && password)) && (
+               <div className="mt-2 text-sm text-gray-500">
+                 Credentials saved • Click to login
+               </div>
+             )}
+           </div>
+         </div>
       ) : (
         <>
           <div className="flex items-center justify-between mb-4">

@@ -23,6 +23,18 @@ export async function POST(request: NextRequest) {
     const { cookies } = await import('next/headers');
     const supabase = createClient(cookies());
     
+    // Get game ID first
+    const { getGame } = await import('@/utils/game-mapping');
+    const gameName = request.headers.get('x-game-name');
+    if (!gameName) {
+      return NextResponse.json({ error: 'Game name is required' }, { status: 400 });
+    }
+    
+    const game = await getGame(gameName);
+    if (!game) {
+      return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+    }
+    
     const { data: gameCredential, error: credentialError } = await supabase
       .from('game_credential')
       .select(`
@@ -30,12 +42,15 @@ export async function POST(request: NextRequest) {
         game:game_id (*)
       `)
       .eq('team_id', parseInt(teamId))
-      .eq('game.name', request.headers.get('x-game-name'))
+      .eq('game_id', game.id)
       .single();
 
     if (credentialError || !gameCredential) {
+      console.error(`Game credential not found for team ${teamId} and game ${gameName}`);
+      console.error('Credential error:', credentialError);
       return NextResponse.json({ 
-        error: 'Game credentials not found for this team' 
+        error: 'Game credentials not found for this team',
+        details: `Team ID: ${teamId}, Game: ${gameName}`
       }, { status: 404 });
     }
 

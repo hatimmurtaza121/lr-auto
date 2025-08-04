@@ -31,6 +31,15 @@ export async function GET(request: NextRequest) {
     
     if (!gameCredential) {
       console.log(`No game credential found for game ${gameName} in team ${teamId}`);
+      console.log(`Available credentials for team ${teamId}:`);
+      const { data: allCredentials } = await supabase
+        .from('game_credential')
+        .select(`
+          id,
+          game:game_id (name)
+        `)
+        .eq('team_id', teamId);
+      console.log('All credentials for this team:', allCredentials);
       return NextResponse.json({
         hasSession: false,
         hasCredentials: false

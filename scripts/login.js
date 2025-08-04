@@ -12,6 +12,8 @@ const username = process.argv[2] || 'TestOstr';
 const password = process.argv[3] || 'Abcd123#';
 const gameurl = process.argv[4] || 'https://www.orionstrike777.com/admin/login';
 const saveToSupabase = process.argv[5] !== 'false'; // Default to true, but can be disabled
+const teamId = process.argv[6] ? parseInt(process.argv[6]) : 1; // Team ID parameter
+const userId = process.argv[7] || 'default-user-id'; // User ID parameter
 const storageFile = path.join(__dirname, '../auth-state.json');
 
 // Initialize Supabase client with service role key for automation
@@ -331,7 +333,7 @@ async function saveSessionToSupabase(username, password, loginUrl, sessionData) 
   try {
     console.log('Saving session data to Supabase...');
     
-    // Determine game name from URL
+    // Determine game name from URL - must match database names exactly
     let gameName = 'Unknown Game';
     if (loginUrl.includes('gamevault999.com')) {
       gameName = 'Game Vault';
@@ -342,16 +344,16 @@ async function saveSessionToSupabase(username, password, loginUrl, sessionData) 
     } else if (loginUrl.includes('yolo777.game')) {
       gameName = 'Yolo';
     } else if (loginUrl.includes('mrallinone777.com')) {
-      gameName = 'Mr. All In One';
+      gameName = 'Mr All In One';
     } else if (loginUrl.includes('orionstrike777.com')) {
       gameName = 'Orion Strike';
     }
 
     console.log(`Detected game: ${gameName}`);
 
-    // For now, using hardcoded values - you can modify these as needed
-    const userId = 'default-user-id'; // You might want to pass this as a parameter
-    const teamId = 1; // You might want to pass this as a parameter
+    // Use the team ID and user ID from command line arguments
+    const currentTeamId = teamId;
+    const currentUserId = userId;
 
     const response = await fetch('http://localhost:3000/api/save-session', {
       method: 'POST',
@@ -359,8 +361,8 @@ async function saveSessionToSupabase(username, password, loginUrl, sessionData) 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        userId: userId,
-        teamId: teamId,
+        userId: currentUserId,
+        teamId: currentTeamId,
         gameName: gameName,
         username: username,
         password: password,
