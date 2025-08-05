@@ -34,8 +34,14 @@ export async function POST(request: NextRequest) {
     if (!game) {
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
+
+    // Get request body for credentials
+    const requestBody = await request.json().catch(() => ({}));
+    const { username, password } = requestBody;
     
-    const { data: gameCredential, error: credentialError } = await supabase
+    // Check if credentials exist for this team and game
+    let gameCredential = null;
+    const { data: existingCredential, error: credentialError } = await supabase
       .from('game_credential')
       .select(`
         id,
@@ -45,23 +51,47 @@ export async function POST(request: NextRequest) {
       .eq('game_id', game.id)
       .single();
 
-    if (credentialError || !gameCredential) {
-      console.error(`Game credential not found for team ${teamId} and game ${gameName}`);
-      console.error('Credential error:', credentialError);
-      return NextResponse.json({ 
-        error: 'Game credentials not found for this team',
-        details: `Team ID: ${teamId}, Game: ${gameName}`
-      }, { status: 404 });
-    }
+    if (existingCredential) {
+      // Use existing credentials
+      gameCredential = existingCredential;
+      console.log(`Using existing game credential: ${gameCredential.id} for team ${teamId} and game ${gameName}`);
+    } else {
+      // Create new credential record with provided credentials or empty values
+      console.log(`No existing credentials found for team ${teamId} and game ${gameName}, creating new record`);
+      
+      const { data: newCredential, error: createError } = await supabase
+        .from('game_credential')
+        .insert({
+          team_id: parseInt(teamId),
+          game_id: game.id,
+          username: username || '',
+          password: password || '',
+          created_at: new Date().toISOString()
+        })
+        .select(`
+          id,
+          game:game_id (*)
+        `)
+        .single();
 
-    console.log(`Found game credential: ${gameCredential.id} for team ${teamId} and game ${gameName}`);
+      if (createError) {
+        console.error('Failed to create game credential:', createError);
+        return NextResponse.json({ 
+          error: 'Failed to create game credential',
+          details: createError.message
+        }, { status: 500 });
+      }
+
+      gameCredential = newCredential;
+      console.log(`Created new game credential: ${gameCredential.id} for team ${teamId} and game ${gameName}`);
+    }
 
     // Create job data for login action
     const jobData: JobData = {
       userId: user.id,
       gameCredentialId: gameCredential.id,
       action: 'login',
-      params: {}, // Login doesn't need additional parameters
+      params: { username, password }, // Pass credentials to the job
       teamId: parseInt(teamId),
       gameName: gameName
     };

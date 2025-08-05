@@ -222,7 +222,8 @@ class ScreenshotWebSocketServer {
       return;
     }
 
-    console.log(`Broadcasting screenshot for ${gameName} - ${action} to ${this.connections.size} clients`);
+    console.log(`WebSocket Server: Broadcasting screenshot for ${gameName} - ${action} to ${this.connections.size} clients`);
+    console.log(`WebSocket Server: Screenshot buffer size: ${screenshotBuffer.length} bytes`);
     
     const base64Image = screenshotBuffer.toString('base64');
     const message: ScreenshotMessage = {
@@ -234,20 +235,25 @@ class ScreenshotWebSocketServer {
     };
 
     const messageStr = JSON.stringify(message);
+    console.log(`WebSocket Server: Message size: ${messageStr.length} characters`);
+    
     let sentCount = 0;
     let failedCount = 0;
 
     this.connections.forEach((connection, connectionId) => {
+      console.log(`WebSocket Server: Checking connection ${connectionId}, readyState: ${connection.ws.readyState}`);
       if (connection.ws.readyState === WebSocket.OPEN) {
         try {
           connection.ws.send(messageStr);
           sentCount++;
+          console.log(`WebSocket Server: Successfully sent to ${connectionId}`);
         } catch (error) {
-          console.error(`Failed to send to ${connectionId}:`, error);
+          console.error(`WebSocket Server: Failed to send to ${connectionId}:`, error);
           this.connections.delete(connectionId);
           failedCount++;
         }
       } else {
+        console.log(`WebSocket Server: Removing dead connection ${connectionId}, readyState: ${connection.ws.readyState}`);
         // Remove dead connections
         this.connections.delete(connectionId);
         failedCount++;
@@ -255,9 +261,9 @@ class ScreenshotWebSocketServer {
     });
 
     if (sentCount === 0) {
-      console.log(`Screenshot captured but no clients connected (${gameName} - ${action})`);
+      console.log(`WebSocket Server: Screenshot captured but no clients connected (${gameName} - ${action})`);
     } else {
-      console.log(`Screenshot broadcasted to ${sentCount} clients, ${failedCount} failed`);
+      console.log(`WebSocket Server: Screenshot broadcasted to ${sentCount} clients, ${failedCount} failed`);
     }
   }
 

@@ -8,6 +8,46 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const config = require('./config');
 
+// WebSocket screenshot capture function
+function createWebSocketScreenshotCapture(page, gameName, action, interval = 500) {
+    console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
+    let screenshotCount = 0;
+    
+    const screenshotInterval = setInterval(async () => {
+        try {
+            screenshotCount++;
+            console.log(`Taking screenshot #${screenshotCount} for ${gameName} - ${action}...`);
+            
+            // Take screenshot as buffer
+            const screenshotBuffer = await page.screenshot();
+            console.log(`Screenshot #${screenshotCount} taken, size: ${screenshotBuffer.length} bytes`);
+            
+            // Convert to base64 for WebSocket transmission
+            const base64Image = screenshotBuffer.toString('base64');
+            
+            // Send via WebSocket (this will be handled by the parent process)
+            console.log(`WebSocket screenshot #${screenshotCount} ready: ${new Date().toISOString()}`);
+            
+            // Emit custom event that parent can listen to
+            if (global.screenshotWebSocketServer) {
+                console.log(`Broadcasting screenshot #${screenshotCount} via WebSocket server...`);
+                console.log('WebSocket server connection count:', global.screenshotWebSocketServer.getConnectionCount());
+                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
+                console.log(`Screenshot #${screenshotCount} broadcasted successfully`);
+            } else {
+                console.log('WebSocket server not available for screenshot broadcasting');
+            }
+        } catch (error) {
+            console.log(`WebSocket screenshot #${screenshotCount} error:`, error);
+        }
+    }, interval);
+
+    return () => {
+        console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action} (took ${screenshotCount} screenshots)`);
+        clearInterval(screenshotInterval);
+    };
+}
+
 const username = process.argv[2] || '';
 const password = process.argv[3] || '';
 const gameurl = process.argv[4] || '';
@@ -221,20 +261,7 @@ async function checkForCaptchaError(page) {
     'p[class*="error"]'
   ];
   
-  // First, let's log all visible text on the page to see what error messages are present
-  console.log('=== DEBUGGING: Checking all visible text for errors ===');
-  try {
-    const allText = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('*'))
-        .filter(el => el.offsetParent !== null) // Only visible elements
-        .map(el => el.textContent?.trim())
-        .filter(text => text && text.length > 0)
-        .join(' | ');
-    });
-    console.log('All visible text on page:', allText);
-  } catch (error) {
-    console.log('Error getting all text:', error.message);
-  }
+  // Removed debugging code that was printing all visible text
   
   for (const selector of errorSelectors) {
     try {
@@ -614,18 +641,19 @@ async function performLoginAttempt(page, username, password) {
   }
 }
 
-async function loginAndSaveState(providedUsername, providedPassword, providedGameUrl, providedUserId, providedGameCredentialId) {
+async function loginAndSaveState(providedUsername, providedPassword, providedGameUrl, providedUserId, providedGameCredentialId, providedParams) {
   console.log('loginAndSaveState called with parameters:', {
     providedUsername,
     providedPassword,
     providedGameUrl,
     providedUserId,
-    providedGameCredentialId
+    providedGameCredentialId,
+    providedParams
   });
   
-  // Use provided parameters if available, otherwise fall back to command line args
-  const loginUsername = providedUsername || username;
-  const loginPassword = providedPassword || password;
+  // Always use manually entered credentials from params, never fall back to saved ones
+  const loginUsername = providedParams?.username || '';
+  const loginPassword = providedParams?.password || '';
   const loginGameUrl = providedGameUrl || gameurl;
   const loginUserId = providedUserId || userId;
   const loginGameCredentialId = providedGameCredentialId || 0; // Default to 0 if not provided
@@ -655,6 +683,22 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
    
     // Create a new page
     const page = await context.newPage();
+   
+    // Start WebSocket screenshot capture
+    let stopScreenshotCapture;
+    try {
+      console.log('Starting WebSocket screenshot capture for login...');
+      console.log('WebSocket server available:', !!global.screenshotWebSocketServer);
+      console.log('WebSocket server details:', global.screenshotWebSocketServer ? {
+        isInitialized: global.screenshotWebSocketServer.isServerInitialized(),
+        connectionCount: global.screenshotWebSocketServer.getConnectionCount()
+      } : 'NOT AVAILABLE');
+      stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'login', 500);
+      console.log('Screenshot capture started successfully');
+    } catch (error) {
+      console.log('Failed to start screenshot capture:', error);
+      stopScreenshotCapture = () => {}; // No-op function
+    }
    
     try {
       console.log('Opening login page...');
@@ -772,17 +816,44 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
         
         console.log('You can now run account creation without logging in again!');
         
+        // Stop screenshot capture
+        stopScreenshotCapture();
+        
         // Close the browser after successful login and state saving
         await browser.close();
         console.log('Browser closed successfully.');
         
-        // Return success result for queue processing
-        return {
-          success: true,
-          message: 'Login successful',
-          sessionToken: 'session-token', // This will be generated by the session manager
-          gameCredentialId: loginGameCredentialId
-        };
+                 // Save credentials to Supabase if they were provided and are different from stored ones
+         if (providedParams?.username && providedParams?.password) {
+           try {
+             console.log('Saving provided credentials to Supabase...');
+             const { data: updateData, error: updateError } = await supabase
+               .from('game_credential')
+               .update({
+                 username: providedParams.username,
+                 password: providedParams.password,
+                 updated_at: new Date().toISOString()
+               })
+               .eq('id', loginGameCredentialId)
+               .select();
+             
+             if (updateError) {
+               console.error('Failed to update credentials:', updateError);
+             } else {
+               console.log('Credentials saved successfully');
+             }
+           } catch (error) {
+             console.error('Error saving credentials:', error);
+           }
+         }
+         
+         // Return success result for queue processing
+         return {
+           success: true,
+           message: 'Login successful',
+           sessionToken: 'session-token', // This will be generated by the session manager
+           gameCredentialId: loginGameCredentialId
+         };
         
       } else if (loginResult.result === 'captcha_error') {
         console.log(`Captcha error on attempt ${attempt} - will retry with fresh page`);
@@ -798,6 +869,9 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
           );
         }
         
+        // Stop screenshot capture
+        stopScreenshotCapture();
+        
         console.log('Closing browser due to captcha error...');
         await browser.close();
         console.log('Browser closed successfully after captcha error');
@@ -808,6 +882,8 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
           attempt++;
         } else {
           console.log(`Max retries (${maxRetries}) reached. Closing browser.`);
+          // Stop screenshot capture
+          stopScreenshotCapture();
           await browser.close();
           return {
             success: false,
@@ -828,6 +904,9 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
           );
         }
         
+        // Stop screenshot capture
+        stopScreenshotCapture();
+        
         await browser.close();
         return {
           success: false,
@@ -837,6 +916,8 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
       
     } catch (error) {
       console.error('Error during login process:', error);
+      // Stop screenshot capture
+      stopScreenshotCapture();
       await browser.close();
       return {
         success: false,

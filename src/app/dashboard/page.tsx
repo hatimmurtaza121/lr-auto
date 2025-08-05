@@ -220,10 +220,10 @@ export default function Dashboard() {
             </div>
           </div>
           
-          {/* Right Column - Browser View (Hidden below lg) */}
-          <div className="hidden lg:block h-[calc(100vh-100px)]">
+          {/* Right Column - Browser View (Always visible on large screens, visible on all screens during execution) */}
+          <div className={`${workerExecuting || isExecuting ? 'block' : 'hidden lg:block'} h-[calc(100vh-100px)]`}>
             <BrowserView 
-              isExecuting={workerExecuting} 
+              isExecuting={workerExecuting || isExecuting} 
               currentLog={currentLog}
               allLogs={allLogs}
             />

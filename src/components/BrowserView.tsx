@@ -37,7 +37,7 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
     setConnectionStatus('connecting');
 
     ws.onopen = () => {
-      console.log('WebSocket connected successfully');
+      console.log('BrowserView: WebSocket connected successfully');
       setConnectionStatus('connected');
       setReconnectAttempts(0); // Reset reconnect attempts on successful connection
       
@@ -48,16 +48,20 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
         teamId: 'current-team'
       };
       ws.send(JSON.stringify(authMessage));
-      console.log('Sent auth message:', authMessage);
+      console.log('BrowserView: Sent auth message:', authMessage);
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('WebSocket message received:', data.type, data);
+        console.log('BrowserView: WebSocket message received:', data.type, data);
+        console.log('BrowserView: Message data length:', event.data.length);
         
         if (data.type === 'screenshot') {
-          console.log('Screenshot received, processing...');
+          console.log('BrowserView: Screenshot received, processing...');
+          console.log('BrowserView: Screenshot data length:', data.data.length);
+          console.log('BrowserView: Screenshot game/action:', data.gameName, data.action);
+          
           // Convert base64 to blob URL
           const byteCharacters = atob(data.data);
           const byteNumbers = new Array(byteCharacters.length);
@@ -77,7 +81,8 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
           blobUrlRef.current = url;
           setImageSrc(url);
           
-          console.log('WebSocket screenshot received and displayed:', data.timestamp);
+          console.log('BrowserView: WebSocket screenshot received and displayed:', data.timestamp);
+          console.log('BrowserView: Image URL created:', url);
         } else if (data.type === 'connection') {
           console.log('WebSocket connection confirmed:', data.message);
         } else if (data.type === 'heartbeat') {
@@ -160,6 +165,27 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
       }
     };
   }, []); // Empty dependency array - only run once on mount
+
+  // Ensure WebSocket connection is ready when execution starts
+  useEffect(() => {
+    if (isExecuting) {
+      console.log('BrowserView: Execution started - ensuring WebSocket connection is ready...');
+      
+      // If not connected, try to connect
+      if (connectionStatus !== 'connected') {
+        console.log('BrowserView: WebSocket not connected, attempting to connect...');
+        createWebSocketConnection();
+      } else {
+        console.log('BrowserView: WebSocket already connected, ready for screenshots');
+      }
+      
+      // Clear any existing image to show fresh screenshots
+      if (imageSrc) {
+        URL.revokeObjectURL(imageSrc);
+        setImageSrc('');
+      }
+    }
+  }, [isExecuting]);
 
   // Keep connection alive with heartbeat and ping
   useEffect(() => {
@@ -265,11 +291,17 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
             <div className="text-6xl mb-4">🖥️</div>
             <p className="text-lg font-medium">Browser View</p>
             <p className="text-sm">
-              {connectionStatus === 'connected' ? 'Waiting for screenshots...' : 
+              {isExecuting && connectionStatus === 'connected' ? 'Ready for screenshots! 🎯' :
+               connectionStatus === 'connected' ? 'Waiting for screenshots...' : 
                connectionStatus === 'connecting' ? 'Connecting to WebSocket...' : 
                reconnectAttempts >= 10 ? 'Connection failed. Click Reconnect.' : 
                'Connecting to WebSocket...'}
             </p>
+            {isExecuting && connectionStatus === 'connected' && (
+              <p className="text-xs text-green-500 mt-2">
+                Screenshots will appear here during login process
+              </p>
+            )}
             {connectionStatus !== 'connected' && reconnectAttempts < 10 && (
               <p className="text-xs text-orange-500 mt-2">
                 Attempting to reconnect... ({reconnectAttempts}/10)

@@ -69,6 +69,8 @@ export interface ActionParams {
   targetUsername?: string;
   amount?: number;
   remark?: string;
+  username?: string;
+  password?: string;
   // Add other parameters as needed
 }
 
@@ -352,7 +354,7 @@ export async function loginWithSession(
   };
 
   try {
-    // Get game info to determine script path
+    // Get game info to determine script path (but don't use saved credentials)
     const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
     
     // Ensure WebSocket server is initialized and make it available to the script
@@ -362,12 +364,14 @@ export async function loginWithSession(
     
     // Import and execute the login script function
     const scriptModule = require(`../../scripts/login.js`);
+    // Always use manually entered credentials, never fall back to saved ones
     const loginResult = await scriptModule.loginAndSaveState(
-      gameInfo.username,
-      gameInfo.password,
+      params?.username || '', // Use whatever is in the input fields
+      params?.password || '', // Use whatever is in the input fields
       gameInfo.game.login_url,
       userId,
-      gameCredentialId
+      gameCredentialId,
+      params // Pass the params to the login script
     );
     
     // Restore original console.log
