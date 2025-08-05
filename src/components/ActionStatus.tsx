@@ -87,6 +87,21 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           window.dispatchEvent(sessionExpiredEvent);
         }
 
+        // Check if this is a completed login job
+        if (status === 'completed' && job.action === 'login' && result) {
+          // Dispatch event for login job completion
+          const loginJobCompleteEvent = new CustomEvent('login-job-complete', {
+            detail: {
+              gameName: job.gameName,
+              action: 'login',
+              success: result.success,
+              sessionToken: result.sessionToken,
+              message: result.message
+            }
+          });
+          window.dispatchEvent(loginJobCompleteEvent);
+        }
+
         return {
           ...job,
           status,
