@@ -3,6 +3,7 @@ import { globalQueue } from '../config/queues';
 import { createRedisConnection } from '../config/redis';
 import { createNewAccountWithSession, resetPasswordWithSession, rechargeWithSession, redeemWithSession, loginWithSession } from '@/utils/action-wrappers';
 import { screenshotWebSocketServer } from '@/utils/websocket-server';
+import { updateGameStatus } from '@/utils/game-status';
 
 export class GlobalWorker {
   private worker: Worker;
@@ -76,12 +77,14 @@ export class GlobalWorker {
         case 'login':
           await job.updateProgress(20);
           console.log(`Job ${job.id}: Processing login...`);
+          console.log(`Job ${job.id}: Team ID from job data:`, data.teamId);
           this.broadcastWorkerStatus(true, 'Processing login...', ['Processing login...']);
           
           result = await loginWithSession(
             data.userId,
             data.gameCredentialId,
-            data.params || {}
+            data.params || {},
+            data.teamId
           );
           break;
 
@@ -143,6 +146,66 @@ export class GlobalWorker {
       console.log(`Job ${job.id}: Result type:`, typeof result);
       console.log(`Job ${job.id}: Result JSON:`, JSON.stringify(result));
       
+      // Save action status to database
+      try {
+        const { getGame } = await import('@/utils/game-mapping');
+        const game = await getGame(data.gameName);
+        if (game) {
+          // Prepare inputs based on action type
+          let inputs: any = {};
+          
+          switch (data.action) {
+            case 'login':
+              // For login, include both username and password
+              inputs = {
+                username: data.params?.username || '',
+                password: data.params?.password || ''
+              };
+              break;
+            case 'newAccount':
+              inputs = {
+                newAccountName: data.params?.newAccountName || '',
+                newPassword: data.params?.newPassword || ''
+              };
+              break;
+            case 'passwordReset':
+              inputs = {
+                targetUsername: data.params?.targetUsername || '',
+                newPassword: data.params?.newPassword || ''
+              };
+              break;
+            case 'recharge':
+              inputs = {
+                targetUsername: data.params?.targetUsername || '',
+                amount: data.params?.amount || 0,
+                remark: data.params?.remark || ''
+              };
+              break;
+            case 'redeem':
+              inputs = {
+                targetUsername: data.params?.targetUsername || '',
+                amount: data.params?.amount || 0,
+                remark: data.params?.remark || ''
+              };
+              break;
+          }
+          
+          await updateGameStatus({
+            teamId: data.teamId,
+            gameId: game.id,
+            action: data.action === 'newAccount' ? 'new_account' : 
+                   data.action === 'passwordReset' ? 'password_reset' : 
+                   data.action,
+            status: result?.success ? 'success' : 'fail',
+            inputs: inputs
+          });
+          
+          console.log(`Job ${job.id}: Action status saved to database`);
+        }
+      } catch (statusError) {
+        console.error(`Job ${job.id}: Failed to save action status:`, statusError);
+      }
+      
       // Dispatch the script result
       this.dispatchScriptResult(job.id || 'unknown', result);
       
@@ -171,6 +234,64 @@ export class GlobalWorker {
       return serializedResult;
     } catch (error) {
       console.error(`Job ${job.id} failed with error:`, error);
+      
+      // Save failed action status to database
+      try {
+        const { getGame } = await import('@/utils/game-mapping');
+        const game = await getGame(data.gameName);
+        if (game) {
+          let inputs: any = {};
+          
+          switch (data.action) {
+            case 'login':
+              inputs = {
+                username: data.params?.username || '',
+                password: data.params?.password || ''
+              };
+              break;
+            case 'newAccount':
+              inputs = {
+                newAccountName: data.params?.newAccountName || '',
+                newPassword: data.params?.newPassword || ''
+              };
+              break;
+            case 'passwordReset':
+              inputs = {
+                targetUsername: data.params?.targetUsername || '',
+                newPassword: data.params?.newPassword || ''
+              };
+              break;
+            case 'recharge':
+              inputs = {
+                targetUsername: data.params?.targetUsername || '',
+                amount: data.params?.amount || 0,
+                remark: data.params?.remark || ''
+              };
+              break;
+            case 'redeem':
+              inputs = {
+                targetUsername: data.params?.targetUsername || '',
+                amount: data.params?.amount || 0,
+                remark: data.params?.remark || ''
+              };
+              break;
+          }
+          
+          await updateGameStatus({
+            teamId: data.teamId,
+            gameId: game.id,
+            action: data.action === 'newAccount' ? 'new_account' : 
+                   data.action === 'passwordReset' ? 'password_reset' : 
+                   data.action,
+            status: 'fail',
+            inputs: inputs
+          });
+          
+          console.log(`Job ${job.id}: Failed action status saved to database`);
+        }
+      } catch (statusError) {
+        console.error(`Job ${job.id}: Failed to save failed action status:`, statusError);
+      }
       
       // Determine if this is an expected error or unexpected error
       const errorMessage = error instanceof Error ? error.message : String(error);

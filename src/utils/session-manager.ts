@@ -136,21 +136,22 @@ export class SessionManager {
       return null;
     }
 
-    // Check if session has expired
-    if (session.expires_at) {
-      const now = new Date();
-      const expiresAt = new Date(session.expires_at);
+    // Check if session has expired or has no expiration date
+    const now = new Date();
+    const expiresAt = session.expires_at ? new Date(session.expires_at) : null;
+    
+    // Consider session inactive if expires_at is null or if it has expired
+    if (!expiresAt || (expiresAt && now > expiresAt)) {
+      console.log(`Session is inactive - expires_at: ${session.expires_at}`);
       
-      if (now > expiresAt) {
-        // Mark session as inactive
-        const supabase = getSupabaseClient();
-        await supabase
-          .from('session')
-          .update({ is_active: false })
-          .eq('id', session.id);
-        
-        return null;
-      }
+      // Mark session as inactive
+      const supabase = getSupabaseClient();
+      await supabase
+        .from('session')
+        .update({ is_active: false })
+        .eq('id', session.id);
+      
+      return null;
     }
 
     return {

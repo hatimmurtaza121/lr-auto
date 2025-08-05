@@ -61,33 +61,52 @@ async function resetAccountPassword(page, context, params = {}) {
         await listFrame.getByRole('textbox', { name: 'Account' }).fill(targetUsername);
         await listFrame.getByRole('button', { name: '  Search' }).click();
 
-        // 3.5a. Check if "No data." row is present
-        const noData = listFrame
-            .locator('tbody > tr > td[colspan="16"] span.help-block')
-            .filter({ hasText: 'No data.' });
-
+        // 3.5. Wait for table to load and stabilize
+        console.log('Waiting for search results to load...');
+        
         // Validate account exists and is accessible
         let accountValidationError = null;
         
-        if (await noData.count() > 0) {
-            console.log('No user exists. Aborting.');
-            accountValidationError = 'No account found';
-        } else {
-            // 3.5b. Now safely grab the first data row
-            const firstRow = listFrame.locator('tbody > tr').first();
-            try {
-                await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
-                const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
-                const foundName = (await accountCell.textContent()).trim();
-                console.log(foundName, '---', targetUsername);
-                if (foundName !== targetUsername) {
-                    console.log('Account in row does not match. Aborting.');
+        // Wait for either data to appear OR "No data" message to appear
+        try {
+            // First, wait for the table to stop loading (either data or no data)
+            await listFrame.locator('tbody').waitFor({ timeout: 10000 });
+            
+            // Give a small buffer for the table to fully render
+            await page.waitForTimeout(1000);
+            
+            // Now check if "No data." row is present
+            const noData = listFrame
+                .locator('tbody > tr > td[colspan="16"] span.help-block')
+                .filter({ hasText: 'No data.' });
+            
+            if (await noData.count() > 0) {
+                console.log('No user exists. Aborting.');
+                accountValidationError = 'No account found';
+            } else {
+                // 3.5b. Now safely grab the first data row
+                const firstRow = listFrame.locator('tbody > tr').first();
+                try {
+                    await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
+                    const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
+                    const foundName = (await accountCell.textContent()).trim();
+                    console.log(foundName, '---', targetUsername);
+                    if (foundName !== targetUsername) {
+                        console.log('Account in row does not match. Aborting.');
+                        accountValidationError = 'No account found';
+                    }
+                } catch {
+                    console.log('No rows found. Aborting.');
                     accountValidationError = 'No account found';
                 }
-            } catch {
-                console.log('No rows found. Aborting.');
-                accountValidationError = 'No account found';
             }
+        } catch (error) {
+            console.log('Table loading timeout. Aborting.');
+            return {
+                success: false,
+                message: 'Table loading timeout',
+                username: targetUsername
+            };
         }
 
         // Early return if validation failed

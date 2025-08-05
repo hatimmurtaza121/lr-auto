@@ -93,7 +93,11 @@ export async function POST(request: NextRequest) {
         teamId: teamId,
         gameId: game.id,
         action: 'login',
-        status: loginResult.success ? 'success' : 'fail'
+        status: loginResult.success ? 'success' : 'fail',
+        inputs: {
+          username: username,
+          password: password
+        }
       });
       console.log(`Login status updated: ${loginResult.success ? 'success' : 'fail'}`);
     } catch (error) {

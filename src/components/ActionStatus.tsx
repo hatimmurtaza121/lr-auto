@@ -192,10 +192,17 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
 
       // Prepare inputs data
       const inputs = params ? {
-        account_name: params.accountName || params.newAccountName || params.targetUsername,
-        password: params.password || params.newPassword,
-        amount: params.amount,
-        remarks: params.remark || params.remarks
+        // For login actions, include both username and password
+        ...(job.action === 'login' ? {
+          username: params.username || '',
+          password: params.password || ''
+        } : {
+          // For other actions, use the existing logic
+          account_name: params.accountName || params.newAccountName || params.targetUsername,
+          password: params.password || params.newPassword,
+          amount: params.amount,
+          remarks: params.remark || params.remarks
+        })
       } : undefined;
 
       // Map action names to match database format

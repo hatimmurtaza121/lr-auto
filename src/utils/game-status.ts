@@ -1,24 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (!supabaseUrl) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required');
-  }
-  if (!supabaseKey) {
-    throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
-  }
-  
-  return createClient(supabaseUrl, supabaseKey);
-}
-
 export interface GameStatusUpdate {
   teamId: number;
   gameId: number;
   action: 'login' | 'new_account' | 'password_reset' | 'recharge' | 'redeem';
   status: 'success' | 'fail' | 'unknown';
+  inputs?: any; // Add inputs field to store action parameters
 }
 
 /**
@@ -28,7 +15,18 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
   try {
     console.log(`Updating game status:`, update);
 
-    const supabase = getSupabaseClient();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required');
+    }
+    if (!supabaseKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
     const { error } = await supabase
       .from('game_action_status')
       .insert({
@@ -36,6 +34,7 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
         game_id: update.gameId,
         action: update.action,
         status: update.status,
+        inputs: update.inputs || null, // Save inputs field
         updated_at: new Date().toISOString()
       });
 
@@ -56,7 +55,18 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
  */
 export async function getGameStatus(teamId: number) {
   try {
-    const supabase = getSupabaseClient();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required');
+    }
+    if (!supabaseKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
     const { data, error } = await supabase
       .from('game_action_status')
       .select(`
@@ -65,6 +75,7 @@ export async function getGameStatus(teamId: number) {
         game_id,
         action,
         status,
+        inputs,
         updated_at,
         game:game_id (
           id,
@@ -101,6 +112,7 @@ export async function getGameStatus(teamId: number) {
           new Date(record.updated_at) > new Date(gameStatus.actions[action].updated_at)) {
         gameStatus.actions[action] = {
           status: record.status,
+          inputs: record.inputs,
           updated_at: record.updated_at
         };
       }

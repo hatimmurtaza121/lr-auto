@@ -23,7 +23,7 @@ function ensureWebSocketServerInitialized() {
 console.log('Action wrappers module loaded - ensuring WebSocket server is initialized...');
 ensureWebSocketServerInitialized();
 
-function getSupabaseClient() {
+async function getGameInfoFromCredentialId(gameCredentialId: number) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   
@@ -34,11 +34,8 @@ function getSupabaseClient() {
     throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
   }
   
-  return createClient(supabaseUrl, supabaseKey);
-}
-
-async function getGameInfoFromCredentialId(gameCredentialId: number) {
-  const supabase = getSupabaseClient();
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  
   const { data: gameCredential, error } = await supabase
     .from('game_credential')
     .select(`
@@ -341,7 +338,8 @@ export async function redeemWithSession(
 export async function loginWithSession(
   userId: string,
   gameCredentialId: number,
-  params: ActionParams
+  params: ActionParams,
+  teamId?: number
 ): Promise<{ success: boolean; message: string; sessionToken?: string; gameCredentialId?: number; needsLogin?: boolean; gameInfo?: any; logs?: string[] }> {
   const logs: string[] = [];
   
@@ -364,6 +362,8 @@ export async function loginWithSession(
     
     // Import and execute the login script function
     const scriptModule = require(`../../scripts/login.js`);
+    console.log('Login wrapper - passing teamId to script:', teamId);
+    console.log('Login wrapper - params:', params);
     // Always use manually entered credentials, never fall back to saved ones
     const loginResult = await scriptModule.loginAndSaveState(
       params?.username || '', // Use whatever is in the input fields
@@ -371,7 +371,7 @@ export async function loginWithSession(
       gameInfo.game.login_url,
       userId,
       gameCredentialId,
-      params // Pass the params to the login script
+      { ...params, teamId } // Pass the params and teamId to the login script
     );
     
     // Restore original console.log

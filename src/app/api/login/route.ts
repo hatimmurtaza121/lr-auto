@@ -61,7 +61,11 @@ export async function POST(request: NextRequest) {
           teamId: teamId,
           gameId: game.id,
           action: 'login',
-          status: 'success'
+          status: 'success',
+          inputs: {
+            username: username,
+            password: password
+          }
         });
         console.log('Login status updated: success');
       } catch (error) {
@@ -79,7 +83,11 @@ export async function POST(request: NextRequest) {
           teamId: teamId,
           gameId: game.id,
           action: 'login',
-          status: 'fail'
+          status: 'fail',
+          inputs: {
+            username: username,
+            password: password
+          }
         });
         console.log('Login status updated: fail');
       } catch (error) {

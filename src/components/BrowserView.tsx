@@ -4,16 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 
 interface BrowserViewProps {
   isExecuting: boolean;
-  currentLog?: string;
-  allLogs?: string[];
 }
 
-export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: BrowserViewProps) {
+export default function BrowserView({ isExecuting }: BrowserViewProps) {
   const [imageSrc, setImageSrc] = useState<string>('');
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  const logContainerRef = useRef<HTMLDivElement>(null);
   const blobUrlRef = useRef<string>('');
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -219,12 +216,7 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
     }
   }, [wsConnection, connectionStatus]);
 
-  // Auto-scroll to bottom when new logs arrive
-  useEffect(() => {
-    if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [allLogs, currentLog]);
+
 
   // Manual reconnect function
   const handleManualReconnect = () => {
@@ -291,7 +283,7 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
             <div className="text-6xl mb-4">🖥️</div>
             <p className="text-lg font-medium">Browser View</p>
             <p className="text-sm">
-              {isExecuting && connectionStatus === 'connected' ? 'Ready for screenshots! 🎯' :
+              {isExecuting && connectionStatus === 'connected' ? 'Ready for screenshots!' :
                connectionStatus === 'connected' ? 'Waiting for screenshots...' : 
                connectionStatus === 'connecting' ? 'Connecting to WebSocket...' : 
                reconnectAttempts >= 10 ? 'Connection failed. Click Reconnect.' : 
@@ -311,30 +303,7 @@ export default function BrowserView({ isExecuting, currentLog, allLogs = [] }: B
         )}
       </div>
 
-      {/* Log Display Area */}
-      {isExecuting && (
-        <div ref={logContainerRef} className="bg-blue-50 border border-blue-200 rounded-2xl p-4 h-40 overflow-y-auto">
-          <div className="flex items-center mb-2">
-            <span className="text-blue-800 font-medium text-sm">Execution Logs</span>
-          </div>
-          <div className="text-xs text-blue-600 space-y-1 font-mono">
-            {/* Show only the latest log */}
-            {allLogs.length > 0 && (
-              <div className="flex items-start">
-                <span className="text-blue-400 mr-2">•</span>
-                <span className="flex-1">{allLogs[allLogs.length - 1]}</span>
-              </div>
-            )}
-            {/* Optionally, show currentLog if it's not already the last log */}
-            {currentLog && currentLog !== allLogs[allLogs.length - 1] && (
-              <div className="flex items-start bg-blue-100 p-1 rounded">
-                <span className="text-blue-600 mr-2 font-bold">→</span>
-                <span className="flex-1 font-medium">{currentLog}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+
     </div>
   );
 } 

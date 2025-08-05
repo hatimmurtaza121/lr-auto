@@ -52,7 +52,8 @@ const username = process.argv[2] || '';
 const password = process.argv[3] || '';
 const gameurl = process.argv[4] || '';
 const saveToSupabase = process.argv[5] !== 'false'; // Default to true, but can be disabled
-const teamId = process.argv[6] ? parseInt(process.argv[6]) : 1; // Team ID parameter
+// Get team ID from command line args, no default - will be handled in loginAndSaveState
+const teamId = process.argv[6] ? parseInt(process.argv[6]) : null;
 const userId = process.argv[7] || 'default-user-id'; // User ID parameter
 const storageFile = path.join(__dirname, '../auth-state.json');
 
@@ -68,6 +69,52 @@ const supabase = createClient(
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+
+/**
+ * Get game information including dashboard URL from database
+ */
+async function getGameInfo(gameCredentialId) {
+  try {
+    console.log(`Fetching game info for credential ID: ${gameCredentialId}`);
+    
+    const { data: gameCredential, error } = await supabase
+      .from('game_credential')
+      .select(`
+        id,
+        username,
+        password,
+        game:game_id (
+          id,
+          name,
+          login_url,
+          dashboard_url
+        )
+      `)
+      .eq('id', gameCredentialId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching game credential:', error);
+      return null;
+    }
+
+    if (!gameCredential) {
+      console.error(`Game credential not found for ID: ${gameCredentialId}`);
+      return null;
+    }
+
+    console.log('Game info retrieved:', {
+      gameName: gameCredential.game.name,
+      loginUrl: gameCredential.game.login_url,
+      dashboardUrl: gameCredential.game.dashboard_url
+    });
+
+    return gameCredential;
+  } catch (error) {
+    console.error('Error in getGameInfo:', error);
+    return null;
+  }
+}
 
 async function solveCaptchaWithGemini(captchaImagePath) {
   try {
@@ -355,6 +402,73 @@ async function logCaptchaToSupabase(imagePath, apiResponse, apiStatus) {
   }
 }
 
+// Function to save or update credentials in Supabase
+async function saveOrUpdateCredentials(username, password, teamId, gameId) {
+  try {
+    console.log('Saving/updating credentials in Supabase...');
+    console.log('Parameters:', { username, teamId, gameId });
+    
+    // Check if credentials already exist for this team and game combination
+    const { data: existingCredential, error: checkError } = await supabase
+      .from('game_credential')
+      .select('id, username, password')
+      .eq('team_id', teamId)
+      .eq('game_id', gameId)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.error('Error checking for existing credentials:', checkError);
+      throw new Error(`Failed to check existing credentials: ${checkError.message}`);
+    }
+    
+    if (existingCredential) {
+      console.log('Found existing credentials, updating...');
+      
+             // Update existing credentials
+       const { data: updateData, error: updateError } = await supabase
+         .from('game_credential')
+         .update({
+           username: username,
+           password: password
+         })
+         .eq('id', existingCredential.id)
+         .select();
+      
+      if (updateError) {
+        console.error('Failed to update credentials:', updateError);
+        throw new Error(`Failed to update credentials: ${updateError.message}`);
+      }
+      
+      console.log('Credentials updated successfully:', updateData);
+      return updateData[0];
+    } else {
+      console.log('No existing credentials found, creating new ones...');
+      
+             // Create new credentials using team_id and game_id directly
+       const { data: newCredential, error: insertError } = await supabase
+         .from('game_credential')
+         .insert({
+           team_id: teamId,
+           game_id: gameId,
+           username: username,
+           password: password
+         })
+         .select();
+      
+      if (insertError) {
+        console.error('Failed to create credentials:', insertError);
+        throw new Error(`Failed to create credentials: ${insertError.message}`);
+      }
+      
+      console.log('New credentials created successfully:', newCredential);
+      return newCredential[0];
+    }
+  } catch (error) {
+    console.error('Error saving/updating credentials:', error);
+    throw error;
+  }
+}
+
 // Function to save session to Supabase
 async function saveSessionToSupabase(username, password, loginUrl, sessionData, userId, gameCredentialId, teamId) {
   try {
@@ -381,10 +495,12 @@ async function saveSessionToSupabase(username, password, loginUrl, sessionData, 
     console.log(`Detected game: ${gameName}`);
 
     // Use the team ID and user ID from parameters
-    const currentTeamId = teamId;
+    const currentTeamId = teamId; // This should be the passed teamId parameter
     const currentUserId = userId;
     
     console.log('Using teamId:', currentTeamId, 'userId:', currentUserId, 'gameCredentialId:', gameCredentialId);
+    console.log('Team ID parameter received:', teamId);
+    
 
     // Check if session already exists for this user and game credential
     console.log('Checking for existing session...');
@@ -462,7 +578,7 @@ async function saveSessionToSupabase(username, password, loginUrl, sessionData, 
   }
 }
 
-async function performLoginAttempt(page, username, password) {
+async function performLoginAttempt(page, username, password, gameCredentialId) {
   console.log('Filling in login credentials...');
   
   // Find and fill username field by placeholder (try username first, then account)
@@ -612,17 +728,84 @@ async function performLoginAttempt(page, username, password) {
     const currentUrl = page.url();
     console.log(`Current URL after login attempt: ${currentUrl}`);
     
-    // Check if URL contains success indicators
-    const successPatterns = ['admin', 'HomeDetail', 'Cashier.aspx'];
-    const isLoginSuccessful = successPatterns.some(pattern => 
-      currentUrl.toLowerCase().includes(pattern.toLowerCase())
-    );
+    // Get game info from database to check dashboard URL
+    const gameInfo = await getGameInfo(gameCredentialId);
+    if (!gameInfo) {
+      console.log('Could not fetch game info from database, falling back to pattern matching');
+      
+      // Fallback to pattern matching if we can't get game info
+      const successPatterns = ['admin', 'HomeDetail', 'Cashier.aspx'];
+      const isLoginSuccessful = successPatterns.some(pattern => 
+        currentUrl.toLowerCase().includes(pattern.toLowerCase())
+      );
+      
+      if (isLoginSuccessful) {
+        console.log('Login successful! URL contains success pattern (fallback).');
+        return { result: 'success', captchaData: captchaResult.captchaData };
+      } else {
+        console.log('Login not successful - URL does not contain success patterns (fallback).');
+        
+        // Check for captcha error again (in case it appeared after the redirect)
+        const captchaError = await checkForCaptchaError(page);
+        if (captchaError) {
+          console.log('Captcha error detected after redirect - will retry with new captcha');
+          return { result: 'captcha_error', captchaData: captchaResult.captchaData };
+        } else {
+          console.log('No captcha error found - login failed.');
+          return { result: 'failed', captchaData: captchaResult.captchaData };
+        }
+      }
+    }
+    
+    // Compare current URL with dashboard URL from database
+    const dashboardUrl = gameInfo.game.dashboard_url;
+    console.log(`Expected dashboard URL: ${dashboardUrl}`);
+    console.log(`Current URL: ${currentUrl}`);
+    
+    // More strict URL matching - check if current URL matches dashboard URL exactly or contains the dashboard path
+    const normalizedCurrentUrl = currentUrl.toLowerCase();
+    const normalizedDashboardUrl = dashboardUrl.toLowerCase();
+    
+    // Extract the domain and path from dashboard URL
+    const dashboardUrlObj = new URL(normalizedDashboardUrl);
+    const dashboardDomain = dashboardUrlObj.hostname;
+    const dashboardPath = dashboardUrlObj.pathname;
+    
+    // Extract the domain and path from current URL
+    const currentUrlObj = new URL(normalizedCurrentUrl);
+    const currentDomain = currentUrlObj.hostname;
+    const currentPath = currentUrlObj.pathname;
+    
+    console.log(`Dashboard domain: ${dashboardDomain}, path: ${dashboardPath}`);
+    console.log(`Current domain: ${currentDomain}, path: ${currentPath}`);
+    
+    // Check if domains match and current path contains or equals dashboard path
+    const domainsMatch = currentDomain === dashboardDomain;
+    const pathMatches = currentPath === dashboardPath || currentPath.startsWith(dashboardPath);
+    
+    const isLoginSuccessful = domainsMatch && pathMatches;
+    
+    console.log(`Domains match: ${domainsMatch}`);
+    console.log(`Path matches: ${pathMatches}`);
+    
+    console.log(`URL comparison: current="${normalizedCurrentUrl}" vs dashboard="${normalizedDashboardUrl}"`);
+    console.log(`Exact match: ${normalizedCurrentUrl === normalizedDashboardUrl}`);
+    console.log(`Starts with: ${normalizedCurrentUrl.startsWith(normalizedDashboardUrl)}`);
     
     if (isLoginSuccessful) {
-      console.log('Login successful! URL contains success pattern.');
+      console.log('Login successful! Current URL matches dashboard URL from database.');
+      
+      // Additional verification: check if we're still on a login page
+      const loginFormPresent = await page.locator('input[type="password"]').isVisible();
+      if (loginFormPresent) {
+        console.log('WARNING: Login form still present despite URL match - login may have failed');
+        console.log('Login failed - still on login page despite URL match');
+        return { result: 'failed', captchaData: captchaResult.captchaData };
+      }
+      
       return { result: 'success', captchaData: captchaResult.captchaData };
     } else {
-      console.log('Login not successful - URL does not contain success patterns.');
+      console.log('Login not successful - URL does not match dashboard URL from database.');
       
       // Check for captcha error again (in case it appeared after the redirect)
       const captchaError = await checkForCaptchaError(page);
@@ -638,6 +821,36 @@ async function performLoginAttempt(page, username, password) {
   } catch (error) {
     console.log('Error during login check:', error.message);
     return { result: 'failed', captchaData: captchaResult.captchaData };
+  }
+}
+
+
+
+// Helper function to get game ID from URL
+function getGameIdFromUrl(loginUrl) {
+  try {
+    console.log(`Determining game ID from URL: ${loginUrl}`);
+    
+    // Map URLs to game IDs based on the database schema
+    if (loginUrl.includes('gamevault999.com')) {
+      return 3; // Game Vault
+    } else if (loginUrl.includes('orionstars.vip')) {
+      return 2; // Orion Stars
+    } else if (loginUrl.includes('juwa777.com')) {
+      return 6; // Juwa City
+    } else if (loginUrl.includes('yolo777.game')) {
+      return 1; // Yolo
+    } else if (loginUrl.includes('mrallinone777.com')) {
+      return 5; // Mr All In One
+    } else if (loginUrl.includes('orionstrike777.com')) {
+      return 4; // Orion Strike
+    }
+    
+    console.log('Could not determine game ID from URL');
+    return null;
+  } catch (error) {
+    console.error('Error determining game ID from URL:', error);
+    return null;
   }
 }
 
@@ -657,14 +870,24 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
   const loginGameUrl = providedGameUrl || gameurl;
   const loginUserId = providedUserId || userId;
   const loginGameCredentialId = providedGameCredentialId || 0; // Default to 0 if not provided
+  const loginTeamId = providedParams?.teamId || teamId; // Get team ID from params or fall back to global
+  if (!loginTeamId) {
+    console.error('No team ID provided - cannot proceed with login');
+    return {
+      success: false,
+      message: 'Team ID is required for login'
+    };
+  }
   
   console.log('Using parameters:', {
     loginUsername,
     loginPassword: '***', // Don't log password
     loginGameUrl,
     loginUserId,
-    loginGameCredentialId
+    loginGameCredentialId,
+    loginTeamId
   });
+  console.log('Team ID parameter received:', teamId);
   
   const maxRetries = 10; // Allow up to 10 attempts for captcha
   let attempt = 1;
@@ -712,7 +935,7 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
       await page.waitForLoadState('networkidle');
       
       // Perform the login attempt
-      const loginResult = await performLoginAttempt(page, loginUsername, loginPassword);
+      const loginResult = await performLoginAttempt(page, loginUsername, loginPassword, loginGameCredentialId);
       
       if (loginResult.result === 'success') {
         console.log(`\nLogin successful on attempt ${attempt}!`);
@@ -802,58 +1025,67 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
         console.log(`Earliest expiration: ${sessionData.earliestExpirationDate}`);
         console.log('Session data captured for Supabase');
         
-                           // Save session to Supabase (only if enabled)
-          if (saveToSupabase) {
-            try {
-              await saveSessionToSupabase(loginUsername, loginPassword, loginGameUrl, sessionData, loginUserId, loginGameCredentialId, teamId);
-              console.log('Session saved to Supabase successfully!');
-            } catch (error) {
-              console.error('Failed to save session to Supabase:', error);
-            }
-          } else {
-            console.log('Skipping Supabase save (disabled via parameter)');
-          }
-        
-        console.log('You can now run account creation without logging in again!');
-        
-        // Stop screenshot capture
-        stopScreenshotCapture();
-        
-        // Close the browser after successful login and state saving
-        await browser.close();
-        console.log('Browser closed successfully.');
-        
-                 // Save credentials to Supabase if they were provided and are different from stored ones
-         if (providedParams?.username && providedParams?.password) {
-           try {
-             console.log('Saving provided credentials to Supabase...');
-             const { data: updateData, error: updateError } = await supabase
-               .from('game_credential')
-               .update({
-                 username: providedParams.username,
-                 password: providedParams.password,
-                 updated_at: new Date().toISOString()
-               })
-               .eq('id', loginGameCredentialId)
-               .select();
-             
-             if (updateError) {
-               console.error('Failed to update credentials:', updateError);
-             } else {
-               console.log('Credentials saved successfully');
-             }
-           } catch (error) {
-             console.error('Error saving credentials:', error);
+                                    // Save or update credentials in Supabase upon successful login FIRST
+         let savedCredentialId = null;
+         try {
+           console.log('Saving credentials after successful login...');
+           
+           // Determine game ID from URL
+           const gameId = getGameIdFromUrl(loginGameUrl);
+           
+           if (!gameId) {
+             console.error('Could not determine game ID for credential saving');
+             console.log('Login successful but could not save credentials - game ID unknown');
+           } else {
+                        console.log(`Using game ID: ${gameId} for credential saving`);
+           console.log(`Using team ID: ${loginTeamId} for credential saving`);
+           
+            
+             const savedCredential = await saveOrUpdateCredentials(
+               loginUsername, 
+               loginPassword, 
+               loginTeamId, 
+               gameId
+             );
+             console.log('Credentials saved/updated successfully:', savedCredential.id);
+             savedCredentialId = savedCredential.id; // Store the credential ID for session creation
            }
+         } catch (error) {
+           console.error('Failed to save credentials after successful login:', error);
+           // Don't fail the entire login process if credential saving fails
          }
          
-         // Return success result for queue processing
-         return {
-           success: true,
-           message: 'Login successful',
-           sessionToken: 'session-token', // This will be generated by the session manager
-           gameCredentialId: loginGameCredentialId
-         };
+         // Save session to Supabase (only if enabled) - use the saved credential ID
+         if (saveToSupabase) {
+           try {
+             // Use the saved credential ID if available, otherwise use the provided one
+             const sessionCredentialId = savedCredentialId || loginGameCredentialId;
+             console.log(`Using team ID: ${loginTeamId} for session saving`);
+             await saveSessionToSupabase(loginUsername, loginPassword, loginGameUrl, sessionData, loginUserId, sessionCredentialId, loginTeamId);
+             console.log('Session saved to Supabase successfully!');
+           } catch (error) {
+             console.error('Failed to save session to Supabase:', error);
+           }
+         } else {
+           console.log('Skipping Supabase save (disabled via parameter)');
+         }
+        
+         console.log('You can now run account creation without logging in again!');
+         
+         // Stop screenshot capture
+         stopScreenshotCapture();
+         
+         // Close the browser after successful login and state saving
+         await browser.close();
+         console.log('Browser closed successfully.');
+         
+                   // Return success result for queue processing
+          return {
+            success: true,
+            message: 'Login successful',
+            sessionToken: 'session-token', // This will be generated by the session manager
+            gameCredentialId: savedCredentialId || loginGameCredentialId
+          };
         
       } else if (loginResult.result === 'captcha_error') {
         console.log(`Captcha error on attempt ${attempt} - will retry with fresh page`);

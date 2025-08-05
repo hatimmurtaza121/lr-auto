@@ -82,12 +82,13 @@ export async function GET(request: NextRequest) {
     }
 
     if (session) {
-      // Check if session has expired
+      // Check if session has expired or has no expiration date
       const now = new Date();
       const expiresAt = session.expires_at ? new Date(session.expires_at) : null;
       
-      if (expiresAt && now > expiresAt) {
-        console.log(`Session for game ${gameName} has expired at ${expiresAt}`);
+      // Consider session inactive if expires_at is null or if it has expired
+      if (!expiresAt || (expiresAt && now > expiresAt)) {
+        console.log(`Session for game ${gameName} is inactive - expires_at: ${session.expires_at}`);
         
         // Mark session as inactive
         await supabase

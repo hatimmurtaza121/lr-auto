@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
 
     // Get team ID from headers
     const teamId = request.headers.get('x-team-id');
+    console.log('Execute-login API - received team ID:', teamId);
     if (!teamId) {
       return NextResponse.json({ error: 'Team ID required' }, { status: 400 });
     }
