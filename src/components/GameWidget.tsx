@@ -73,10 +73,29 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       }
     };
 
+    // Listen for login job completion
+    const handleLoginJobComplete = (event: CustomEvent) => {
+      const { gameName: completedGameName, action, success, sessionToken, message } = event.detail;
+      
+      if (completedGameName === gameName && action === 'login') {
+        console.log(`Login job completed for ${gameName}:`, { success, message });
+        if (success) {
+          setSessionToken(sessionToken || 'session-token');
+          setIsLoggedIn(true);
+          setNeedsLogin(false);
+          setErrorMessage('');
+        } else {
+          setErrorMessage(message || 'Login failed');
+        }
+      }
+    };
+
     window.addEventListener('session-expired', handleSessionExpired as EventListener);
+    window.addEventListener('login-job-complete', handleLoginJobComplete as EventListener);
 
     return () => {
       window.removeEventListener('session-expired', handleSessionExpired as EventListener);
+      window.removeEventListener('login-job-complete', handleLoginJobComplete as EventListener);
     };
   }, [gameName]);
 
@@ -149,14 +168,16 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         throw new Error('User not authenticated');
       }
 
-      const response = await fetch('/api/login-with-session', {
+      // Use the new queue-based login endpoint
+      const response = await fetch('/api/execute-login', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'x-team-id': teamId,
+          'x-game-name': gameName,
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ username, password, gameName }),
+        body: JSON.stringify({ username, password }),
       });
       
       if (!response.ok) {
@@ -165,10 +186,28 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       }
       
       const data = await response.json();
-      setSessionToken(data.sessionToken);
-      setIsLoggedIn(true);
-      setNeedsLogin(false); // Reset needsLogin state
-      console.log('Login successful:', data);
+      
+      if (data.jobId) {
+        // Login job was added to queue successfully
+        console.log('Login job added to queue:', data.jobId);
+        
+        // Dispatch event for ActionStatus component to track this job
+        const newJobEvent = new CustomEvent('new-job', {
+          detail: {
+            jobId: data.jobId,
+            gameName: gameName,
+            action: 'login'
+          }
+        });
+        window.dispatchEvent(newJobEvent);
+        
+        // Show success message for job submission
+        setErrorMessage('');
+        // Note: We don't set isLoggedIn here because we need to wait for the job to complete
+        // The ActionStatus component will handle showing the progress
+      } else {
+        throw new Error('No job ID returned from login request');
+      }
     } catch (error) {
       console.error('Login failed:', error);
       

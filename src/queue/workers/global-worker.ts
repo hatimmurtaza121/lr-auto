@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { globalQueue } from '../config/queues';
 import { createRedisConnection } from '../config/redis';
-import { createNewAccountWithSession, resetPasswordWithSession, rechargeWithSession, redeemWithSession } from '@/utils/action-wrappers';
+import { createNewAccountWithSession, resetPasswordWithSession, rechargeWithSession, redeemWithSession, loginWithSession } from '@/utils/action-wrappers';
 import { screenshotWebSocketServer } from '@/utils/websocket-server';
 
 export class GlobalWorker {
@@ -73,6 +73,18 @@ export class GlobalWorker {
       console.log(`Job ${job.id}: Processing...`);
 
       switch (data.action) {
+        case 'login':
+          await job.updateProgress(20);
+          console.log(`Job ${job.id}: Processing login...`);
+          this.broadcastWorkerStatus(true, 'Processing login...', ['Processing login...']);
+          
+          result = await loginWithSession(
+            data.userId,
+            data.gameCredentialId,
+            data.params || {}
+          );
+          break;
+
         case 'newAccount':
           await job.updateProgress(20);
           console.log(`Job ${job.id}: Processing new account...`);

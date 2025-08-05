@@ -2,6 +2,7 @@ import { executeWithSession } from './session-manager';
 import { Page, BrowserContext } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import { screenshotWebSocketServer } from './websocket-server';
+import crypto from 'crypto';
 
 // Initialize WebSocket server for screenshot broadcasting
 // This ensures screenshots can be sent even if no clients are connected yet
@@ -330,4 +331,74 @@ export async function redeemWithSession(
   }
 
   return result as { success: boolean; message: string; username?: string; amount?: number };
+} 
+
+/**
+ * Wrapper for login action
+ */
+export async function loginWithSession(
+  userId: string,
+  gameCredentialId: number,
+  params: ActionParams
+): Promise<{ success: boolean; message: string; sessionToken?: string; gameCredentialId?: number; needsLogin?: boolean; gameInfo?: any; logs?: string[] }> {
+  const logs: string[] = [];
+  
+  // Override console.log to capture logs
+  const originalLog = console.log;
+  console.log = (...args) => {
+    const logMessage = args.join(' ');
+    logs.push(logMessage);
+    originalLog(...args);
+  };
+
+  try {
+    // Get game info to determine script path
+    const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+    
+    // Ensure WebSocket server is initialized and make it available to the script
+    ensureWebSocketServerInitialized();
+    (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+    console.log('WebSocket server made available to script');
+    
+    // Import and execute the login script function
+    const scriptModule = require(`../../scripts/login.js`);
+    const loginResult = await scriptModule.loginAndSaveState(
+      gameInfo.username,
+      gameInfo.password,
+      gameInfo.game.login_url,
+      userId,
+      gameCredentialId
+    );
+    
+    // Restore original console.log
+    console.log = originalLog;
+    
+    if (loginResult.success) {
+      // Generate a session token for the successful login
+      const sessionToken = crypto.randomBytes(32).toString('hex');
+      
+      return {
+        success: true,
+        message: 'Login successful',
+        sessionToken: sessionToken,
+        gameCredentialId: gameCredentialId,
+        logs
+      };
+    } else {
+      return {
+        success: false,
+        message: loginResult.message || 'Login failed',
+        logs
+      };
+    }
+  } catch (error) {
+    // Restore original console.log
+    console.log = originalLog;
+    
+    return {
+      success: false,
+      message: `Error during login: ${error}`,
+      logs
+    };
+  }
 } 
