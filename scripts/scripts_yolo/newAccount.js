@@ -36,7 +36,7 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
 }
 
 async function createNewAccount(page, context, params = {}) {
-    const { newAccountName = 'testing07', newPassword = 'Hatim121' } = params;
+    const { newAccountName = '', newPassword = '' } = params;
     
     console.log('Starting account creation process...');
     console.log(`Account Name: ${newAccountName}`);

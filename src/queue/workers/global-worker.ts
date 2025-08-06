@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { globalQueue } from '../config/queues';
+import { actionQueue } from '../config/queues';
 import { createRedisConnection } from '../config/redis';
 import { createNewAccountWithSession, resetPasswordWithSession, rechargeWithSession, redeemWithSession, loginWithSession } from '@/utils/action-wrappers';
 import { screenshotWebSocketServer } from '@/utils/websocket-server';
@@ -10,11 +10,11 @@ export class GlobalWorker {
   private isProcessing = false;
 
   constructor() {
-    this.worker = new Worker('global-queue', async (job: Job) => {
+    this.worker = new Worker('action-queue', async (job: Job) => {
       await this.processJob(job);
     }, {
       connection: createRedisConnection(),
-      concurrency: 1, // Process one job at a time
+      concurrency: 1, // Process one job at a time (FIFO)
       removeOnComplete: { count: 10 },
       removeOnFail: { count: 10 },
     });
@@ -146,6 +146,13 @@ export class GlobalWorker {
       console.log(`Job ${job.id}: Result type:`, typeof result);
       console.log(`Job ${job.id}: Result JSON:`, JSON.stringify(result));
       
+      // Calculate execution time using BullMQ's built-in timing
+      const processedOn = job.processedOn;
+      const finishedOn = job.finishedOn || Date.now();
+      const executionTimeSecs = processedOn && finishedOn ? (finishedOn - processedOn) / 1000 : undefined;
+      
+      console.log(`Job ${job.id}: BullMQ timing - processedOn: ${processedOn}, finishedOn: ${finishedOn}, executionTime: ${executionTimeSecs}s`);
+      
       // Save action status to database
       try {
         const { getGame } = await import('@/utils/game-mapping');
@@ -197,10 +204,11 @@ export class GlobalWorker {
                    data.action === 'passwordReset' ? 'password_reset' : 
                    data.action,
             status: result?.success ? 'success' : 'fail',
-            inputs: inputs
+            inputs: inputs,
+            executionTimeSecs: executionTimeSecs
           });
           
-          console.log(`Job ${job.id}: Action status saved to database`);
+          console.log(`Job ${job.id}: Action status saved to database (execution time: ${executionTimeSecs}s)`);
         }
       } catch (statusError) {
         console.error(`Job ${job.id}: Failed to save action status:`, statusError);
@@ -234,6 +242,13 @@ export class GlobalWorker {
       return serializedResult;
     } catch (error) {
       console.error(`Job ${job.id} failed with error:`, error);
+      
+      // Calculate execution time using BullMQ's built-in timing for failed jobs
+      const processedOn = job.processedOn;
+      const finishedOn = job.finishedOn || Date.now();
+      const executionTimeSecs = processedOn && finishedOn ? (finishedOn - processedOn) / 1000 : undefined;
+      
+      console.log(`Job ${job.id}: BullMQ timing for failed job - processedOn: ${processedOn}, finishedOn: ${finishedOn}, executionTime: ${executionTimeSecs}s`);
       
       // Save failed action status to database
       try {
@@ -284,10 +299,11 @@ export class GlobalWorker {
                    data.action === 'passwordReset' ? 'password_reset' : 
                    data.action,
             status: 'fail',
-            inputs: inputs
+            inputs: inputs,
+            executionTimeSecs: executionTimeSecs
           });
           
-          console.log(`Job ${job.id}: Failed action status saved to database`);
+          console.log(`Job ${job.id}: Failed action status saved to database (execution time: ${executionTimeSecs}s)`);
         }
       } catch (statusError) {
         console.error(`Job ${job.id}: Failed to save failed action status:`, statusError);
@@ -317,7 +333,7 @@ export class GlobalWorker {
     return {
       isRunning: this.worker.isRunning(),
       concurrency: this.worker.concurrency,
-      queues: ['global-queue']
+      queues: ['action-queue']
     };
   }
 

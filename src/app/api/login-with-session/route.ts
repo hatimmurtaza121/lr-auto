@@ -6,7 +6,6 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import crypto from 'crypto';
 import path from 'path';
 import { getGame, getGameCredential } from '@/utils/game-mapping';
-import { updateGameStatus } from '@/utils/game-status';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,23 +85,6 @@ export async function POST(request: NextRequest) {
 
     // Run the existing login script (disable Supabase saving since we handle it here)
     const loginResult = await runLoginScript('scripts', username, password, game.login_url, false);
-    
-    // Update login status in game_action_status table
-    try {
-      await updateGameStatus({
-        teamId: teamId,
-        gameId: game.id,
-        action: 'login',
-        status: loginResult.success ? 'success' : 'fail',
-        inputs: {
-          username: username,
-          password: password
-        }
-      });
-      console.log(`Login status updated: ${loginResult.success ? 'success' : 'fail'}`);
-    } catch (error) {
-      console.error('Failed to update login status:', error);
-    }
     
     if (!loginResult.success) {
       throw new Error(loginResult.error || 'Login script failed');

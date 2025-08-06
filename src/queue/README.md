@@ -4,32 +4,25 @@ This directory contains the BullMQ queue system implementation for handling game
 
 ## Overview
 
-The queue system allows users to execute multiple actions concurrently. Actions are queued and processed by workers in order of priority:
+The queue system allows users to execute multiple actions concurrently. Actions are queued and processed in **FIFO (First In, First Out)** order using a single unified queue:
 
-1. **Login** (Highest priority)
-2. **New Account**
-3. **Password Reset**
-4. **Recharge**
-5. **Redeem** (Lowest priority)
+- **Single Queue**: All actions go to the same `action-queue`
+- **FIFO Processing**: Jobs are executed in the order they were added
+- **Simple & Predictable**: No complex priority logic
 
 ## Architecture
 
 ### Components
 
-- **Producers** (`src/queue/producers/`): Add jobs to queues
-- **Workers** (`src/queue/workers/`): Process jobs from queues
+- **Producers** (`src/queue/producers/`): Add jobs to the unified action queue
+- **Workers** (`src/queue/workers/`): Process jobs from the action queue
 - **Config** (`src/queue/config/`): Redis and queue configuration
 - **Types** (`src/queue/types/`): TypeScript interfaces
 
-### Queues
+### Queue
 
-Each action type has its own queue:
-- `login-queue`
-- `new-account-queue`
-- `password-reset-queue`
-- `recharge-queue`
-- `redeem-queue`
-- `general-queue` (fallback)
+All actions use a single unified queue:
+- `action-queue` - Processes all action types (login, newAccount, passwordReset, recharge, redeem)
 
 ## Setup
 
@@ -145,10 +138,10 @@ Update `src/queue/config/queues.ts` to modify queue settings:
 defaultJobOptions: {
   removeOnComplete: 100, // Keep last 100 completed jobs
   removeOnFail: 50, // Keep last 50 failed jobs
-  attempts: 3, // Retry failed jobs up to 3 times
+  attempts: 1, // No retries - if job fails, leave it as failed
   backoff: {
     type: 'exponential',
-    delay: 2000, // Start with 2 seconds delay
+    delay: 2000, // Start with 2 seconds delay (not used since attempts=1)
   },
 }
 ```
@@ -174,6 +167,22 @@ Get queue statistics via API:
 ```bash
 curl "http://localhost:3000/api/queue/queue-status?action=newAccount"
 ```
+
+## FIFO Processing
+
+### How It Works
+
+1. **Job Added**: `login` job added to action queue
+2. **Job Added**: `redeem` job added to action queue  
+3. **Job Added**: `passwordReset` job added to action queue
+4. **Execution Order**: `login` → `redeem` → `passwordReset` (FIFO)
+
+### Benefits
+
+- **Simple**: No complex priority logic
+- **Predictable**: Jobs execute in exact order they were added
+- **Fair**: No job can jump ahead of others
+- **Easy to Debug**: All jobs in one queue
 
 ## Troubleshooting
 

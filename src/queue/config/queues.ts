@@ -5,18 +5,12 @@ import { Queue } from 'bullmq';
 import { createRedisConnection } from './redis';
 import { JobData } from '../types/job-types';
 
-// Queue names
+// Single unified queue name
 export const QUEUE_NAMES = {
-  LOGIN: 'login-queue',
-  NEW_ACCOUNT: 'new-account-queue',
-  PASSWORD_RESET: 'password-reset-queue',
-  RECHARGE: 'recharge-queue',
-  REDEEM: 'redeem-queue',
-  GENERAL: 'general-queue',
-  GLOBAL: 'global-queue'
+  ACTION: 'action-queue'
 } as const;
 
-// Create queues
+// Create queue
 export const createQueue = (name: string) => {
   return new Queue<JobData>(name, {
     connection: createRedisConnection(),
@@ -32,47 +26,5 @@ export const createQueue = (name: string) => {
   });
 };
 
-// Create specific queues
-export const loginQueue = createQueue(QUEUE_NAMES.LOGIN);
-export const newAccountQueue = createQueue(QUEUE_NAMES.NEW_ACCOUNT);
-export const passwordResetQueue = createQueue(QUEUE_NAMES.PASSWORD_RESET);
-export const rechargeQueue = createQueue(QUEUE_NAMES.RECHARGE);
-export const redeemQueue = createQueue(QUEUE_NAMES.REDEEM);
-export const generalQueue = createQueue(QUEUE_NAMES.GENERAL);
-export const globalQueue = createQueue(QUEUE_NAMES.GLOBAL);
-
-// Get queue by action type
-export const getQueueByAction = (action: string) => {
-  switch (action) {
-    case 'login':
-      return loginQueue;
-    case 'newAccount':
-      return newAccountQueue;
-    case 'passwordReset':
-      return passwordResetQueue;
-    case 'recharge':
-      return rechargeQueue;
-    case 'redeem':
-      return redeemQueue;
-    default:
-      return generalQueue;
-  }
-};
-
-// Get queue priority by action type
-export const getQueuePriority = (action: string): number => {
-  switch (action) {
-    case 'login':
-      return 1; // Highest priority
-    case 'newAccount':
-      return 2;
-    case 'passwordReset':
-      return 3;
-    case 'recharge':
-      return 4;
-    case 'redeem':
-      return 5;
-    default:
-      return 10; // Lowest priority
-  }
-}; 
+// Create the unified action queue
+export const actionQueue = createQueue(QUEUE_NAMES.ACTION); 

@@ -56,211 +56,58 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
 
   // Update job status with improved message handling
   const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string, timing?: { startTime?: number; endTime?: number; duration?: number }, params?: any, source?: string) => {
-    console.log(`[${componentId}] updateJobStatus called for job ${jobId} from ${source || 'unknown source'}`);
-    
-    setJobs(prev => prev.map(job => {
-      if (job.jobId === jobId) {
-        // Determine the final message to display
-        let finalMessage = message;
-        
-        if (status === 'completed' && result) {
-          // For completed jobs, prioritize the script result message
-          if (result.message) {
-            finalMessage = result.message;
-          } else if (result.success !== undefined) {
-            // If no message but success flag exists, create appropriate message
-            finalMessage = result.success ? 'Operation completed successfully' : 'Operation failed';
-          }
-        } else if (status === 'failed' && error) {
-          finalMessage = error;
-        }
+    console.log(`=== FRONTEND UPDATE CALLED ===`);
+    console.log(`Updating jobId:`, jobId);
+    console.log(`Status:`, status);
+    console.log(`Message:`, message);
+    console.log(`Result:`, result);
+    console.log(`Error:`, error);
+    console.log(`Timing:`, timing);
+    console.log(`Params:`, params);
+    console.log(`Source:`, source);
 
-        // Check if the message indicates session expiration
-        if (finalMessage.includes('Session expired. Please login first.')) {
-          // Dispatch event to trigger login screen for this game
-          const sessionExpiredEvent = new CustomEvent('session-expired', {
-            detail: {
-              gameName: job.gameName,
-              jobId: jobId
-            }
-          });
-          window.dispatchEvent(sessionExpiredEvent);
-        }
-
-        // Check if this is a completed login job
-        if (status === 'completed' && job.action === 'login' && result) {
-          // Dispatch event for login job completion
-          const loginJobCompleteEvent = new CustomEvent('login-job-complete', {
-            detail: {
-              gameName: job.gameName,
-              action: 'login',
-              success: result.success,
-              sessionToken: result.sessionToken,
-              message: result.message
-            }
-          });
-          window.dispatchEvent(loginJobCompleteEvent);
-        }
-
-        return {
-          ...job,
+    setJobs(prevJobs => {
+      const existingJobIndex = prevJobs.findIndex(job => job.jobId === jobId);
+      
+      if (existingJobIndex !== -1) {
+        // Update existing job
+        const updatedJobs = [...prevJobs];
+        updatedJobs[existingJobIndex] = {
+          ...updatedJobs[existingJobIndex],
           status,
-          message: finalMessage,
+          message,
           result,
           error,
-          timestamp: new Date().toLocaleTimeString(),
-          ...timing, // Include timing information
-          params, // Include parameters
+          startTime: timing?.startTime,
+          endTime: timing?.endTime,
+          duration: timing?.duration,
+          params
         };
+        console.log(`✅ Updated existing job:`, updatedJobs[existingJobIndex]);
+        return updatedJobs;
+      } else {
+        // Add new job (this shouldn't happen often)
+        const newJob: JobStatus = {
+          jobId,
+          gameName: 'Unknown', // Will be updated later
+          action: 'Unknown',    // Will be updated later
+          status,
+          message,
+          timestamp: new Date().toLocaleTimeString(),
+          result,
+          error,
+          startTime: timing?.startTime,
+          endTime: timing?.endTime,
+          duration: timing?.duration,
+          params
+        };
+        console.log(`✅ Added new job:`, newJob);
+        return [...prevJobs, newJob];
       }
-      return job;
-    }));
-
-    // Remove from active jobs if completed, failed, or cancelled
-    if (status === 'completed' || status === 'failed' || status === 'cancelled') {
-      setActiveJobIds(prev => {
-        const newSet = new Set(Array.from(prev));
-        newSet.delete(jobId);
-        return newSet;
-      });
-
-      console.log(`[${componentId}] Job finished, calling updateGameStatusInSupabase:`, {
-        jobId,
-        status,
-        result,
-        timing,
-        params
-      });
-
-      // Call API to update game status in Supabase when job finishes
-      updateGameStatusInSupabase(jobId, status, result, timing, params);
-    }
-  };
-
-  // Function to update game status in Supabase
-  const updateGameStatusInSupabase = async (jobId: string, status: JobStatus['status'], result?: any, timing?: { startTime?: number; endTime?: number; duration?: number }, params?: any) => {
-    console.log('updateGameStatusInSupabase called with:', {
-      jobId,
-      status,
-      result,
-      timing,
-      params
     });
 
-    // Check if we've already processed this job
-    if (processedJobs.has(jobId)) {
-      console.log(`Job ${jobId} already processed, skipping`);
-      return;
-    }
-
-    try {
-      // Find the job to get game info
-      const job = jobs.find(j => j.jobId === jobId);
-      if (!job) {
-        console.error('Job not found for status update:', jobId);
-        return;
-      }
-
-      console.log('Found job:', job);
-
-      // Get team ID
-      const { getSelectedTeamId } = await import('@/utils/team');
-      const teamId = getSelectedTeamId();
-      if (!teamId) {
-        console.error('No team selected for status update');
-        return;
-      }
-
-      // Get game ID from game name
-      const { getGameId } = await import('@/utils/game-mapping');
-      const gameId = await getGameId(job.gameName);
-      if (!gameId) {
-        console.error(`Game not found: ${job.gameName}`);
-        return;
-      }
-
-      // Determine the final status for Supabase
-      let finalStatus: 'success' | 'fail' | 'unknown' = 'unknown';
-      if (status === 'completed' && result) {
-        finalStatus = result.success ? 'success' : 'fail';
-      } else if (status === 'failed') {
-        finalStatus = 'fail';
-      }
-
-      // Calculate execution time in seconds
-      const executionTimeSecs = timing?.duration ? timing.duration / 1000 : undefined;
-
-      // Prepare inputs data
-      const inputs = params ? {
-        // For login actions, include both username and password
-        ...(job.action === 'login' ? {
-          username: params.username || '',
-          password: params.password || ''
-        } : {
-          // For other actions, use the existing logic
-          account_name: params.accountName || params.newAccountName || params.targetUsername,
-          password: params.password || params.newPassword,
-          amount: params.amount,
-          remarks: params.remark || params.remarks
-        })
-      } : undefined;
-
-      // Map action names to match database format
-      const actionMap: { [key: string]: string } = {
-        'newAccount': 'new_account',
-        'passwordReset': 'password_reset',
-        'recharge': 'recharge',
-        'redeem': 'redeem',
-        // Add lowercase versions in case job actions are lowercase
-        'newaccount': 'new_account',
-        'passwordreset': 'password_reset'
-      };
-
-      console.log('Job action before mapping:', job.action);
-      const action = actionMap[job.action] || job.action;
-      console.log('Action after mapping:', action);
-
-      console.log('Updating game status in Supabase:', {
-        teamId,
-        gameId,
-        action,
-        status: finalStatus,
-        inputs,
-        execution_time_secs: executionTimeSecs
-      });
-
-      // Get session for authorization
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      // Call the API to update game status
-      console.log(`Making API call for job ${jobId} at ${new Date().toISOString()}`);
-      const response = await fetch('/api/update-game-status', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`
-        },
-        body: JSON.stringify({
-          teamId: teamId,
-          gameId: gameId,
-          action: action,
-          status: finalStatus,
-          inputs: inputs,
-          execution_time_secs: executionTimeSecs
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to update game status in Supabase:', response.statusText);
-      } else {
-        console.log(`API call successful for job ${jobId} at ${new Date().toISOString()}`);
-        // Mark this job as processed
-        setProcessedJobs(prev => new Set([...Array.from(prev), jobId]));
-      }
-    } catch (error) {
-      console.error('Error updating game status in Supabase:', error);
-    }
+    // Remove the database update call - let the worker handle it
+    console.log(`Skipping database update for job ${jobId} - worker will handle it`);
   };
 
   // Format duration for display
@@ -421,6 +268,16 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                 endTime: status.endTime,
                 duration: status.duration
               }, status.params, 'polling');
+
+              // Remove job from active set if it's completed, failed, or cancelled
+              if (jobStatus === 'completed' || jobStatus === 'failed' || jobStatus === 'cancelled') {
+                setActiveJobIds(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(jobId);
+                  return newSet;
+                });
+                console.log(`Removed job ${jobId} from active set (status: ${jobStatus})`);
+              }
             }
           }
         } catch (error) {
@@ -461,6 +318,16 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
       });
       
       updateJobStatus(jobId, status, finalMessage, result, error, { startTime, endTime, duration }, undefined, 'event');
+      
+      // Remove job from active set if it's completed, failed, or cancelled
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        setActiveJobIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(jobId);
+          return newSet;
+        });
+        console.log(`Removed job ${jobId} from active set via event (status: ${status})`);
+      }
     };
 
     window.addEventListener('new-job', handleNewJob as EventListener);

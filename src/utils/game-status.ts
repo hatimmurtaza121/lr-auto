@@ -6,6 +6,7 @@ export interface GameStatusUpdate {
   action: 'login' | 'new_account' | 'password_reset' | 'recharge' | 'redeem';
   status: 'success' | 'fail' | 'unknown';
   inputs?: any; // Add inputs field to store action parameters
+  executionTimeSecs?: number; // Add execution time field
 }
 
 /**
@@ -35,6 +36,7 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
         action: update.action,
         status: update.status,
         inputs: update.inputs || null, // Save inputs field
+        execution_time_secs: update.executionTimeSecs || null, // Save execution time
         updated_at: new Date().toISOString()
       });
 

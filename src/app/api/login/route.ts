@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'child_process';
-import { updateGameStatus } from '@/utils/game-status';
 import { getGame } from '@/utils/game-mapping';
 import { getUserSession, getTeamContextFromRequest } from '@/utils/api-helpers';
 
@@ -36,13 +35,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Game not found' }, { status: 400 });
     }
 
-        console.log(`Logging into ${gameName} for user ${user.id}, team ${teamId}`);
+    console.log(`Logging into ${gameName} for user ${user.id}, team ${teamId}`);
 
     // Run the login script
     const scriptPath = `scripts/login.js`;
     const args = [username, password, game.login_url];
 
-      try {
+    try {
       const result = await new Promise<string>((resolve, reject) => {
         const proc = spawn('node', [scriptPath, ...args]);
         let output = '';
@@ -55,45 +54,11 @@ export async function POST(request: NextRequest) {
         });
       });
       
-      // Update login status in game_action_status table
-      try {
-        await updateGameStatus({
-          teamId: teamId,
-          gameId: game.id,
-          action: 'login',
-          status: 'success',
-          inputs: {
-            username: username,
-            password: password
-          }
-        });
-        console.log('Login status updated: success');
-      } catch (error) {
-        console.error('Failed to update login status:', error);
-      }
-      
       // Generate a session token
       const sessionToken = `${gameName}_${username}_${Date.now()}`;
       sessionStore[sessionToken] = { username, gameName, result, created: Date.now() };
       return NextResponse.json({ sessionToken });
     } catch (err: any) {
-      // Update login status as failed
-      try {
-        await updateGameStatus({
-          teamId: teamId,
-          gameId: game.id,
-          action: 'login',
-          status: 'fail',
-          inputs: {
-            username: username,
-            password: password
-          }
-        });
-        console.log('Login status updated: fail');
-      } catch (error) {
-        console.error('Failed to update login status:', error);
-      }
-      
       return NextResponse.json({ error: err.message || 'Login failed' }, { status: 500 });
     }
   } catch (error) {

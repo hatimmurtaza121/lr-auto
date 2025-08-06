@@ -1,9 +1,9 @@
-import { getQueueByAction, getQueuePriority } from '../config/queues';
+import { actionQueue } from '../config/queues';
 import { JobData, JobProgress } from '../types/job-types';
 
 export class ActionProducer {
   /**
-   * Add a job to the appropriate queue based on action type
+   * Add a job to the unified action queue
    */
   static async addJob(jobData: JobData): Promise<string> {
     try {
@@ -12,22 +12,16 @@ export class ActionProducer {
         throw new Error('Invalid job data: missing required fields');
       }
       
-      // Use global queue for single job processing
-      const { createQueue } = await import('../config/queues');
-      const queue = createQueue('global-queue');
-      const priority = getQueuePriority(jobData.action);
-      
       // Generate unique job ID
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(2, 11);
       const jobId = `${jobData.action}-${timestamp}-${randomId}`;
       
-      // Add job to queue
-      const job = await queue.add(
+      // Add job to unified action queue (FIFO - no priority)
+      const job = await actionQueue.add(
         jobData.action,
         jobData,
         {
-          priority,
           delay: 0, // No delay, process immediately
           jobId: jobId,
           removeOnComplete: 100, // Keep last 100 completed jobs
@@ -36,7 +30,7 @@ export class ActionProducer {
       );
 
       const finalJobId = job.id || jobId;
-      console.log(`Job added to ${jobData.action} queue with ID: ${finalJobId}`);
+      console.log(`Job added to action queue with ID: ${finalJobId} (action: ${jobData.action})`);
       return finalJobId;
     } catch (error) {
       console.error('Error adding job to queue:', error);
@@ -68,24 +62,21 @@ export class ActionProducer {
    */
   static async getJobStatus(jobId: string, action: string): Promise<JobProgress | null> {
     try {
-      // Use global queue for job status
-      const { createQueue } = await import('../config/queues');
-      const queue = createQueue('global-queue');
-      const job = await queue.getJob(jobId);
+      const job = await actionQueue.getJob(jobId);
       
       if (!job) {
-        console.log(`Job ${jobId} not found in global-queue`);
+        console.log(`Job ${jobId} not found in action-queue`);
         return null;
       }
 
-             const state = await job.getState();
-       const progress = job.progress; // progress is a property, not a method
-       let result = job.returnvalue;
-       const failedReason = job.failedReason;
-       const progressNumber = typeof progress === 'number' ? progress : 0;
-       const stateString = String(state);
+      const state = await job.getState();
+      const progress = job.progress; // progress is a property, not a method
+      let result = job.returnvalue;
+      const failedReason = job.failedReason;
+      const progressNumber = typeof progress === 'number' ? progress : 0;
+      const stateString = String(state);
 
-             // If job is completed, try to get result from job data first, then returnvalue
+      // If job is completed, try to get result from job data first, then returnvalue
       if (stateString === 'completed') {
         console.log(`Job ${jobId} is completed, checking for result...`);
         console.log(`Job ${jobId} returnvalue:`, job.returnvalue);
@@ -135,7 +126,7 @@ export class ActionProducer {
         console.log(`Job ${jobId} returnvalue === undefined:`, job.returnvalue === undefined);
         
         // Try to get the job again to see if it's a timing issue
-        const jobAgain = await queue.getJob(jobId);
+        const jobAgain = await actionQueue.getJob(jobId);
         if (jobAgain) {
           console.log(`Job ${jobId} re-fetched returnvalue:`, jobAgain.returnvalue);
         }
@@ -229,21 +220,17 @@ export class ActionProducer {
     try {
       console.log(`=== CANCELLING JOB ${jobId} ===`);
       
-      // Use global queue for job cancellation
-      const { createQueue } = await import('../config/queues');
-      const queue = createQueue('global-queue');
-      
-      console.log(`Got global queue, looking for job ${jobId}`);
+      console.log(`Got action queue, looking for job ${jobId}`);
       
       // Get the specific job by ID
-      const job = await queue.getJob(jobId);
+      const job = await actionQueue.getJob(jobId);
       
       if (!job) {
-        console.log(`❌ Job ${jobId} not found in global-queue`);
+        console.log(`❌ Job ${jobId} not found in action-queue`);
         return false;
       }
 
-      console.log(`✅ Found job ${jobId} in global-queue`);
+      console.log(`✅ Found job ${jobId} in action-queue`);
       console.log(`Job data:`, job.data);
       console.log(`Job ID:`, job.id);
       console.log(`Job name:`, job.name);
@@ -259,8 +246,8 @@ export class ActionProducer {
 
       if (state === 'waiting' || state === 'prioritized') {
         console.log(`✅ Job ${jobId} is in ${state} state, removing from queue`);
-        // Remove the specific job from the global queue
-        console.log(`🗑️ Removing job ${jobId} from global-queue...`);
+        // Remove the specific job from the action queue
+        console.log(`🗑️ Removing job ${jobId} from action-queue...`);
         await job.remove();
       } else if (state === 'active') {
         console.log(`✅ Job ${jobId} is in active state, marking as cancelled`);
@@ -283,11 +270,10 @@ export class ActionProducer {
    */
   static async getQueueStats(action: string) {
     try {
-      const queue = getQueueByAction(action);
-      const waiting = await queue.getWaiting();
-      const active = await queue.getActive();
-      const completed = await queue.getCompleted();
-      const failed = await queue.getFailed();
+      const waiting = await actionQueue.getWaiting();
+      const active = await actionQueue.getActive();
+      const completed = await actionQueue.getCompleted();
+      const failed = await actionQueue.getFailed();
 
       return {
         waiting: waiting.length,
