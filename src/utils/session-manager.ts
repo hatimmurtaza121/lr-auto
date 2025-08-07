@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import crypto from 'crypto';
+import config from '../../scripts/config.js';
 
 function getSupabaseClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -251,7 +252,7 @@ export class SessionManager {
     credentials: GameCredentials;
   }> {
     if (!this.browser) {
-      this.browser = await chromium.launch({ headless: true });
+      this.browser = await chromium.launch({ headless: config.BROWSER_HEADLESS });
     }
 
     const context = await this.browser.newContext();
@@ -431,8 +432,7 @@ export class SessionManager {
     try {
       if (!this.browser) {
         this.browser = await chromium.launch({ 
-          headless: false, // Show the browser
-          slowMo: 1000, // Slow down actions so you can see what's happening
+          headless: config.BROWSER_HEADLESS, // Use config setting
           args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
       }

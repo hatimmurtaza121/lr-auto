@@ -47,9 +47,11 @@ async function resetAccountPassword(page, context, params = {}) {
          const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'passwordReset', 500);
 
     try {
+        // From here
+        await page.goto('https://agent.yolo777.game/admin');
+        await page.getByRole('link', { name: ' Player Management ' }).click();
+        await page.getByRole('link', { name: ' Player List' }).click();
         await page.waitForLoadState('networkidle');
-        await page.getByRole('link', { name: ' Player Management ' }).click();
-        await page.getByRole('link', { name: ' Player List' }).click();
 
         // 2. Grab the iframe that contains the player list
         const listFrame = await page
@@ -62,6 +64,7 @@ async function resetAccountPassword(page, context, params = {}) {
         await listFrame.getByRole('button', { name: '  Search' }).click();
 
         // 3.5. Wait for table to load and stabilize
+        await page.waitForTimeout(1000);
         console.log('Waiting for search results to load...');
         
         // Validate account exists and is accessible

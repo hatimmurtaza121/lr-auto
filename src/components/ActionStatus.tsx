@@ -278,6 +278,21 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                 });
                 console.log(`Removed job ${jobId} from active set (status: ${jobStatus})`);
               }
+
+              // Dispatch login-job-complete event for login jobs
+              if (job.action === 'login' && (jobStatus === 'completed' || jobStatus === 'failed')) {
+                const loginJobCompleteEvent = new CustomEvent('login-job-complete', {
+                  detail: {
+                    gameName: job.gameName,
+                    action: 'login',
+                    success: jobStatus === 'completed',
+                    sessionToken: jobStatus === 'completed' ? 'session-token' : null,
+                    message: message
+                  }
+                });
+                window.dispatchEvent(loginJobCompleteEvent);
+                console.log(`Dispatched login-job-complete event for ${job.gameName}:`, { success: jobStatus === 'completed', message });
+              }
             }
           }
         } catch (error) {
@@ -327,6 +342,22 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           return newSet;
         });
         console.log(`Removed job ${jobId} from active set via event (status: ${status})`);
+      }
+
+      // Dispatch login-job-complete event for login jobs
+      const job = jobs.find(j => j.jobId === jobId);
+      if (job && job.action === 'login' && (status === 'completed' || status === 'failed')) {
+        const loginJobCompleteEvent = new CustomEvent('login-job-complete', {
+          detail: {
+            gameName: job.gameName,
+            action: 'login',
+            success: status === 'completed',
+            sessionToken: status === 'completed' ? 'session-token' : null,
+            message: finalMessage
+          }
+        });
+        window.dispatchEvent(loginJobCompleteEvent);
+        console.log(`Dispatched login-job-complete event for ${job.gameName} via event:`, { success: status === 'completed', message: finalMessage });
       }
     };
 
