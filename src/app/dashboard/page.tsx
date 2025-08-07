@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import GameWidget from '@/components/GameWidget';
 import BrowserView from '@/components/BrowserView';
 import ActionStatus from '@/components/ActionStatus';
+import Loader from '@/components/Loader';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@mui/material';
@@ -151,7 +152,7 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return <Loader message="Loading dashboard..." />;
   }
 
   if (error) {
@@ -224,8 +225,6 @@ export default function Dashboard() {
           <div className={`${workerExecuting || isExecuting ? 'block' : 'hidden lg:block'} h-[calc(100vh-100px)]`}>
             <BrowserView 
               isExecuting={workerExecuting || isExecuting} 
-              currentLog={currentLog}
-              allLogs={allLogs}
             />
           </div>
         </div>

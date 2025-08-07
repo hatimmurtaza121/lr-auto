@@ -11,7 +11,6 @@ import {
   Typography,
   Box,
   Alert,
-  CircularProgress,
   Select,
   MenuItem,
   FormControl,
@@ -19,6 +18,7 @@ import {
 } from '@mui/material';
 import { setSelectedTeamId as saveTeamId } from '@/utils/team';
 import Navbar from '@/components/Navbar';
+import Loader from '@/components/Loader';
 
 interface Team {
   id: number;
@@ -92,39 +92,7 @@ export default function ChooseTeamPage() {
   };
 
   if (loading) {
-    return (
-      <div
-        className="flex flex-col h-screen items-center px-4 overflow-hidden"
-        style={{ 
-          paddingTop: "15vh", 
-          paddingBottom: "15vh",
-          background: "white",
-        }}
-      >
-        {/* Top spacing */}
-        <div className="flex-1"></div>
-        
-        {/* Loading content in middle */}
-        <div className="flex flex-col items-center space-y-6 z-10">
-          <CircularProgress 
-            size={60}
-            sx={{ 
-              color: "#000",
-            }}
-          />
-          <Typography 
-            variant="h6" 
-            className="text-gray-700"
-            sx={{ fontWeight: 500 }}
-          >
-            Loading teams...
-          </Typography>
-        </div>
-        
-        {/* Bottom spacing */}
-        <div className="flex-1"></div>
-      </div>
-    );
+    return <Loader message="Loading teams..." />;
   }
 
   return (
@@ -235,7 +203,7 @@ export default function ChooseTeamPage() {
                 disabled={submitting || !selectedTeamId}
                 startIcon={
                   submitting ? (
-                    <CircularProgress size={20} sx={{ color: "#fff" }} />
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   ) : undefined
                 }
                 className="py-1 px-4 font-semibold text-base hover:scale-[1.02]"

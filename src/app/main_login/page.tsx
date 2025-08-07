@@ -219,7 +219,7 @@ export default function LoginPage() {
                 disabled={isSubmitting}
                 startIcon={
                   isSubmitting ? (
-                    <CircularProgress size={20} sx={{ color: "#fff" }} />
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   ) : undefined
                 }
                 className="py-1 px-4 font-semibold text-base hover:scale-[1.02]"

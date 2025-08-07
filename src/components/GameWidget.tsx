@@ -3,6 +3,12 @@
 import { useState, lazy, Suspense, useEffect } from 'react';
 import { runPlaywrightScript } from '@/utils/playwright';
 import { createClient } from '@/lib/supabase/client';
+import {
+  TextField,
+  Button,
+  Alert,
+  Box,
+} from "@mui/material";
 
 const supabase = createClient();
 
@@ -320,42 +326,110 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
           </div>
           {!isLoggedIn && isExpanded ? (
             <div 
-              className="space-y-4 animate-in slide-in-from-top-2 duration-200"
+              className="space-y-6 animate-in slide-in-from-top-2 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <input
-                type="text"
-                placeholder="Username"
+              <TextField
+                label="Username"
+                variant="outlined"
+                fullWidth
                 value={username}
                 onChange={e => {
                   setUsername(e.target.value);
                   setErrorMessage(''); // Clear error when user types
                 }}
-                className="w-full border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-700"
+                error={!!errorMessage}
+                helperText={errorMessage}
                 disabled={isLoading}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    backgroundColor: "rgba(255,255,255,0.9)",
+                    borderRadius: "12px",
+                    height: "48px", // Match the py-3 height (24px) + some padding
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
+                    "&.Mui-focused": { 
+                      backgroundColor: "rgba(255,255,255,1)",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#1976d2",
+                        borderWidth: "2px",
+                      },
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    color: "rgba(0,0,0,0.7)",
+                    fontWeight: 500,
+                    "&.Mui-focused": {
+                      color: "#1976d2",
+                    },
+                  },
+                }}
               />
-              <input
+              <TextField
+                label="Password"
+                variant="outlined"
+                fullWidth
                 type="password"
-                placeholder="Password"
                 value={password}
                 onChange={e => {
                   setPassword(e.target.value);
                   setErrorMessage(''); // Clear error when user types
                 }}
-                className="w-full border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-700"
+                error={!!errorMessage}
+                helperText={errorMessage}
                 disabled={isLoading}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    backgroundColor: "rgba(255,255,255,0.9)",
+                    borderRadius: "12px",
+                    height: "48px", // Match the py-3 height (24px) + some padding
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
+                    "&.Mui-focused": { 
+                      backgroundColor: "rgba(255,255,255,1)",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#1976d2",
+                        borderWidth: "2px",
+                      },
+                    },
+                  },
+                  "& .MuiInputLabel-root": {
+                    color: "rgba(0,0,0,0.7)",
+                    fontWeight: 500,
+                    "&.Mui-focused": {
+                      color: "#1976d2",
+                    },
+                  },
+                }}
               />
               {/* Error Message - Positioned between password and login button */}
               {errorMessage && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-red-700 text-sm font-medium">
+                <Alert severity="error" className="w-full mb-6">
                   {errorMessage}
-                </div>
+                </Alert>
               )}
-              <button
-                onClick={handleLogin}
-                disabled={isLoading || !username || !password}
-                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-300 text-white font-medium py-3 px-4 rounded-2xl transition-all duration-150 active:scale-95 disabled:cursor-not-allowed shadow"
-              >
+                             <Button
+                 variant="contained"
+                 onClick={handleLogin}
+                 disabled={isLoading || !username || !password}
+                 fullWidth
+                 sx={{
+                   backgroundColor: "#1976d2",
+                   color: "#fff",
+                   height: 40,
+                   fontWeight: 600,
+                   fontSize: "1rem",
+                   textTransform: "none",
+                   borderRadius: "16px",
+                   boxShadow: "0 8px 20px -5px rgba(25,118,210,0.3)",
+                   "&:hover": {
+                     backgroundColor: "#1565c0",
+                     boxShadow: "0 12px 28px -5px rgba(25,118,210,0.4)",
+                   },
+                   "&:disabled": {
+                     backgroundColor: "#90caf9",
+                     color: "#fff",
+                   },
+                 }}
+               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -364,7 +438,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 ) : (
                   'Login'
                 )}
-              </button>
+              </Button>
             </div>
           ) : isLoggedIn ? (
             <Suspense fallback={
@@ -386,44 +460,112 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
             </Suspense>
           ) : needsLogin ? (
             <div 
-              className="space-y-4 animate-in slide-in-from-top-2 duration-200"
+              className="space-y-6 animate-in slide-in-from-top-2 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-3 text-yellow-700 text-sm font-medium">
+              <Alert severity="warning" className="w-full mb-6">
                 Session expired. Please login again to continue.
-              </div>
-              <input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={e => {
-                  setUsername(e.target.value);
-                  setErrorMessage('');
-                }}
-                className="w-full border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-700"
-                disabled={isLoading}
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={e => {
-                  setPassword(e.target.value);
-                  setErrorMessage('');
-                }}
-                className="w-full border-2 border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-blue-700"
-                disabled={isLoading}
-              />
+              </Alert>
+                                             <TextField
+                  label="Username"
+                  variant="outlined"
+                  fullWidth
+                  value={username}
+                  onChange={e => {
+                    setUsername(e.target.value);
+                    setErrorMessage('');
+                  }}
+                  error={!!errorMessage}
+                  helperText={errorMessage}
+                  disabled={isLoading}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "rgba(255,255,255,0.9)",
+                      borderRadius: "12px",
+                      height: "48px", // Match the py-3 height (24px) + some padding
+                      "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
+                      "&.Mui-focused": { 
+                        backgroundColor: "rgba(255,255,255,1)",
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#1976d2",
+                          borderWidth: "2px",
+                        },
+                      },
+                    },
+                    "& .MuiInputLabel-root": {
+                      color: "rgba(0,0,0,0.7)",
+                      fontWeight: 500,
+                      "&.Mui-focused": {
+                        color: "#1976d2",
+                      },
+                    },
+                  }}
+                />
+                               <TextField
+                  label="Password"
+                  variant="outlined"
+                  fullWidth
+                  type="password"
+                  value={password}
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    setErrorMessage('');
+                  }}
+                  error={!!errorMessage}
+                  helperText={errorMessage}
+                  disabled={isLoading}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      backgroundColor: "rgba(255,255,255,0.9)",
+                      borderRadius: "12px",
+                      height: "48px", // Match the py-3 height (24px) + some padding
+                      "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
+                      "&.Mui-focused": { 
+                        backgroundColor: "rgba(255,255,255,1)",
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#1976d2",
+                          borderWidth: "2px",
+                        },
+                      },
+                    },
+                    "& .MuiInputLabel-root": {
+                      color: "rgba(0,0,0,0.7)",
+                      fontWeight: 500,
+                      "&.Mui-focused": {
+                        color: "#1976d2",
+                      },
+                    },
+                  }}
+                />
               {errorMessage && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-red-700 text-sm font-medium">
+                <Alert severity="error" className="w-full mb-6">
                   {errorMessage}
-                </div>
+                </Alert>
               )}
-              <button
-                onClick={handleLogin}
-                disabled={isLoading || !username || !password}
-                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-300 text-white font-medium py-3 px-4 rounded-2xl transition-all duration-150 active:scale-95 disabled:cursor-not-allowed shadow"
-              >
+                             <Button
+                 variant="contained"
+                 onClick={handleLogin}
+                 disabled={isLoading || !username || !password}
+                 fullWidth
+                 sx={{
+                   backgroundColor: "#1976d2",
+                   color: "#fff",
+                   height: 40,
+                   fontWeight: 600,
+                   fontSize: "1rem",
+                   textTransform: "none",
+                   borderRadius: "16px",
+                   boxShadow: "0 8px 20px -5px rgba(25,118,210,0.3)",
+                   "&:hover": {
+                     backgroundColor: "#1565c0",
+                     boxShadow: "0 12px 28px -5px rgba(25,118,210,0.4)",
+                   },
+                   "&:disabled": {
+                     backgroundColor: "#90caf9",
+                     color: "#fff",
+                   },
+                 }}
+               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -432,7 +574,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 ) : (
                   'Reconnect'
                 )}
-              </button>
+              </Button>
             </div>
           ) : null}
         </>

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import Loader from '@/components/Loader';
 
 export default function Home() {
   const supabase = createClient();
@@ -18,9 +19,5 @@ export default function Home() {
     });
   }, [router, supabase.auth]);
 
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-    </div>
-  );
+  return <Loader message="Initializing..." />;
 }
