@@ -51,7 +51,7 @@ export default function ChooseTeamPage() {
 
   const fetchTeams = async () => {
     try {
-      const response = await fetch('/api/teams');
+      const response = await fetch('/api/team');
       const data = await response.json();
       
       if (response.ok) {

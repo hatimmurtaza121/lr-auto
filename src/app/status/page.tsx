@@ -92,7 +92,7 @@ export default function StatusPage() {
       }
 
       // First, get all games available for this team
-      const gamesResponse = await fetch(`/api/teams?teamId=${teamId}`, {
+      const gamesResponse = await fetch(`/api/team?teamId=${teamId}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
