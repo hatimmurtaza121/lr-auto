@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getSelectedTeamId } from '@/utils/team';
 import { createClient } from '@/lib/supabase/client';
 
@@ -17,35 +17,78 @@ interface FormInputs {
   [key: string]: string;
 }
 
-// Map game names to action types
-const getActionType = (actionId: number): 'newAccount' | 'passwordReset' | 'recharge' | 'redeem' => {
-  switch (actionId) {
-    case 1: return 'newAccount';
-    case 2: return 'passwordReset';
-    case 3: return 'recharge';
-    case 4: return 'redeem';
-    default: return 'newAccount';
-  }
-};
+interface Action {
+  id: number;
+  name: string;
+  display_name?: string | null;
+  inputs_json?: {
+    fields: Array<{
+      key: string;
+      label: string;
+      placeholder?: string;
+      required?: boolean;
+    }>;
+  };
+}
 
 // Import game mapping utility
 import { getGameId } from '@/utils/game-mapping';
 
 export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onExecutionStart, onExecutionEnd, onLogUpdate }: GameDashboardProps) {
   const supabase = createClient();
-  const [selectedAction, setSelectedAction] = useState<number>(1);
-  const [formInputs, setFormInputs] = useState<FormInputs>({
-    accountName: '',
-    password: '',
-    rechargeAmount: '',
-    redeemAmount: '',
-    remark: '',
-  });
+  const [actions, setActions] = useState<Action[]>([]);
+  const [selectedAction, setSelectedAction] = useState<number | null>(null);
+  const [formInputs, setFormInputs] = useState<FormInputs>({});
   const [output, setOutput] = useState<string>('');
   const [isExecuting, setIsExecuting] = useState(false);
+  const [loadingActions, setLoadingActions] = useState(true);
 
   const [currentLog, setCurrentLog] = useState<string>('');
   const [allLogs, setAllLogs] = useState<string[]>([]);
+
+  // Fetch actions from database
+  const fetchActions = async () => {
+    try {
+      setLoadingActions(true);
+      const gameId = await getGameId(gameName);
+      if (!gameId) {
+        console.error('Game not found:', gameName);
+        return;
+      }
+
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error('User not authenticated');
+        return;
+      }
+
+      const response = await fetch(`/api/actions?gameId=${gameId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setActions(data.actions || []);
+        // Set first action as selected if available
+        if (data.actions && data.actions.length > 0) {
+          setSelectedAction(data.actions[0].id);
+        }
+      } else {
+        console.error('Failed to fetch actions');
+      }
+    } catch (error) {
+      console.error('Error fetching actions:', error);
+    } finally {
+      setLoadingActions(false);
+    }
+  };
+
+  // Load actions on component mount
+  useEffect(() => {
+    fetchActions();
+  }, [gameName]);
 
   const handleInputChange = (key: string, value: string) => {
     setFormInputs(prev => ({
@@ -98,93 +141,51 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
   };
 
   const handleSubmit = async () => {
-    // Check session before executing
-    const sessionValid = await checkSessionBeforeExecute();
-    if (!sessionValid) {
-      return; // Login screen will be shown by onNeedsLogin callback
+    if (!selectedAction) {
+      setOutput('Please select an action first');
+      return;
     }
 
-    setIsExecuting(true);
-    setOutput('');
-    setCurrentLog('Starting action...');
-    setAllLogs(['Starting action...']);
-    
-    // Notify parent that execution started
-    onExecutionStart?.();
-    
-    // Simulate real-time log updates
-    const logSteps = [
-      'Starting account creation process...',
-      'Page loaded successfully',
-      'Clicked Player Management',
-      'Clicked Player List',
-      'Clicked Player List link',
-      'Iframe found',
-      'Dialog create button found',
-      'Clicked dialog create button',
-      'Filled account name',
-      'Filled password',
-      'Clicked submit button'
-    ];
-    
-    let currentStep = 0;
-    const logInterval = setInterval(() => {
-      if (currentStep < logSteps.length) {
-        const newCurrentLog = logSteps[currentStep];
-        const newAllLogs = [...allLogs, logSteps[currentStep]];
-        setCurrentLog(newCurrentLog);
-        setAllLogs(newAllLogs);
-        onLogUpdate?.(newCurrentLog, newAllLogs);
-        currentStep++;
-      } else {
-        clearInterval(logInterval);
-      }
-    }, 1000); // Update every second
-    
     try {
+      // Start loading immediately
+      setIsExecuting(true);
+
+      // Check session before executing
+      const sessionValid = await checkSessionBeforeExecute();
+      if (!sessionValid) {
+        setIsExecuting(false);
+        return; // Login screen will be shown by onNeedsLogin callback
+      }
+
+      setOutput('');
+      setCurrentLog('');
+      setAllLogs([]);
+
       const teamId = getSelectedTeamId();
       if (!teamId) {
-        throw new Error('No team selected');
+        setOutput('Error: No team selected');
+        return;
       }
 
       // Get user session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        throw new Error('User not authenticated');
+        setOutput('Error: User not authenticated');
+        return;
       }
 
-      const actionType = getActionType(selectedAction);
+      const selectedActionData = actions.find(action => action.id === selectedAction);
+      if (!selectedActionData) {
+        setOutput('Error: Selected action not found');
+        return;
+      }
 
-      // Prepare parameters based on action type
+      // Build params dynamically based on the action's input schema
       let params: any = {};
-      
-      switch (actionType) {
-        case 'newAccount':
-          params = {
-            newAccountName: formInputs.accountName,
-            newPassword: formInputs.password
-          };
-          break;
-        case 'passwordReset':
-          params = {
-            targetUsername: formInputs.accountName,
-            newPassword: formInputs.password
-          };
-          break;
-        case 'recharge':
-          params = {
-            targetUsername: formInputs.accountName,
-            amount: parseFloat(formInputs.rechargeAmount) || 0,
-            remark: formInputs.remark
-          };
-          break;
-        case 'redeem':
-          params = {
-            targetUsername: formInputs.accountName,
-            amount: parseFloat(formInputs.redeemAmount) || 0,
-            remark: formInputs.remark
-          };
-          break;
+      if (selectedActionData.inputs_json && selectedActionData.inputs_json.fields) {
+        selectedActionData.inputs_json.fields.forEach((field) => {
+          params[field.key] = formInputs[field.key] || '';
+        });
       }
 
       const response = await fetch('/api/execute-action', {
@@ -196,7 +197,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          action: actionType,
+          action: selectedActionData.name,
           params: params
         })
       });
@@ -215,7 +216,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
           detail: {
             jobId: result.jobId,
             gameName: gameName,
-            action: actionType
+            action: selectedActionData.name
           }
         });
         window.dispatchEvent(newJobEvent);
@@ -244,61 +245,53 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
       }
       
       setOutput(JSON.stringify(result, null, 2));
-          } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        setOutput(`Error: ${errorMessage}`);
-      } finally {
-        clearInterval(logInterval);
-        
-        // Cleanup polling timeout
-        if ((window as any).__pollCleanup) {
-          (window as any).__pollCleanup();
-          delete (window as any).__pollCleanup;
-        }
-        
-        // Note: setIsExecuting(false) is now handled in the polling logic
-        // when the job actually completes or fails
-      }
-  };
-
-  const actions = [
-    { id: 1, name: 'New Account' },
-    { id: 2, name: 'Password Reset' },
-    { id: 3, name: 'Recharge' },
-    { id: 4, name: 'Redeem' },
-  ];
-
-  // Define input fields for each action
-  const getInputFields = () => {
-    switch (selectedAction) {
-      case 1: // New Account
-        return [
-          { key: 'accountName', label: 'New Account Name', placeholder: 'Enter new account name' },
-          { key: 'password', label: 'New Password', placeholder: 'Enter new password' }
-        ];
-      case 2: // Password Reset
-        return [
-          { key: 'accountName', label: 'Account Name', placeholder: 'Enter account name' },
-          { key: 'password', label: 'New Password', placeholder: 'Enter new password' }
-        ];
-      case 3: // Recharge
-        return [
-          { key: 'accountName', label: 'Account Name', placeholder: 'Enter account name' },
-          { key: 'rechargeAmount', label: 'Recharge Amount', placeholder: 'Enter recharge amount' },
-          { key: 'remark', label: 'Remark', placeholder: 'Enter remark' }
-        ];
-      case 4: // Redeem
-        return [
-          { key: 'accountName', label: 'Account Name', placeholder: 'Enter account name' },
-          { key: 'redeemAmount', label: 'Redeem Amount', placeholder: 'Enter redeem amount' },
-          { key: 'remark', label: 'Remark', placeholder: 'Enter remark' }
-        ];
-      default:
-        return [];
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setOutput(`Error: ${errorMessage}`);
+    } finally {
+      setIsExecuting(false);
     }
   };
 
+  // Define input fields for each action
+  const getInputFields = () => {
+    const selectedActionData = actions.find(action => action.id === selectedAction);
+    
+    if (!selectedActionData || !selectedActionData.inputs_json || !selectedActionData.inputs_json.fields) {
+      return [];
+    }
+
+    return selectedActionData.inputs_json.fields.map((field) => ({
+      key: field.key,
+      label: field.label,
+      placeholder: field.placeholder || `Enter ${field.label.toLowerCase()}`,
+      required: field.required !== false
+    }));
+  };
+
   const currentInputFields = getInputFields();
+
+  if (loadingActions) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+          <span className="ml-2 text-content-primary">Loading actions...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (actions.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-content-secondary">No actions available for this game.</p>
+          <p className="text-sm text-content-tertiary mt-2">Add actions in the Settings page to get started.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -307,10 +300,10 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
         <div className="flex-1 space-y-4">
           <h3 className="text-lg font-semibold text-content-primary">Configuration</h3>
           
-          {currentInputFields.map(({ key, label, placeholder }) => (
+          {currentInputFields.map(({ key, label, placeholder, required }) => (
             <div key={key}>
               <label className="block text-sm font-medium text-content-secondary mb-1">
-                {label}
+                {label} {required && <span className="text-red-500">*</span>}
               </label>
               <input
                 type="text"
@@ -318,6 +311,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
                 onChange={(e) => handleInputChange(key, e.target.value)}
                 className="w-full px-4 py-3 bg-surface-secondary border border-border-primary rounded-2xl focus:outline-none focus:ring-2 focus:ring-border-focus focus:border-transparent transition-all duration-200 text-content-primary placeholder-content-tertiary"
                 placeholder={placeholder}
+                required={required}
               />
             </div>
           ))}
@@ -337,20 +331,18 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
                   : 'bg-surface-primary hover:bg-surface-secondary text-content-primary border-border-primary'
               }`}
             >
-              {action.name}
+              {(action.display_name && action.display_name.trim().length > 0)
+                ? action.display_name
+                : action.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </button>
           ))}
         </div>
       </div>
 
-
-
-
-
       {/* Submit Button */}
       <button
         onClick={handleSubmit}
-        disabled={isExecuting}
+        disabled={isExecuting || !selectedAction}
         className="w-full bg-primary-500 hover:bg-primary-600 active:bg-primary-700 disabled:bg-primary-300 text-content-inverse font-medium py-4 px-6 rounded-2xl transition-all duration-150 active:animate-tap disabled:cursor-not-allowed shadow-primary"
       >
         {isExecuting ? (
@@ -359,17 +351,17 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
             <span className="ml-2">Executing...</span>
           </div>
         ) : (
-          `Execute ${actions.find(a => a.id === selectedAction)?.name}`
+          'Execute Action'
         )}
       </button>
 
-      {/* Output - Hidden */}
-      {/* {output && (
+      {/* Output Display */}
+      {output && (
         <div className="bg-surface-secondary border border-border-primary rounded-2xl p-4">
-          <h4 className="text-sm font-medium text-content-secondary mb-2">Output:</h4>
-          <pre className="text-sm text-content-tertiary whitespace-pre-wrap">{output}</pre>
+          <h3 className="text-lg font-semibold text-content-primary mb-2">Output</h3>
+          <pre className="text-sm text-content-secondary whitespace-pre-wrap">{output}</pre>
         </div>
-      )} */}
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Navbar from '@/components/Navbar';
@@ -21,73 +21,157 @@ interface Game {
   created_at: string;
 }
 
+interface Action {
+  id: number;
+  game_id: number;
+  name: string;
+  display_name?: string | null;
+  inputs_json: any;
+  updated_at: string;
+}
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
-  type: 'team' | 'game';
+  type: 'team' | 'game' | 'action';
   loading?: boolean;
-  editData?: Team | Game | null;
+  editData?: Team | Game | Action | null;
+  games?: Game[];
 }
 
-function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData }: ModalProps) {
+function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, games }: ModalProps) {
+  const toSnakeCase = (value: string): string => {
+    return value
+      .trim()
+      .replace(/["']/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+  };
   const [formData, setFormData] = useState({
     name: '',
+    display_name: '',
     code: '',
     login_url: '',
-    dashboard_url: ''
+    dashboard_url: '',
+    game_id: '',
+    inputs_json: { fields: [] }
   });
 
-  // Update form data when editData changes
+  const [actionFields, setActionFields] = useState<Array<{ label: string }>>([]);
+
+  // Update form data when editData changes or when modal opens
   useEffect(() => {
+    if (!isOpen) return;
     if (editData) {
       if (type === 'team') {
         const team = editData as Team;
         setFormData({
           name: team.name,
+          display_name: '',
           code: team.code,
           login_url: '',
-          dashboard_url: ''
+          dashboard_url: '',
+          game_id: '',
+          inputs_json: { fields: [] }
         });
-      } else {
+      } else if (type === 'game') {
         const game = editData as Game;
         setFormData({
           name: game.name,
+          display_name: '',
           code: '',
           login_url: game.login_url,
-          dashboard_url: game.dashboard_url
+          dashboard_url: game.dashboard_url,
+          game_id: '',
+          inputs_json: { fields: [] }
         });
+      } else if (type === 'action') {
+        const action = editData as Action;
+        setFormData({
+          name: action.name,
+          display_name: action.display_name || action.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+          code: '',
+          login_url: '',
+          dashboard_url: '',
+          game_id: action.game_id.toString(),
+          inputs_json: action.inputs_json || { fields: [] }
+        });
+        setActionFields((action.inputs_json?.fields || []).map((f: any) => ({ label: f.label })));
       }
     } else {
-      setFormData({ name: '', code: '', login_url: '', dashboard_url: '' });
+      setFormData({ name: '', display_name: '', code: '', login_url: '', dashboard_url: '', game_id: '', inputs_json: { fields: [] } });
+      setActionFields([]);
     }
-  }, [editData, type]);
+  }, [editData, type, isOpen]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (type === 'team') {
       onSubmit({ name: formData.name, code: formData.code });
-    } else {
+    } else if (type === 'game') {
       onSubmit({ 
         name: formData.name, 
         login_url: formData.login_url, 
         dashboard_url: formData.dashboard_url 
       });
+    } else if (type === 'action') {
+      const generatedName = toSnakeCase(formData.display_name || formData.name);
+      const normalizedFields = actionFields.map((f) => ({
+        label: f.label,
+        key: toSnakeCase(f.label),
+      }));
+      onSubmit({ 
+        name: generatedName,
+        display_name: formData.display_name || formData.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+        game_id: parseInt(formData.game_id),
+        inputs_json: { fields: normalizedFields }
+      });
     }
   };
 
   const handleClose = () => {
-    setFormData({ name: '', code: '', login_url: '', dashboard_url: '' });
+    setFormData({ name: '', display_name: '', code: '', login_url: '', dashboard_url: '', game_id: '', inputs_json: { fields: [] } });
+    setActionFields([]);
     onClose();
+  };
+
+  const addActionField = () => {
+    setActionFields([...actionFields, { label: '' }]);
+  };
+
+  const removeActionField = (index: number) => {
+    setActionFields(actionFields.filter((_, i) => i !== index));
+  };
+
+  const updateActionField = (index: number, value: string) => {
+    const newFields = [...actionFields];
+    newFields[index] = { label: value };
+    setActionFields(newFields);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => { e.stopPropagation(); }}>
         <h2 className="text-xl font-semibold mb-4">
-          {editData ? 'Edit' : 'Add New'} {type === 'team' ? 'Team' : 'Game'}
+          {editData ? 'Edit' : 'Add New'} {type === 'team' ? 'Team' : type === 'game' ? 'Game' : 'Action'}
         </h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -100,7 +184,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData }: M
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -112,13 +196,13 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData }: M
                 <input
                   type="text"
                   value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  onChange={(e) => setFormData({...formData, code: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
             </>
-          ) : (
+          ) : type === 'game' ? (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -127,7 +211,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData }: M
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -139,41 +223,121 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData }: M
                 <input
                   type="url"
                   value={formData.login_url}
-                  onChange={(e) => setFormData({ ...formData, login_url: e.target.value })}
+                  onChange={(e) => setFormData({...formData, login_url: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Dashboard URL *
+                  Dashboard URL
                 </label>
                 <input
                   type="url"
                   value={formData.dashboard_url}
-                  onChange={(e) => setFormData({ ...formData, dashboard_url: e.target.value })}
+                  onChange={(e) => setFormData({...formData, dashboard_url: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
                 />
               </div>
             </>
-          )}
-          
-          <div className="flex justify-end space-x-3 pt-4">
+          ) : type === 'action' ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Game *
+                </label>
+                <select
+                  value={formData.game_id}
+                  onChange={(e) => setFormData({...formData, game_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                  required
+                >
+                  <option value="">Select a game</option>
+                  {games?.map((game) => (
+                    <option key={game.id} value={game.id}>
+                      {game.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.display_name}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    display_name: e.target.value,
+                    name: toSnakeCase(e.target.value)
+                  })}
+                  placeholder="e.g. Password Reset"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Key: <span className="font-mono">{toSnakeCase(formData.display_name || '')}</span>
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Input Fields
+                </label>
+                <div className="space-y-3">
+                  {actionFields.map((field, index) => (
+                    <div key={index} className="flex items-start justify-between">
+                      <div className="flex-1 mr-2">
+                        <input
+                          type="text"
+                          placeholder="Label (e.g., Target Username)"
+                          value={field.label}
+                          onChange={(e) => updateActionField(index, e.target.value)}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Key: <span className="font-mono">{toSnakeCase(field.label || '')}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeActionField(index)}
+                        className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                        title="Delete field"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addActionField}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                  >
+                    + Add Field
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : null}
+
+          <div className="flex space-x-3 pt-4">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-              disabled={loading}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? (editData ? 'Updating...' : 'Adding...') : (editData ? 'Update' : 'Add')}
+              {loading ? 'Saving...' : (editData ? 'Update' : 'Add')}
             </button>
           </div>
         </form>
@@ -182,207 +346,363 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData }: M
   );
 }
 
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  message: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  loading?: boolean;
+}
+
+function ConfirmDialog({ isOpen, message, onCancel, onConfirm, loading = false }: ConfirmDialogProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onCancel}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-semibold mb-4">Confirm Delete</h2>
+        <p className="text-gray-700 mb-6">{message}</p>
+        <div className="flex space-x-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 disabled:opacity-50"
+            disabled={loading}
+          >
+            {loading ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
-  const supabase = createClient();
   const router = useRouter();
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState<Team[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [actions, setActions] = useState<Action[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<'team' | 'game'>('team');
+  const [modalType, setModalType] = useState<'team' | 'game' | 'action'>('team');
   const [modalLoading, setModalLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Team | Game | null>(null);
+  const [editData, setEditData] = useState<Team | Game | Action | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const confirmOnConfirmRef = useRef<(() => Promise<void> | void) | null>(null);
+
+  // Collapsible state per widget
+  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [gamesOpen, setGamesOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+
+  const openConfirm = (message: string, onConfirm: () => Promise<void> | void) => {
+    setConfirmMessage(message);
+    confirmOnConfirmRef.current = onConfirm;
+    setConfirmOpen(true);
+  };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.replace('/main_login');
-        return;
-      }
-      fetchData();
-    };
-
     checkAuth();
-  }, [router, supabase.auth]);
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push('/main_login');
+      return;
+    }
+    fetchData();
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
       
       // Fetch teams
-      const teamsResponse = await fetch('/api/team');
-      if (teamsResponse.ok) {
-        const teamsData = await teamsResponse.json();
-        setTeams(teamsData.teams || []);
+      const { data: teamsData, error: teamsError } = await supabase
+        .from('team')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (teamsError) {
+        console.error('Error fetching teams:', teamsError);
+      } else {
+        setTeams(teamsData || []);
       }
 
       // Fetch games
-      const gamesResponse = await fetch('/api/game');
-      if (gamesResponse.ok) {
-        const gamesData = await gamesResponse.json();
-        setGames(gamesData.games || []);
+      const { data: gamesData, error: gamesError } = await supabase
+        .from('game')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (gamesError) {
+        console.error('Error fetching games:', gamesError);
+      } else {
+        setGames(gamesData || []);
       }
 
-      setLoading(false);
+      // Fetch actions
+      await fetchActions();
+
     } catch (error) {
       console.error('Error fetching data:', error);
-      setError('Failed to load settings data');
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActions = async () => {
+    try {
+      const { data: actionsData, error: actionsError } = await supabase
+        .from('actions')
+        .select(`
+          *,
+          game:game_id (id, name)
+        `)
+        .order('updated_at', { ascending: false });
+
+      if (actionsError) {
+        console.error('Error fetching actions:', actionsError);
+      } else {
+        setActions(actionsData || []);
+      }
+    } catch (error) {
+      console.error('Error fetching actions:', error);
     }
   };
 
   const handleAddTeam = async (data: { name: string; code: string }) => {
     try {
       setModalLoading(true);
-      const response = await fetch('/api/team', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const { error } = await supabase
+        .from('team')
+        .insert(data);
 
-      if (response.ok) {
-        const newTeam = await response.json();
-        setTeams([...teams, newTeam]);
-        setModalOpen(false);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to add team');
+      if (error) {
+        console.error('Error adding team:', error);
+        alert('Failed to add team');
+        return;
       }
+
+      fetchData();
+      setModalOpen(false);
     } catch (error) {
       console.error('Error adding team:', error);
-      setError('Failed to add team');
+      alert('Failed to add team');
     } finally {
       setModalLoading(false);
     }
   };
 
   const handleUpdateTeam = async (data: { name: string; code: string }) => {
-    if (!editData || !('id' in editData)) return;
-    
     try {
       setModalLoading(true);
-      const response = await fetch(`/api/team/${editData.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const team = editData as Team;
+      const { error } = await supabase
+        .from('team')
+        .update(data)
+        .eq('id', team.id);
 
-      if (response.ok) {
-        const updatedTeam = await response.json();
-        setTeams(teams.map(team => team.id === editData.id ? updatedTeam : team));
-        setModalOpen(false);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to update team');
+      if (error) {
+        console.error('Error updating team:', error);
+        alert('Failed to update team');
+        return;
       }
+
+      fetchData();
+      setModalOpen(false);
     } catch (error) {
       console.error('Error updating team:', error);
-      setError('Failed to update team');
+      alert('Failed to update team');
     } finally {
       setModalLoading(false);
     }
   };
 
   const handleDeleteTeam = async (teamId: number) => {
-    if (!confirm('Are you sure you want to delete this team?')) return;
-    
-    try {
-      const response = await fetch(`/api/team/${teamId}`, {
-        method: 'DELETE',
-      });
+    openConfirm('Are you sure you want to delete this team?', async () => {
+      try {
+        setConfirmLoading(true);
+        const { error } = await supabase
+          .from('team')
+          .delete()
+          .eq('id', teamId);
 
-      if (response.ok) {
-        setTeams(teams.filter(team => team.id !== teamId));
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to delete team');
+        if (error) {
+          console.error('Error deleting team:', error);
+          alert('Failed to delete team');
+          return;
+        }
+
+        setConfirmOpen(false);
+        fetchData();
+      } catch (error) {
+        console.error('Error deleting team:', error);
+        alert('Failed to delete team');
+      } finally {
+        setConfirmLoading(false);
       }
-    } catch (error) {
-      console.error('Error deleting team:', error);
-      setError('Failed to delete team');
-    }
+    });
   };
 
   const handleAddGame = async (data: { name: string; login_url: string; dashboard_url: string }) => {
     try {
       setModalLoading(true);
-      const response = await fetch('/api/game', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const { error } = await supabase
+        .from('game')
+        .insert(data);
 
-      if (response.ok) {
-        const newGame = await response.json();
-        setGames([...games, newGame]);
-        setModalOpen(false);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to add game');
+      if (error) {
+        console.error('Error adding game:', error);
+        alert('Failed to add game');
+        return;
       }
+
+      fetchData();
+      setModalOpen(false);
     } catch (error) {
       console.error('Error adding game:', error);
-      setError('Failed to add game');
+      alert('Failed to add game');
     } finally {
       setModalLoading(false);
     }
   };
 
   const handleUpdateGame = async (data: { name: string; login_url: string; dashboard_url: string }) => {
-    if (!editData || !('id' in editData)) return;
-    
     try {
       setModalLoading(true);
-      const response = await fetch(`/api/game/${editData.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const game = editData as Game;
+      const { error } = await supabase
+        .from('game')
+        .update(data)
+        .eq('id', game.id);
 
-      if (response.ok) {
-        const updatedGame = await response.json();
-        setGames(games.map(game => game.id === editData.id ? updatedGame : game));
-        setModalOpen(false);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to update game');
+      if (error) {
+        console.error('Error updating game:', error);
+        alert('Failed to update game');
+        return;
       }
+
+      fetchData();
+      setModalOpen(false);
     } catch (error) {
       console.error('Error updating game:', error);
-      setError('Failed to update game');
+      alert('Failed to update game');
     } finally {
       setModalLoading(false);
     }
   };
 
   const handleDeleteGame = async (gameId: number) => {
-    if (!confirm('Are you sure you want to delete this game?')) return;
-    
-    try {
-      const response = await fetch(`/api/game/${gameId}`, {
-        method: 'DELETE',
-      });
+    openConfirm('Are you sure you want to delete this game?', async () => {
+      try {
+        setConfirmLoading(true);
+        const { error } = await supabase
+          .from('game')
+          .delete()
+          .eq('id', gameId);
 
-      if (response.ok) {
-        setGames(games.filter(game => game.id !== gameId));
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to delete game');
+        if (error) {
+          console.error('Error deleting game:', error);
+          alert('Failed to delete game');
+          return;
+        }
+
+        setConfirmOpen(false);
+        fetchData();
+      } catch (error) {
+        console.error('Error deleting game:', error);
+        alert('Failed to delete game');
+      } finally {
+        setConfirmLoading(false);
       }
+    });
+  };
+
+  const handleAddAction = async (data: { name: string; display_name?: string; game_id: number; inputs_json: any }) => {
+    try {
+      setModalLoading(true);
+      const { error } = await supabase
+        .from('actions')
+        .insert(data);
+
+      if (error) {
+        console.error('Error adding action:', error);
+        alert('Failed to add action');
+        return;
+      }
+
+      fetchData();
+      setModalOpen(false);
     } catch (error) {
-      console.error('Error deleting game:', error);
-      setError('Failed to delete game');
+      console.error('Error adding action:', error);
+      alert('Failed to add action');
+    } finally {
+      setModalLoading(false);
     }
+  };
+
+  const handleUpdateAction = async (data: { name: string; display_name?: string; game_id: number; inputs_json: any }) => {
+    try {
+      setModalLoading(true);
+      const action = editData as Action;
+      const { error } = await supabase
+        .from('actions')
+        .update(data)
+        .eq('id', action.id);
+
+      if (error) {
+        console.error('Error updating action:', error);
+        alert('Failed to update action');
+        return;
+      }
+
+      fetchData();
+      setModalOpen(false);
+    } catch (error) {
+      console.error('Error updating action:', error);
+      alert('Failed to update action');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleDeleteAction = async (actionId: number) => {
+    openConfirm('Are you sure you want to delete this action?', async () => {
+      try {
+        setConfirmLoading(true);
+        const { error } = await supabase
+          .from('actions')
+          .delete()
+          .eq('id', actionId);
+
+        if (error) {
+          console.error('Error deleting action:', error);
+          alert('Failed to delete action');
+          return;
+        }
+
+        setConfirmOpen(false);
+        fetchData();
+      } catch (error) {
+        console.error('Error deleting action:', error);
+        alert('Failed to delete action');
+      } finally {
+        setConfirmLoading(false);
+      }
+    });
   };
 
   const handleModalSubmit = (data: any) => {
@@ -392,20 +712,25 @@ export default function Settings() {
       } else {
         handleAddTeam(data);
       }
-    } else {
+    } else if (modalType === 'game') {
       if (editData) {
         handleUpdateGame(data);
       } else {
         handleAddGame(data);
       }
+    } else if (modalType === 'action') {
+      if (editData) {
+        handleUpdateAction(data);
+      } else {
+        handleAddAction(data);
+      }
     }
   };
 
-  const openModal = (type: 'team' | 'game', data?: Team | Game) => {
+  const openModal = (type: 'team' | 'game' | 'action', data?: Team | Game | Action) => {
     setModalType(type);
     setEditData(data || null);
     setModalOpen(true);
-    setError(null);
   };
 
   if (loading) {
@@ -419,17 +744,21 @@ export default function Settings() {
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
           
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-700">{error}</p>
-            </div>
-          )}
+          {/* Error display removed as per new_code, assuming it's handled by alerts */}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-8 items-start">
             {/* Teams Section */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Teams</h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 self-start">
+              <div className="flex justify-between items-center mb-2">
+                <button
+                  className="flex items-center space-x-2 text-xl font-semibold text-gray-900"
+                  onClick={() => setTeamsOpen((v) => !v)}
+                >
+                  <span>Teams</span>
+                  <svg className={`w-5 h-5 text-gray-500 transform transition-transform ${teamsOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
                 <button
                   onClick={() => openModal('team')}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -438,51 +767,59 @@ export default function Settings() {
                 </button>
               </div>
               
-              <div className="space-y-3">
+              {teamsOpen && (
+              <div className="divide-y-2 divide-gray-400 mt-4">
                 {teams.length === 0 ? (
                   <p className="text-gray-500 text-center py-4">No teams found</p>
                 ) : (
-                                     teams.map((team) => (
-                     <div key={team.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                       <div>
-                         <p className="font-medium text-gray-900">{team.name}</p>
-                         <p className="text-sm text-gray-500">Code: {team.code}</p>
-                       </div>
-                       <div className="flex items-center space-x-3">
-                         <span className="text-xs text-gray-400">
-                           {new Date(team.created_at).toLocaleDateString()}
-                         </span>
-                         <div className="flex space-x-2">
-                                                       <button
-                              onClick={() => openModal('team', team)}
-                              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-                              title="Edit team"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-                                                       <button
-                              onClick={() => handleDeleteTeam(team.id)}
-                              className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                              title="Delete team"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                         </div>
-                       </div>
-                     </div>
-                   ))
+                  teams.map((team) => (
+                    <div key={team.id} className="px-3 py-2 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{team.name}</p>
+                        <p className="text-sm text-gray-500">Code: {team.code}</p>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <span className="text-xs text-gray-400">{new Date(team.created_at).toLocaleDateString()}</span>
+                        <div className="flex space-x-2">
+                        <button
+                          onClick={() => openModal('team', team)}
+                          className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                          title="Edit team"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTeam(team.id)}
+                          className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                          title="Delete team"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
+              )}
             </div>
 
             {/* Games Section */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Games</h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 self-start">
+              <div className="flex justify-between items-center mb-2">
+                <button
+                  className="flex items-center space-x-2 text-xl font-semibold text-gray-900"
+                  onClick={() => setGamesOpen((v) => !v)}
+                >
+                  <span>Games</span>
+                  <svg className={`w-5 h-5 text-gray-500 transform transition-transform ${gamesOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
                 <button
                   onClick={() => openModal('game')}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -491,50 +828,125 @@ export default function Settings() {
                 </button>
               </div>
               
-              <div className="space-y-3">
+              {gamesOpen && (
+              <div className="divide-y-2 divide-gray-400 mt-4">
                 {games.length === 0 ? (
                   <p className="text-gray-500 text-center py-4">No games found</p>
                 ) : (
-                                     games.map((game) => (
-                                           <div key={game.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                        <div className="flex-1 min-w-0 mr-4">
-                          <p className="font-medium text-gray-900">{game.name}</p>
-                          <p className="text-sm text-gray-500 truncate">
-                            Login: {game.login_url}
-                          </p>
-                          <p className="text-sm text-gray-500 truncate">
-                            Dashboard: {game.dashboard_url}
-                          </p>
+                  games.map((game) => (
+                    <div key={game.id} className="flex items-center justify-between px-3 py-2">
+                      <div className="flex-1 min-w-0 mr-4">
+                        <p className="font-medium text-gray-900">{game.name}</p>
+                        <p className="text-sm text-gray-500 truncate">
+                          Login: {game.login_url}
+                        </p>
+                        <p className="text-sm text-gray-500 truncate">
+                          Dashboard: {game.dashboard_url}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <span className="text-xs text-gray-400">
+                          {new Date(game.created_at).toLocaleDateString()}
+                        </span>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => openModal('game', game)}
+                            className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                            title="Edit game"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGame(game.id)}
+                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                            title="Delete game"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                         </div>
-                                               <div className="flex items-center space-x-4">
-                          <span className="text-xs text-gray-400">
-                            {new Date(game.created_at).toLocaleDateString()}
-                          </span>
-                          <div className="flex space-x-2">
-                           <button
-                             onClick={() => openModal('game', game)}
-                             className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-                             title="Edit game"
-                           >
-                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                             </svg>
-                           </button>
-                           <button
-                             onClick={() => handleDeleteGame(game.id)}
-                             className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                             title="Delete game"
-                           >
-                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                             </svg>
-                           </button>
-                         </div>
-                       </div>
-                     </div>
-                   ))
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
+              )}
+            </div>
+
+            {/* Actions Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 self-start">
+              <div className="flex justify-between items-center mb-2">
+                <button
+                  className="flex items-center space-x-2 text-xl font-semibold text-gray-900"
+                  onClick={() => setActionsOpen((v) => !v)}
+                >
+                  <span>Actions</span>
+                  <svg className={`w-5 h-5 text-gray-500 transform transition-transform ${actionsOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => openModal('action')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Add Action
+                </button>
+              </div>
+              
+              {actionsOpen && (
+              <div className="divide-y-2 divide-gray-400 mt-4">
+                {actions.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">No actions found</p>
+                ) : (
+                  actions.map((action) => {
+                    const game = games.find(g => g.id === action.game_id);
+                    const displayName = (action.display_name && action.display_name.trim().length > 0)
+                      ? action.display_name
+                      : action.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    
+                    return (
+                      <div key={action.id} className="flex items-center justify-between px-3 py-2">
+                        <div className="flex-1 min-w-0 mr-4">
+                          <p className="font-medium text-gray-900">{displayName}</p>
+                          <p className="text-sm text-gray-500">Game: {game?.name || 'Unknown'}</p>
+                          <p className="text-xs text-gray-400">
+                            {action.inputs_json?.fields?.length || 0} input fields
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className="text-xs text-gray-400">
+                            {new Date(action.updated_at).toLocaleDateString()}
+                          </span>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => openModal('action', action)}
+                              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                              title="Edit action"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAction(action.id)}
+                              className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                              title="Delete action"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              )}
             </div>
           </div>
         </div>
@@ -542,11 +954,19 @@ export default function Settings() {
 
       <Modal
         isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => { setModalOpen(false); setEditData(null); }}
         onSubmit={handleModalSubmit}
         type={modalType}
         loading={modalLoading}
         editData={editData}
+        games={games}
+      />
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        message={confirmMessage}
+        loading={confirmLoading}
+        onCancel={() => { if (!confirmLoading) setConfirmOpen(false); }}
+        onConfirm={() => { if (confirmOnConfirmRef.current) confirmOnConfirmRef.current(); }}
       />
     </div>
   );

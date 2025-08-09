@@ -59,12 +59,65 @@ export async function POST(request: NextRequest) {
 
     console.log('Adding action to queue:', action, 'with params:', params);
 
+    // Convert camelCase action names to snake_case for database lookup
+    const actionNameForDb = action === 'newAccount' ? 'new_account' : 
+                           action === 'passwordReset' ? 'password_reset' : 
+                           action;
+    
+    // Initialize snakeCaseParams with original params
+    let snakeCaseParams = params;
+    
+    // For non-login actions, validate against database actions
+    if (action !== 'login') {
+      
+      const { data: actionDefinition, error: actionError } = await supabase
+        .from('actions')
+        .select('*')
+        .eq('game_id', game.id)
+        .eq('name', actionNameForDb)
+        .single();
+
+      if (actionError || !actionDefinition) {
+        console.error(`Action ${actionNameForDb} not found for game ${gameName}`);
+        return NextResponse.json({ 
+          error: `Action '${action}' not found for this game`,
+          details: `Game: ${gameName}, Action: ${action}`
+        }, { status: 404 });
+      }
+
+      // Validate params against action definition if inputs_json exists
+      if (actionDefinition.inputs_json && actionDefinition.inputs_json.fields) {
+        // Convert camelCase parameter names to snake_case for validation
+        const convertedParams: any = {};
+        Object.keys(params).forEach(key => {
+          const snakeKey = key === 'targetUsername' ? 'target_username' :
+                          key === 'newPassword' ? 'new_password' :
+                          key === 'newAccountName' ? 'account_name' :
+                          key;
+          convertedParams[snakeKey] = params[key];
+        });
+        
+        const requiredFields = actionDefinition.inputs_json.fields.filter((field: any) => field.required !== false);
+        const missingFields = requiredFields.filter((field: any) => !convertedParams[field.key]);
+        
+        if (missingFields.length > 0) {
+          return NextResponse.json({ 
+            error: 'Missing required fields',
+            details: `Missing: ${missingFields.map((f: any) => f.label).join(', ')}`
+          }, { status: 400 });
+        }
+        
+        // Replace params with snake_case keys for the worker
+        snakeCaseParams = convertedParams;
+      }
+    }
+
     // Create job data
     const jobData: JobData = {
       userId: user.id,
       gameCredentialId: gameCredential.id,
-      action,
-      params: params || {},
+      action: actionNameForDb, // Use snake_case action name
+      params: snakeCaseParams,
       teamId: parseInt(teamId),
       gameName: request.headers.get('x-game-name') || '',
     };

@@ -33,7 +33,7 @@ export interface JobProgress {
   params?: any; // Job parameters
 }
 
-export type ActionType = 'login' | 'newAccount' | 'passwordReset' | 'recharge' | 'redeem';
+export type ActionType = string; // Allow any action name since they're dynamic
 
 export interface QueueJob {
   id: string;

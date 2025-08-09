@@ -31,19 +31,22 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
     };
 }
 
-async function recharge(page, context, params = {}) {
-    const { accountName = 'testing01', rechargeAmount = '1', remarks = 'test remarks' } = params;
+async function run(page, context, params = {}) {
+    // Handle both old camelCase and new snake_case parameter names
+    const target_username = params.target_username || params.targetUsername || 'testing01';
+    const amount = params.amount || '1';
+    const remark = params.remark || 'test remarks';
 
-    console.log(`Account to recharge: ${accountName}`);
-    console.log(`Recharge amount: ${rechargeAmount}`);
-    console.log(`Remarks: ${remarks}`);
+    console.log(`Account to recharge: ${target_username}`);
+    console.log(`Recharge amount: ${amount}`);
+    console.log(`Remarks: ${remark}`);
 
-             // Start WebSocket screenshot capture
-         const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'recharge', 500);
+    // Start WebSocket screenshot capture
+    const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'recharge', 500);
 
     try {
         // From here
-        await page.goto('https://agent.yolo777.game/admin');
+        await page.reload();
         await page.getByRole('link', { name: ' Player Management ' }).click();
         await page.getByRole('link', { name: ' Player List' }).click();
         await page.waitForLoadState('networkidle');
@@ -55,7 +58,7 @@ async function recharge(page, context, params = {}) {
             .contentFrame();
         
         // 3. Search for the account
-        await listFrame.getByRole('textbox', { name: 'Account' }).fill(accountName);
+        await listFrame.getByRole('textbox', { name: 'Account' }).fill(target_username);
         await listFrame.getByRole('button', { name: '  Search' }).click();
 
         // 3.5. Wait for table to load and stabilize
@@ -80,7 +83,7 @@ async function recharge(page, context, params = {}) {
                 return {
                     success: false,
                     message: 'No account found',
-                    username: accountName
+                    username: target_username
                 };
             }
 
@@ -90,13 +93,13 @@ async function recharge(page, context, params = {}) {
                 await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
                 const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
                 const foundName = (await accountCell.textContent()).trim();
-                console.log(foundName, '---', accountName);
-                if (foundName !== accountName) {
+                console.log(foundName, '---', target_username);
+                if (foundName !== target_username) {
                   console.log('Account in row does not match. Aborting.');
                   return {
                     success: false,
                     message: 'No account found',
-                    username: accountName
+                    username: target_username
                   };
                 }
             } catch {
@@ -104,7 +107,7 @@ async function recharge(page, context, params = {}) {
               return {
                 success: false,
                 message: 'No account found',
-                username: accountName
+                username: target_username
               };
             }
         } catch (error) {
@@ -112,15 +115,15 @@ async function recharge(page, context, params = {}) {
             return {
                 success: false,
                 message: 'Table loading timeout',
-                username: accountName
+                username: target_username
             };
         }
 
         await listFrame.getByRole('button', { name: 'editor' }).click();
         await listFrame.locator('a').filter({ hasText: 'Recharge' }).click();
 
-        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByPlaceholder('Input score').fill(rechargeAmount);
-        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input remark' }).fill(remarks);
+        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByPlaceholder('Input score').fill(amount);
+        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input remark' }).fill(remark);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('button', { name: ' Submit' }).click();
         
         // 6. Capture and log the success/error message
@@ -136,68 +139,57 @@ async function recharge(page, context, params = {}) {
             return {
                 success: true,
                 message: 'Recharge successful',
-                username: accountName,
-                amount: parseFloat(rechargeAmount)
+                username: target_username,
+                amount: parseFloat(amount)
             };
         } catch (successError) {
             try {
-                // Check for "Amount cannot be 0" error
-                const zeroAmountError = listFrame
-                    .locator('div')
-                    .filter({ hasText: /^The score must be greater than 0\.$/ })
-                    .nth(1);
-                await zeroAmountError.waitFor({ state: 'visible', timeout: 3000 });
-                await zeroAmountError.click();
+                // Check for "amount should be greater than 0" error
+                const zeroError = listFrame.getByText('Amount should be greater than 0');
+                await zeroError.waitFor({ state: 'visible', timeout: 3000 });
+                await zeroError.click();
                 console.log('Amount should be greater than 0');
                 return {
                     success: false,
                     message: 'Amount should be greater than 0',
-                    username: accountName,
-                    amount: parseFloat(rechargeAmount)
+                    username: target_username,
+                    amount: parseFloat(amount)
                 };
             } catch (zeroError) {
                 try {
-                    // Check for "Amount is insufficient" error
-                    const insufficientError = listFrame
-                        .locator('div')
-                        .filter({ hasText: 'The score is insufficient' })
-                        .nth(1);
+                    // Check for "amount is insufficient" error
+                    const insufficientError = listFrame.getByText('Amount is insufficient');
                     await insufficientError.waitFor({ state: 'visible', timeout: 3000 });
                     await insufficientError.click();
                     console.log('Amount is insufficient');
                     return {
                         success: false,
                         message: 'Amount is insufficient',
-                        username: accountName,
-                        amount: parseFloat(rechargeAmount)
+                        username: target_username,
+                        amount: parseFloat(amount)
                     };
                 } catch (insufficientError) {
-                    // If neither success nor specific error found, return generic error
-                    console.log('Try again');
+                    console.log('Try again, maybe the amount is insufficient');
                     return {
                         success: false,
                         message: 'Try again, maybe the amount is insufficient',
-                        username: accountName,
-                        amount: parseFloat(rechargeAmount)
+                        username: target_username,
+                        amount: parseFloat(amount)
                     };
                 }
             }
         }
-
     } catch (error) {
-        console.error('Error during recharging amount:', error);
-        stopScreenshotCapture();
+        console.error('Error during recharge:', error);
         return {
             success: false,
             message: `Error during recharge: ${error}`,
-            username: accountName,
-            amount: parseFloat(rechargeAmount)
+            username: target_username,
+            amount: parseFloat(amount)
         };
     } finally {
-        // Stop WebSocket screenshot capture
         stopScreenshotCapture();
     }
 }
 
-// Export the function for external use
-module.exports = { recharge };
+module.exports = { run };

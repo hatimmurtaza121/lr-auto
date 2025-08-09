@@ -37,18 +37,20 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
     };
 }
 
-async function resetAccountPassword(page, context, params = {}) {
-    const { targetUsername = 'testing01', newPassword = 'NewPassword123' } = params;
+async function run(page, context, params = {}) {
+    // Handle both old camelCase and new snake_case parameter names
+    const target_username = params.target_username || params.targetUsername || 'testing01';
+    const new_password = params.new_password || params.newPassword || 'NewPassword123';
     
-    console.log(`Account to reset: ${targetUsername}`);
-    console.log(`New password: ${newPassword}`);
+    console.log(`Account to reset: ${target_username}`);
+    console.log(`New password: ${new_password}`);
 
-             // Start WebSocket screenshot capture
-         const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'passwordReset', 500);
+    // Start WebSocket screenshot capture
+    const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'password_reset', 500);
 
     try {
         // From here
-        await page.goto('https://agent.yolo777.game/admin');
+        await page.reload();
         await page.getByRole('link', { name: ' Player Management ' }).click();
         await page.getByRole('link', { name: ' Player List' }).click();
         await page.waitForLoadState('networkidle');
@@ -60,7 +62,7 @@ async function resetAccountPassword(page, context, params = {}) {
             .contentFrame();
         
         // 3. Search for the account
-        await listFrame.getByRole('textbox', { name: 'Account' }).fill(targetUsername);
+        await listFrame.getByRole('textbox', { name: 'Account' }).fill(target_username);
         await listFrame.getByRole('button', { name: '  Search' }).click();
 
         // 3.5. Wait for table to load and stabilize
@@ -93,8 +95,8 @@ async function resetAccountPassword(page, context, params = {}) {
                     await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
                     const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
                     const foundName = (await accountCell.textContent()).trim();
-                    console.log(foundName, '---', targetUsername);
-                    if (foundName !== targetUsername) {
+                    console.log(foundName, '---', target_username);
+                    if (foundName !== target_username) {
                         console.log('Account in row does not match. Aborting.');
                         accountValidationError = 'No account found';
                     }
@@ -108,13 +110,13 @@ async function resetAccountPassword(page, context, params = {}) {
             return {
                 success: false,
                 message: 'Table loading timeout',
-                username: targetUsername
+                username: target_username
             };
         }
 
         // Early return if validation failed
         if (accountValidationError) {
-            return { success: false, message: accountValidationError, username: targetUsername };
+            return { success: false, message: accountValidationError, username: target_username };
         }
 
         
@@ -126,7 +128,7 @@ async function resetAccountPassword(page, context, params = {}) {
             .click();
         
         // 5. Fill in the new password and submit
-        await listFrame.getByRole('textbox', { name: 'Input Password' }).fill(newPassword);
+        await listFrame.getByRole('textbox', { name: 'Input Password' }).fill(new_password);
         await listFrame.getByRole('button', { name: ' Submit' }).click();
         
         // 6. Capture and log the success/error message
@@ -142,7 +144,7 @@ async function resetAccountPassword(page, context, params = {}) {
             return {
                 success: true,
                 message: 'Password reset successful',
-                username: targetUsername
+                username: target_username
             };
         } catch (successError) {
             try {
@@ -157,7 +159,7 @@ async function resetAccountPassword(page, context, params = {}) {
                 return {
                     success: false,
                     message: 'Old password cannot be the new password',
-                    username: targetUsername
+                    username: target_username
                 };
             } catch (errorError) {
                 // If neither success nor specific error found, return generic error
@@ -165,18 +167,18 @@ async function resetAccountPassword(page, context, params = {}) {
                 return {
                     success: false,
                     message: 'Try again',
-                    username: targetUsername
+                    username: target_username
                 };
             }
         }
-    
+     
     } catch (error) {
         console.error('Error during password reset:', error);
         stopScreenshotCapture();
         return {
             success: false,
             message: `Error resetting password: ${error}`,
-            username: targetUsername
+            username: target_username
         };
     } finally {
         // Stop WebSocket screenshot capture
@@ -184,5 +186,4 @@ async function resetAccountPassword(page, context, params = {}) {
     }
 }
 
-// Export the function for external use
-module.exports = { resetAccountPassword };
+module.exports = { run };

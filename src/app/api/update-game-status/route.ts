@@ -30,11 +30,10 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Validate action
-    const validActions = ['login', 'new_account', 'password_reset', 'recharge', 'redeem'];
-    if (!validActions.includes(action)) {
+    // Validate action - allow any action name since they're dynamic
+    if (!action || typeof action !== 'string') {
       return NextResponse.json({ 
-        error: `Invalid action. Must be one of: ${validActions.join(', ')}` 
+        error: 'Valid action name is required' 
       }, { status: 400 });
     }
 

@@ -91,12 +91,8 @@ export default function StatusPage() {
         throw new Error('User not authenticated');
       }
 
-      // First, get all games available for this team
-      const gamesResponse = await fetch(`/api/team?teamId=${teamId}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      // Fetch all games using the game API
+      const gamesResponse = await fetch('/api/game');
 
       if (!gamesResponse.ok) {
         throw new Error('Failed to fetch games');
@@ -112,61 +108,61 @@ export default function StatusPage() {
         }
       });
 
-             let statusData: GameStatus[] = [];
-       if (statusResponse.ok) {
-         const statusResult = await statusResponse.json();
-         statusData = statusResult.data || [];
-       }
+      let statusData: GameStatus[] = [];
+      if (statusResponse.ok) {
+        const statusResult = await statusResponse.json();
+        statusData = statusResult.data || [];
+      }
 
-       console.log('Raw status data from API:', JSON.stringify(statusData, null, 2));
+      console.log('Raw status data from API:', JSON.stringify(statusData, null, 2));
 
-             // Create complete game status list with unknown status for missing actions
-       const completeGameStatuses = allGames.map((game: any) => {
-         const existingStatus = statusData.find((status: any) => status.game_id === game.id);
-         
-         if (existingStatus) {
-           // Ensure all 5 actions are present, fill missing ones with unknown
-           const allActions = {
-             login: { status: 'unknown', updated_at: new Date().toISOString() },
-             new_account: { status: 'unknown', updated_at: new Date().toISOString() },
-             password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
-             recharge: { status: 'unknown', updated_at: new Date().toISOString() },
-             redeem: { status: 'unknown', updated_at: new Date().toISOString() }
-           };
-           
-           // Merge existing status with default unknown status
-           Object.assign(allActions, existingStatus.actions);
-           
-           return {
-             ...existingStatus,
-             actions: allActions
-           };
-         } else {
-           // Create new game status with unknown for all actions
-           return {
-             game_id: game.id,
-             game_name: game.name,
-             login_url: game.login_url,
-             actions: {
-               login: { status: 'unknown', updated_at: new Date().toISOString() },
-               new_account: { status: 'unknown', updated_at: new Date().toISOString() },
-               password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
-               recharge: { status: 'unknown', updated_at: new Date().toISOString() },
-               redeem: { status: 'unknown', updated_at: new Date().toISOString() }
-             }
-           };
-         }
-       });
-
-                     console.log('Final game statuses:', JSON.stringify(completeGameStatuses, null, 2));
+      // Create complete game status list with unknown status for missing actions
+      const completeGameStatuses = allGames.map((game: any) => {
+        const existingStatus = statusData.find((status: any) => status.game_id === game.id);
         
-        // Sort game statuses in descending order by game name
-        const sortedGameStatuses = completeGameStatuses.sort((a: GameStatus, b: GameStatus) => 
-          b.game_name.localeCompare(a.game_name)
-        );
-        
-        setGameStatuses(sortedGameStatuses);
-        setLastUpdated(new Date());
+        if (existingStatus) {
+          // Ensure all 5 actions are present, fill missing ones with unknown
+          const allActions = {
+            login: { status: 'unknown', updated_at: new Date().toISOString() },
+            new_account: { status: 'unknown', updated_at: new Date().toISOString() },
+            password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
+            recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+            redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+          };
+          
+          // Merge existing status with default unknown status
+          Object.assign(allActions, existingStatus.actions);
+          
+          return {
+            ...existingStatus,
+            actions: allActions
+          };
+        } else {
+          // Create new game status with unknown for all actions
+          return {
+            game_id: game.id,
+            game_name: game.name,
+            login_url: game.login_url,
+            actions: {
+              login: { status: 'unknown', updated_at: new Date().toISOString() },
+              new_account: { status: 'unknown', updated_at: new Date().toISOString() },
+              password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
+              recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+              redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+            }
+          };
+        }
+      });
+
+      console.log('Final game statuses:', JSON.stringify(completeGameStatuses, null, 2));
+      
+      // Sort game statuses in descending order by game name
+      const sortedGameStatuses = completeGameStatuses.sort((a: GameStatus, b: GameStatus) => 
+        b.game_name.localeCompare(a.game_name)
+      );
+      
+      setGameStatuses(sortedGameStatuses);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching game status:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch status');

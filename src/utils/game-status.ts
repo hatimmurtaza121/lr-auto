@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 export interface GameStatusUpdate {
   teamId: number;
   gameId: number;
-  action: 'login' | 'new_account' | 'password_reset' | 'recharge' | 'redeem';
+  action: string;
   status: 'success' | 'fail' | 'unknown';
   inputs?: any; // Add inputs field to store action parameters
   executionTimeSecs?: number; // Add execution time field

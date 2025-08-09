@@ -53,11 +53,10 @@ export async function POST(request: NextRequest) {
       gameName,
     };
 
-    // Validate action type
-    const validActions = ['login', 'newAccount', 'passwordReset', 'recharge', 'redeem'];
-    if (!validActions.includes(action)) {
+    // Validate action type - allow any action name since they're dynamic
+    if (!action || typeof action !== 'string') {
       return NextResponse.json({ 
-        error: 'Invalid action type' 
+        error: 'Valid action name is required' 
       }, { status: 400 });
     }
 

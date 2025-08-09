@@ -68,6 +68,10 @@ export interface ActionParams {
   remark?: string;
   username?: string;
   password?: string;
+  // Snake_case parameter names for new system
+  account_name?: string;
+  new_password?: string;
+  target_username?: string;
   // Add other parameters as needed
 }
 
@@ -90,7 +94,9 @@ export async function createNewAccountWithSession(
   };
 
   const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
-    const { newAccountName = "testing07", newPassword = "Hatim121" } = params;
+    // Handle both old camelCase and new snake_case parameter names
+    const newAccountName = params.newAccountName || params.account_name || "testing07";
+    const newPassword = params.newPassword || params.new_password || "Hatim121";
     
     console.log('Starting account creation process...');
 
@@ -104,10 +110,10 @@ export async function createNewAccountWithSession(
       console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
-      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/newAccount.js`);
-      const result = await scriptModule.createNewAccount(page, context, {
-        newAccountName,
-        newPassword
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/new_account.js`);
+      const result = await scriptModule.run(page, context, {
+        account_name: newAccountName,
+        new_password: newPassword
       });
       
       return { ...result, logs };
@@ -146,7 +152,9 @@ export async function resetPasswordWithSession(
   params: ActionParams
 ): Promise<{ success: boolean; message: string; username?: string; needsLogin?: boolean; gameInfo?: any }> {
   const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
-    const { targetUsername, newPassword = "NewPassword123" } = params;
+    // Handle both old camelCase and new snake_case parameter names
+    const targetUsername = params.targetUsername || params.target_username;
+    const newPassword = params.newPassword || params.new_password || "NewPassword123";
     
     if (!targetUsername) {
       return {
@@ -167,10 +175,10 @@ export async function resetPasswordWithSession(
       console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
-      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/passwordReset.js`);
-      const result = await scriptModule.resetAccountPassword(page, context, {
-        targetUsername,
-        newPassword
+      const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/password_reset.js`);
+      const result = await scriptModule.run(page, context, {
+        target_username: targetUsername,
+        new_password: newPassword
       });
       
       return result;
@@ -205,7 +213,10 @@ export async function rechargeWithSession(
   params: ActionParams
 ): Promise<{ success: boolean; message: string; username?: string; amount?: number; needsLogin?: boolean; gameInfo?: any }> {
   const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
-    const { targetUsername, amount = 0, remark = "test remarks" } = params;
+    // Handle both old camelCase and new snake_case parameter names
+    const targetUsername = params.targetUsername || params.target_username;
+    const amount = params.amount || 0;
+    const remark = params.remark || "test remarks";
     
     if (!targetUsername) {
       return {
@@ -234,10 +245,10 @@ export async function rechargeWithSession(
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/recharge.js`);
-      const result = await scriptModule.recharge(page, context, {
-        accountName: targetUsername,
-        rechargeAmount: amount.toString(),
-        remarks: remark
+      const result = await scriptModule.run(page, context, {
+        target_username: targetUsername,
+        amount: amount,
+        remark: remark
       });
       
       return result;
@@ -273,7 +284,10 @@ export async function redeemWithSession(
   params: ActionParams
 ): Promise<{ success: boolean; message: string; username?: string; amount?: number; needsLogin?: boolean; gameInfo?: any }> {
   const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
-    const { targetUsername, amount = 0, remark = "test remarks" } = params;
+    // Handle both old camelCase and new snake_case parameter names
+    const targetUsername = params.targetUsername || params.target_username;
+    const amount = params.amount || 0;
+    const remark = params.remark || "test remarks";
     
     if (!targetUsername) {
       return {
@@ -302,10 +316,10 @@ export async function redeemWithSession(
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/redeem.js`);
-      const result = await scriptModule.redeem(page, context, {
-        accountName: targetUsername,
-        redeemAmount: amount.toString(),
-        remarks: remark
+      const result = await scriptModule.run(page, context, {
+        target_username: targetUsername,
+        amount: amount,
+        remark: remark
       });
       
       return result;
@@ -405,4 +419,67 @@ export async function loginWithSession(
       logs
     };
   }
+} 
+
+/**
+ * Dynamic executor for actions loaded from database
+ */
+export async function executeDynamicActionWithSession(
+  userId: string,
+  gameCredentialId: number,
+  actionName: string,
+  params: Record<string, any>
+): Promise<{ success: boolean; message: string; needsLogin?: boolean; gameInfo?: any }> {
+  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+    console.log(`Starting dynamic action: ${actionName} with params:`, params);
+
+    try {
+      // Get game info to determine script path
+      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      
+      // Ensure WebSocket server is initialized and make it available to the script
+      ensureWebSocketServerInitialized();
+      (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+      console.log('WebSocket server made available to script');
+      
+      // Build script path based on game name and action name
+      const gameSlug = gameInfo.name.toLowerCase().replace(/\s+/g, '');
+      const scriptPath = `../../scripts/scripts_${gameSlug}/${actionName}.js`;
+      
+      console.log(`Loading script from: ${scriptPath}`);
+      
+      // Import and execute the script function with authenticated page
+      const scriptModule = require(scriptPath);
+      
+      // Try to find the run function (preferred) or fallback to actionName function
+      const runFunction = scriptModule.run || scriptModule[actionName] || scriptModule.default;
+      
+      if (!runFunction || typeof runFunction !== 'function') {
+        throw new Error(`Script ${actionName}.js must export a 'run' function or '${actionName}' function`);
+      }
+      
+      console.log(`Executing ${actionName} with params:`, params);
+      const result = await runFunction(page, context, params);
+      
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error executing ${actionName}: ${error}`,
+        actionName
+      };
+    }
+  });
+
+  // Check if result indicates needsLogin
+  if (result && typeof result === 'object' && 'needsLogin' in result) {
+    return {
+      success: false,
+      message: 'Session expired. Please login first.',
+      needsLogin: true,
+      gameInfo: (result as any).gameInfo
+    };
+  }
+
+  return result as { success: boolean; message: string };
 } 

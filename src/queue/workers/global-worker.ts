@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { actionQueue } from '../config/queues';
 import { createRedisConnection } from '../config/redis';
-import { createNewAccountWithSession, resetPasswordWithSession, rechargeWithSession, redeemWithSession, loginWithSession } from '@/utils/action-wrappers';
+import { loginWithSession, executeDynamicActionWithSession } from '@/utils/action-wrappers';
 import { screenshotWebSocketServer } from '@/utils/websocket-server';
 import { updateGameStatus } from '@/utils/game-status';
 
@@ -73,71 +73,27 @@ export class GlobalWorker {
       await job.updateProgress(10);
       console.log(`Job ${job.id}: Processing...`);
 
-      switch (data.action) {
-        case 'login':
-          await job.updateProgress(20);
-          console.log(`Job ${job.id}: Processing login...`);
-          console.log(`Job ${job.id}: Team ID from job data:`, data.teamId);
-          this.broadcastWorkerStatus(true, 'Processing login...', ['Processing login...']);
-          
-          result = await loginWithSession(
-            data.userId,
-            data.gameCredentialId,
-            data.params || {},
-            data.teamId
-          );
-          break;
-
-        case 'newAccount':
-          await job.updateProgress(20);
-          console.log(`Job ${job.id}: Processing new account...`);
-          this.broadcastWorkerStatus(true, 'Processing new account...', ['Processing new account...']);
-          
-          result = await createNewAccountWithSession(
-            data.userId,
-            data.gameCredentialId,
-            data.params || {}
-          );
-          break;
-
-        case 'passwordReset':
-          await job.updateProgress(20);
-          console.log(`Job ${job.id}: Processing password reset...`);
-          this.broadcastWorkerStatus(true, 'Processing password reset...', ['Processing password reset...']);
-          
-          result = await resetPasswordWithSession(
-            data.userId,
-            data.gameCredentialId,
-            data.params || {}
-          );
-          break;
-
-        case 'recharge':
-          await job.updateProgress(20);
-          console.log(`Job ${job.id}: Processing recharge...`);
-          this.broadcastWorkerStatus(true, 'Processing recharge...', ['Processing recharge...']);
-          
-          result = await rechargeWithSession(
-            data.userId,
-            data.gameCredentialId,
-            data.params || {}
-          );
-          break;
-
-        case 'redeem':
-          await job.updateProgress(20);
-          console.log(`Job ${job.id}: Processing redeem...`);
-          this.broadcastWorkerStatus(true, 'Processing redeem...', ['Processing redeem...']);
-          
-          result = await redeemWithSession(
-            data.userId,
-            data.gameCredentialId,
-            data.params || {}
-          );
-          break;
-
-        default:
-          throw new Error(`Unknown action: ${data.action}`);
+      // Handle all actions dynamically
+      await job.updateProgress(20);
+      console.log(`Job ${job.id}: Processing action: ${data.action}...`);
+      this.broadcastWorkerStatus(true, `Processing ${data.action}...`, [`Processing ${data.action}...`]);
+      
+      if (data.action === 'login') {
+        // Special handling for login (needs teamId)
+        result = await loginWithSession(
+          data.userId,
+          data.gameCredentialId,
+          data.params || {},
+          data.teamId
+        );
+      } else {
+        // Use dynamic executor for all other actions
+        result = await executeDynamicActionWithSession(
+          data.userId,
+          data.gameCredentialId,
+          data.action,
+          data.params || {}
+        );
       }
 
       await job.updateProgress(100);
@@ -158,51 +114,14 @@ export class GlobalWorker {
         const { getGame } = await import('@/utils/game-mapping');
         const game = await getGame(data.gameName);
         if (game) {
-          // Prepare inputs based on action type
-          let inputs: any = {};
-          
-          switch (data.action) {
-            case 'login':
-              // For login, include both username and password
-              inputs = {
-                username: data.params?.username || '',
-                password: data.params?.password || ''
-              };
-              break;
-            case 'newAccount':
-              inputs = {
-                newAccountName: data.params?.newAccountName || '',
-                newPassword: data.params?.newPassword || ''
-              };
-              break;
-            case 'passwordReset':
-              inputs = {
-                targetUsername: data.params?.targetUsername || '',
-                newPassword: data.params?.newPassword || ''
-              };
-              break;
-            case 'recharge':
-              inputs = {
-                targetUsername: data.params?.targetUsername || '',
-                amount: data.params?.amount || 0,
-                remark: data.params?.remark || ''
-              };
-              break;
-            case 'redeem':
-              inputs = {
-                targetUsername: data.params?.targetUsername || '',
-                amount: data.params?.amount || 0,
-                remark: data.params?.remark || ''
-              };
-              break;
-          }
+          // Use params as-is since they're already in snake_case from the API
+          const inputs = data.params || {};
+          const actionName = data.action;
           
           await updateGameStatus({
             teamId: data.teamId,
             gameId: game.id,
-            action: data.action === 'newAccount' ? 'new_account' : 
-                   data.action === 'passwordReset' ? 'password_reset' : 
-                   data.action,
+            action: actionName,
             status: result?.success ? 'success' : 'fail',
             inputs: inputs,
             executionTimeSecs: executionTimeSecs
@@ -255,49 +174,13 @@ export class GlobalWorker {
         const { getGame } = await import('@/utils/game-mapping');
         const game = await getGame(data.gameName);
         if (game) {
-          let inputs: any = {};
-          
-          switch (data.action) {
-            case 'login':
-              inputs = {
-                username: data.params?.username || '',
-                password: data.params?.password || ''
-              };
-              break;
-            case 'newAccount':
-              inputs = {
-                newAccountName: data.params?.newAccountName || '',
-                newPassword: data.params?.newPassword || ''
-              };
-              break;
-            case 'passwordReset':
-              inputs = {
-                targetUsername: data.params?.targetUsername || '',
-                newPassword: data.params?.newPassword || ''
-              };
-              break;
-            case 'recharge':
-              inputs = {
-                targetUsername: data.params?.targetUsername || '',
-                amount: data.params?.amount || 0,
-                remark: data.params?.remark || ''
-              };
-              break;
-            case 'redeem':
-              inputs = {
-                targetUsername: data.params?.targetUsername || '',
-                amount: data.params?.amount || 0,
-                remark: data.params?.remark || ''
-              };
-              break;
-          }
+          // Use params as-is since they're already in snake_case from the API
+          const inputs = data.params || {};
           
           await updateGameStatus({
             teamId: data.teamId,
             gameId: game.id,
-            action: data.action === 'newAccount' ? 'new_account' : 
-                   data.action === 'passwordReset' ? 'password_reset' : 
-                   data.action,
+            action: data.action, // Already in snake_case from API
             status: 'fail',
             inputs: inputs,
             executionTimeSecs: executionTimeSecs

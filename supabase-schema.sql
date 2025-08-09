@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS session            CASCADE;
 DROP TABLE IF EXISTS game_credential    CASCADE;
 DROP TABLE IF EXISTS game               CASCADE;
 DROP TABLE IF EXISTS team               CASCADE;
+DROP TABLE IF EXISTS actions            CASCADE;
 
 -- 1) team
 CREATE TABLE team (
@@ -58,13 +59,22 @@ CREATE TABLE game_action_status (
   id                  SERIAL PRIMARY KEY,
   team_id             INTEGER NOT NULL REFERENCES team(id) ON DELETE CASCADE,
   game_id             INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
-  action              TEXT NOT NULL CHECK (action IN ('login', 'new_account', 'password_reset', 'recharge', 'redeem')),
+  action              TEXT NOT NULL,
   status              TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('success', 'fail', 'unknown')),
   inputs              JSONB,
   execution_time_secs NUMERIC(10,2),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Create the actions table
+CREATE TABLE actions (
+  id            SERIAL       PRIMARY KEY,
+  game_id       INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
+  name          TEXT         NOT NULL,                    -- "new_account", "ban_user"
+  display_name  TEXT
+  inputs_json   JSONB,                                    -- Field definitions (can be null)
+  updated_at    TIMESTAMPTZ  DEFAULT now(),
+);
 
 CREATE INDEX ON session(user_id);
 CREATE INDEX ON session(game_credential_id);
@@ -72,6 +82,19 @@ CREATE INDEX ON session(is_active);
 
 CREATE INDEX ON game_action_status(team_id, game_id);
 CREATE INDEX ON game_action_status(updated_at);
+
+-- 4) captcha_log
+CREATE TABLE captcha_log (
+  id           SERIAL       PRIMARY KEY,     -- auto-incrementing ID
+  image_path   TEXT         NOT NULL,        -- storage key or URL of CAPTCHA image
+  api_response TEXT,                         -- what Gemini returned (nullable)
+  api_status   TEXT         NOT NULL DEFAULT 'fail'
+                                        CHECK (api_status IN ('success','fail')),
+  solved_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+
+
 
 -- Function to get latest game action status for each team_id, game_id, action combination
 CREATE OR REPLACE FUNCTION get_latest_game_action_status(team_id_param INTEGER)
@@ -99,14 +122,11 @@ BEGIN
       gas.inputs,
       gas.execution_time_secs,
       gas.updated_at,
-      g.name as game_name,
-      g.login_url as game_login_url,
       ROW_NUMBER() OVER (
         PARTITION BY gas.team_id, gas.game_id, gas.action 
         ORDER BY gas.updated_at DESC
       ) as rn
     FROM game_action_status gas
-    JOIN game g ON gas.game_id = g.id
     WHERE gas.team_id = team_id_param
   )
   SELECT 
@@ -118,27 +138,14 @@ BEGIN
     lr.inputs,
     lr.execution_time_secs,
     lr.updated_at,
-    lr.game_name,
-    lr.game_login_url
+    g.name as game_name,
+    g.login_url as game_login_url
   FROM latest_records lr
+  JOIN game g ON lr.game_id = g.id
   WHERE lr.rn = 1
-  ORDER BY lr.game_id, lr.action;
+  ORDER BY lr.updated_at DESC;
 END;
 $$ LANGUAGE plpgsql;
-
--- 4) captcha_log
-CREATE TABLE captcha_log (
-  id           SERIAL       PRIMARY KEY,     -- auto-incrementing ID
-  image_path   TEXT         NOT NULL,        -- storage key or URL of CAPTCHA image
-  api_response TEXT,                         -- what Gemini returned (nullable)
-  api_status   TEXT         NOT NULL DEFAULT 'fail'
-                                        CHECK (api_status IN ('success','fail')),
-  solved_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
-);
-
-
-
-
 
 
 INSERT INTO public.team (code, name) VALUES

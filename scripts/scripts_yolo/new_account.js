@@ -35,28 +35,30 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
     };
 }
 
-async function createNewAccount(page, context, params = {}) {
-    const { newAccountName = 'testing01', newPassword = 'password01' } = params;
+async function run(page, context, params = {}) {
+    // Handle both old camelCase and new snake_case parameter names
+    const accountName = params.account_name || params.newAccountName || 'testing01';
+    const password = params.new_password || params.newPassword || 'password01';
     
     console.log('Starting account creation process...');
-    console.log(`Account Name: ${newAccountName}`);
-    console.log(`Password: ${newPassword}`);
+    console.log(`Account Name: ${accountName}`);
+    console.log(`Password: ${password}`);
     
-               // Start WebSocket screenshot capture
-           const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'newAccount', 500);
+    // Start WebSocket screenshot capture
+    const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'new_account', 500);
     
     try {
         // From here
-        await page.goto('https://agent.yolo777.game/admin');
+        await page.reload();
         await page.getByRole('link', { name: ' Player Management ' }).click();
         await page.getByRole('link', { name: ' Player List' }).click();
         await page.waitForLoadState('networkidle');
 
-        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('button', { name: '  New' }).click();
+        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('button', { name: '  New' }).click();
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Account' }).click();
-        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Account' }).fill(newAccountName);
+        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Account' }).fill(accountName);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Password' }).click();
-        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Password' }).fill(newPassword);
+        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Password' }).fill(password);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByText('Submit').click();
 
         // Checking errors and success message
@@ -74,7 +76,7 @@ async function createNewAccount(page, context, params = {}) {
           return {
             success: true,
             message: 'Account created successfully',
-            accountName: newAccountName
+            accountName: accountName
           };
         } catch (successError) {
           try {
@@ -86,7 +88,7 @@ async function createNewAccount(page, context, params = {}) {
             return {
               success: false,
               message: 'Account has already been created',
-              accountName: newAccountName
+              accountName: accountName
             };
           } catch (errorError) {
             // If neither success nor specific error found, return generic error
@@ -94,7 +96,7 @@ async function createNewAccount(page, context, params = {}) {
             return {
               success: false,
               message: 'Try again',
-              accountName: newAccountName
+              accountName: accountName
             };
           }
         }
@@ -104,7 +106,7 @@ async function createNewAccount(page, context, params = {}) {
         return {
           success: false,
           message: `Error creating account: ${error.message || error}`,
-          accountName: newAccountName
+          accountName: accountName
         };
     } finally {
         // Stop WebSocket screenshot capture
@@ -113,4 +115,4 @@ async function createNewAccount(page, context, params = {}) {
 }
 
 // Export the function for external use
-module.exports = { createNewAccount };
+module.exports = { run };
