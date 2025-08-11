@@ -5,17 +5,17 @@ export async function POST(request: NextRequest) {
   try {
     const { jobId, action } = await request.json();
 
-    console.log(`=== CANCEL API CALLED ===`);
-    console.log(`Request body:`, { jobId, action });
+    // console.log(`=== CANCEL API CALLED ===`);
+    // console.log(`Request body:`, { jobId, action });
 
     if (!jobId || !action) {
-      console.log(`❌ Missing jobId or action`);
+      // console.log(`❌ Missing jobId or action`);
       return NextResponse.json({ 
         error: 'Job ID and action are required' 
       }, { status: 400 });
     }
 
-    console.log(`✅ Attempting to cancel job ${jobId} for action ${action}`);
+    // console.log(`✅ Attempting to cancel job ${jobId} for action ${action}`);
 
     // Use ActionProducer to cancel the job
     const success = await ActionProducer.cancelJob(jobId);

@@ -28,7 +28,7 @@ class ScreenshotWebSocketServer {
 
   initialize(port: number = 8080) {
     if (this.isInitialized && this.wss) {
-      console.log('WebSocket server already initialized');
+      // console.log('WebSocket server already initialized');
       return;
     }
 
@@ -53,7 +53,7 @@ class ScreenshotWebSocketServer {
         // Attempt to restart server after delay
         setTimeout(() => {
           if (!this.isInitialized) {
-            console.log('Attempting to restart WebSocket server...');
+            // console.log('Attempting to restart WebSocket server...');
             this.initialize(this.port);
           }
         }, 5000);
@@ -63,7 +63,7 @@ class ScreenshotWebSocketServer {
       this.startHeartbeat();
       this.startCleanup();
 
-      console.log(`WebSocket server started on port ${port}`);
+      // console.log(`WebSocket server started on port ${port}`);
     } catch (error) {
       console.error('Failed to initialize WebSocket server:', error);
       this.isInitialized = false;
@@ -74,7 +74,7 @@ class ScreenshotWebSocketServer {
   private handleNewConnection(ws: WebSocket) {
     const connectionId = `conn_${++this.connectionCounter}`;
     
-    console.log(`WebSocket client connected: ${connectionId}`);
+    // console.log(`WebSocket client connected: ${connectionId}`);
     
     this.connections.set(connectionId, { 
       ws,
@@ -108,7 +108,7 @@ class ScreenshotWebSocketServer {
             connection.teamId = data.teamId;
             connection.lastHeartbeat = Date.now();
           }
-          console.log(`Authenticated connection ${connectionId} for user ${data.userId}, team ${data.teamId}`);
+          // console.log(`Authenticated connection ${connectionId} for user ${data.userId}, team ${data.teamId}`);
         } else if (data.type === 'heartbeat') {
           // Update heartbeat timestamp
           const connection = this.connections.get(connectionId);
@@ -124,12 +124,12 @@ class ScreenshotWebSocketServer {
           }
         }
       } catch (error) {
-        console.log('Invalid message format:', error);
+        // console.log('Invalid message format:', error);
       }
     });
 
     ws.on('close', (code, reason) => {
-      console.log(`WebSocket client disconnected: ${connectionId}, code: ${code}, reason: ${reason}`);
+      // console.log(`WebSocket client disconnected: ${connectionId}, code: ${code}, reason: ${reason}`);
       this.connections.delete(connectionId);
     });
 
@@ -193,7 +193,7 @@ class ScreenshotWebSocketServer {
       this.connections.forEach((connection, connectionId) => {
         // Remove connections that haven't responded in 90 seconds
         if (connection.lastHeartbeat && (now - connection.lastHeartbeat) > 90000) {
-          console.log(`Removing stale connection: ${connectionId}`);
+          // console.log(`Removing stale connection: ${connectionId}`);
           this.connections.delete(connectionId);
           try {
             connection.ws.close();
@@ -204,7 +204,7 @@ class ScreenshotWebSocketServer {
         
         // Remove connections that have been open too long (24 hours)
         if ((now - connection.connectionTime) > 86400000) {
-          console.log(`Removing old connection: ${connectionId}`);
+          // console.log(`Removing old connection: ${connectionId}`);
           this.connections.delete(connectionId);
           try {
             connection.ws.close();
@@ -218,12 +218,12 @@ class ScreenshotWebSocketServer {
 
   broadcastScreenshot(screenshotBuffer: Buffer, gameName: string, action: string) {
     if (!this.wss) {
-      console.log('WebSocket server not initialized');
+      // console.log('WebSocket server not initialized');
       return;
     }
 
-    console.log(`WebSocket Server: Broadcasting screenshot for ${gameName} - ${action} to ${this.connections.size} clients`);
-    console.log(`WebSocket Server: Screenshot buffer size: ${screenshotBuffer.length} bytes`);
+    // console.log(`WebSocket Server: Broadcasting screenshot for ${gameName} - ${action} to ${this.connections.size} clients`);
+    // console.log(`WebSocket Server: Screenshot buffer size: ${screenshotBuffer.length} bytes`);
     
     const base64Image = screenshotBuffer.toString('base64');
     const message: ScreenshotMessage = {
@@ -235,25 +235,25 @@ class ScreenshotWebSocketServer {
     };
 
     const messageStr = JSON.stringify(message);
-    console.log(`WebSocket Server: Message size: ${messageStr.length} characters`);
+    // console.log(`WebSocket Server: Message size: ${messageStr.length} characters`);
     
     let sentCount = 0;
     let failedCount = 0;
 
     this.connections.forEach((connection, connectionId) => {
-      console.log(`WebSocket Server: Checking connection ${connectionId}, readyState: ${connection.ws.readyState}`);
+      // console.log(`WebSocket Server: Checking connection ${connectionId}, readyState: ${connection.ws.readyState}`);
       if (connection.ws.readyState === WebSocket.OPEN) {
         try {
           connection.ws.send(messageStr);
           sentCount++;
-          console.log(`WebSocket Server: Successfully sent to ${connectionId}`);
+          // console.log(`WebSocket Server: Successfully sent to ${connectionId}`);
         } catch (error) {
           console.error(`WebSocket Server: Failed to send to ${connectionId}:`, error);
           this.connections.delete(connectionId);
           failedCount++;
         }
       } else {
-        console.log(`WebSocket Server: Removing dead connection ${connectionId}, readyState: ${connection.ws.readyState}`);
+        // console.log(`WebSocket Server: Removing dead connection ${connectionId}, readyState: ${connection.ws.readyState}`);
         // Remove dead connections
         this.connections.delete(connectionId);
         failedCount++;
@@ -261,9 +261,9 @@ class ScreenshotWebSocketServer {
     });
 
     if (sentCount === 0) {
-      console.log(`WebSocket Server: Screenshot captured but no clients connected (${gameName} - ${action})`);
+      // console.log(`WebSocket Server: Screenshot captured but no clients connected (${gameName} - ${action})`);
     } else {
-      console.log(`WebSocket Server: Screenshot broadcasted to ${sentCount} clients, ${failedCount} failed`);
+      // console.log(`WebSocket Server: Screenshot broadcasted to ${sentCount} clients, ${failedCount} failed`);
     }
   }
 
@@ -289,7 +289,7 @@ class ScreenshotWebSocketServer {
       }
     });
 
-    console.log(`Worker status broadcasted to ${this.wss.clients.size} clients, ${failedCount} failed`);
+    // console.log(`Worker status broadcasted to ${this.wss.clients.size} clients, ${failedCount} failed`);
   }
 
   broadcastScriptResult(jobId: string, result: any) {
@@ -315,7 +315,7 @@ class ScreenshotWebSocketServer {
       }
     });
 
-    console.log(`Script result broadcasted to ${this.wss.clients.size} clients, ${failedCount} failed`);
+    // console.log(`Script result broadcasted to ${this.wss.clients.size} clients, ${failedCount} failed`);
   }
 
   getConnectionCount(): number {
@@ -342,7 +342,7 @@ class ScreenshotWebSocketServer {
       this.wss = null;
       this.connections.clear();
       this.isInitialized = false;
-      console.log('WebSocket server closed');
+      // console.log('WebSocket server closed');
     }
   }
 }

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Saving session for game: ${gameName}, user: ${userId}, team: ${teamId}`);
+    // console.log(`Saving session for game: ${gameName}, user: ${userId}, team: ${teamId}`);
 
     // Get or create game credential
     let gameCredentialId: number;
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to update session: ${sessionError.message}`);
       }
 
-      console.log(`Updated existing session: ${existingSession.id}`);
+      // console.log(`Updated existing session: ${existingSession.id}`);
     } else {
       // Create new session
       const { error: sessionError } = await supabase
@@ -119,10 +119,10 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to save session: ${sessionError.message}`);
       }
 
-      console.log('Created new session');
+      // console.log('Created new session');
     }
 
-    console.log(`Session saved successfully for game credential ${gameCredentialId}`);
+    // console.log(`Session saved successfully for game credential ${gameCredentialId}`);
 
     return NextResponse.json({
       success: true,

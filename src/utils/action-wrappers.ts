@@ -10,17 +10,17 @@ let wsServerInitialized = false;
 
 function ensureWebSocketServerInitialized() {
   if (!screenshotWebSocketServer.isServerInitialized()) {
-    console.log('Initializing WebSocket server for screenshot broadcasting...');
+    // console.log('Initializing WebSocket server for screenshot broadcasting...');
     screenshotWebSocketServer.initialize(8080);
     wsServerInitialized = true;
-    console.log('WebSocket server initialized on port 8080');
+    // console.log('WebSocket server initialized on port 8080');
   } else {
-    console.log('WebSocket server already initialized');
+    // console.log('WebSocket server already initialized');
   }
 }
 
 // Initialize immediately when this module is loaded
-console.log('Action wrappers module loaded - ensuring WebSocket server is initialized...');
+// console.log('Action wrappers module loaded - ensuring WebSocket server is initialized...');
 ensureWebSocketServerInitialized();
 
 async function getGameInfoFromCredentialId(gameCredentialId: number) {
@@ -98,8 +98,6 @@ export async function createNewAccountWithSession(
     const newAccountName = params.newAccountName || params.account_name || "testing07";
     const newPassword = params.newPassword || params.new_password || "Hatim121";
     
-    console.log('Starting account creation process...');
-
     try {
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
@@ -107,7 +105,6 @@ export async function createNewAccountWithSession(
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
-      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/new_account.js`);
@@ -163,8 +160,6 @@ export async function resetPasswordWithSession(
       };
     }
 
-    console.log(`Starting password reset for user: ${targetUsername}`);
-
     try {
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
@@ -172,7 +167,6 @@ export async function resetPasswordWithSession(
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
-      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/password_reset.js`);
@@ -232,8 +226,6 @@ export async function rechargeWithSession(
       };
     }
 
-    console.log(`Starting recharge for user: ${targetUsername}, amount: ${amount}`);
-
     try {
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
@@ -241,7 +233,6 @@ export async function rechargeWithSession(
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
-      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/recharge.js`);
@@ -303,8 +294,6 @@ export async function redeemWithSession(
       };
     }
 
-    console.log(`Starting redeem for user: ${targetUsername}, amount: ${amount}`);
-
     try {
       // Get game info to determine script path
       const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
@@ -312,7 +301,6 @@ export async function redeemWithSession(
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
-      console.log('WebSocket server made available to script');
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(`../../scripts/scripts_${gameInfo.name.toLowerCase().replace(/\s+/g, '')}/redeem.js`);
@@ -372,12 +360,11 @@ export async function loginWithSession(
     // Ensure WebSocket server is initialized and make it available to the script
     ensureWebSocketServerInitialized();
     (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
-    console.log('WebSocket server made available to script');
     
     // Import and execute the login script function
     const scriptModule = require(`../../scripts/login.js`);
-    console.log('Login wrapper - passing teamId to script:', teamId);
-    console.log('Login wrapper - params:', params);
+    // console.log('Login wrapper - passing teamId to script:', teamId);
+    // console.log('Login wrapper - params:', params);
     // Always use manually entered credentials, never fall back to saved ones
     const loginResult = await scriptModule.loginAndSaveState(
       params?.username || '', // Use whatever is in the input fields
@@ -431,7 +418,7 @@ export async function executeDynamicActionWithSession(
   params: Record<string, any>
 ): Promise<{ success: boolean; message: string; needsLogin?: boolean; gameInfo?: any }> {
   const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
-    console.log(`Starting dynamic action: ${actionName} with params:`, params);
+    // console.log(`Starting dynamic action: ${actionName} with params:`, params);
 
     try {
       // Get game info to determine script path
@@ -440,13 +427,12 @@ export async function executeDynamicActionWithSession(
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
-      console.log('WebSocket server made available to script');
       
       // Build script path based on game name and action name
       const gameSlug = gameInfo.name.toLowerCase().replace(/\s+/g, '');
       const scriptPath = `../../scripts/scripts_${gameSlug}/${actionName}.js`;
       
-      console.log(`Loading script from: ${scriptPath}`);
+      // console.log(`Loading script from: ${scriptPath}`);
       
       // Import and execute the script function with authenticated page
       const scriptModule = require(scriptPath);
@@ -458,7 +444,7 @@ export async function executeDynamicActionWithSession(
         throw new Error(`Script ${actionName}.js must export a 'run' function or '${actionName}' function`);
       }
       
-      console.log(`Executing ${actionName} with params:`, params);
+      // console.log(`Executing ${actionName} with params:`, params);
       const result = await runFunction(page, context, params);
       
       return result;

@@ -18,7 +18,6 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
   // Function to create WebSocket connection
   const createWebSocketConnection = () => {
     if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
-      console.log('WebSocket connection already exists');
       return;
     }
 
@@ -28,13 +27,11 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
       reconnectTimeoutRef.current = null;
     }
 
-    console.log(`Creating WebSocket connection to ws://localhost:8080... (attempt ${reconnectAttempts + 1})`);
     const ws = new WebSocket('ws://localhost:8080');
     setWsConnection(ws);
     setConnectionStatus('connecting');
 
     ws.onopen = () => {
-      console.log('BrowserView: WebSocket connected successfully');
       setConnectionStatus('connected');
       setReconnectAttempts(0); // Reset reconnect attempts on successful connection
       
@@ -45,20 +42,13 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
         teamId: 'current-team'
       };
       ws.send(JSON.stringify(authMessage));
-      console.log('BrowserView: Sent auth message:', authMessage);
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('BrowserView: WebSocket message received:', data.type, data);
-        console.log('BrowserView: Message data length:', event.data.length);
         
         if (data.type === 'screenshot') {
-          console.log('BrowserView: Screenshot received, processing...');
-          console.log('BrowserView: Screenshot data length:', data.data.length);
-          console.log('BrowserView: Screenshot game/action:', data.gameName, data.action);
-          
           // Convert base64 to blob URL
           const byteCharacters = atob(data.data);
           const byteNumbers = new Array(byteCharacters.length);
@@ -78,16 +68,10 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
           blobUrlRef.current = url;
           setImageSrc(url);
           
-          console.log('BrowserView: WebSocket screenshot received and displayed:', data.timestamp);
-          console.log('BrowserView: Image URL created:', url);
         } else if (data.type === 'connection') {
-          console.log('WebSocket connection confirmed:', data.message);
         } else if (data.type === 'heartbeat') {
-          console.log('WebSocket heartbeat received:', data.timestamp);
         } else if (data.type === 'worker_status') {
-          console.log('Worker status received:', data);
         } else if (data.type === 'pong') {
-          console.log('WebSocket pong received:', data.timestamp);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -95,7 +79,6 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
     };
 
     ws.onclose = (event) => {
-      console.log('WebSocket disconnected:', event.code, event.reason);
       setConnectionStatus('disconnected');
       
       // Clear heartbeat interval
@@ -111,14 +94,13 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
       
       if (reconnectAttempts < maxReconnectAttempts) {
         const delay = Math.min(baseDelay * Math.pow(2, reconnectAttempts), maxDelay);
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`);
         
         reconnectTimeoutRef.current = setTimeout(() => {
           setReconnectAttempts(prev => prev + 1);
           createWebSocketConnection();
         }, delay);
       } else {
-        console.log('Max reconnection attempts reached. Manual refresh required.');
+        // Max reconnection attempts reached. Manual refresh required.
       }
     };
 
@@ -130,13 +112,10 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
 
   // Initialize WebSocket connection immediately when component mounts
   useEffect(() => {
-    console.log('BrowserView component mounted - initializing WebSocket connection...');
     createWebSocketConnection();
     
     // Cleanup function to close connection when component unmounts
     return () => {
-      console.log('BrowserView component unmounting - closing WebSocket connection...');
-      
       // Clear reconnection timeout
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
@@ -166,14 +145,9 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
   // Ensure WebSocket connection is ready when execution starts
   useEffect(() => {
     if (isExecuting) {
-      console.log('BrowserView: Execution started - ensuring WebSocket connection is ready...');
-      
       // If not connected, try to connect
       if (connectionStatus !== 'connected') {
-        console.log('BrowserView: WebSocket not connected, attempting to connect...');
         createWebSocketConnection();
-      } else {
-        console.log('BrowserView: WebSocket already connected, ready for screenshots');
       }
       
       // Clear any existing image to show fresh screenshots
@@ -220,7 +194,6 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
 
   // Manual reconnect function
   const handleManualReconnect = () => {
-    console.log('Manual reconnect requested');
     setReconnectAttempts(0);
     if (wsConnection) {
       wsConnection.close();
@@ -270,10 +243,9 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
             alt="Live browser view" 
             className="max-w-full max-h-full object-contain"
             onLoad={(e) => {
-              console.log('BrowserView: Image loaded successfully:', imageSrc);
+              // Image loaded successfully
             }}
             onError={(e) => {
-              console.log('BrowserView: Image failed to load:', imageSrc);
               // Hide broken image
               (e.target as HTMLImageElement).style.display = 'none';
             }}

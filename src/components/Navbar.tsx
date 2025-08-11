@@ -84,12 +84,10 @@ export default function Navbar() {
   };
 
   const handleTeamSelect = async (team: Team) => {
-    console.log('Team selected:', team);
     setSelectedTeamId(team.id);
     setSelectedTeamName(team.name);
     setTeamsDropdownOpen(false);
     // Force a hard refresh to ensure the new team context is loaded
-    console.log('Reloading page...');
     window.location.reload();
   };
 

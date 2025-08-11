@@ -37,8 +37,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
   // Generate unique component ID for debugging
   const componentId = useMemo(() => `ActionStatus-${Math.random().toString(36).substr(2, 9)}`, []);
   
-  console.log(`ActionStatus component ${componentId} mounted at ${new Date().toISOString()}`);
-
   // Add a new job Monsanto tracking
   const addJob = (jobId: string, gameName: string, action: string) => {
     const newJob: JobStatus = {
@@ -56,16 +54,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
 
   // Update job status with improved message handling
   const updateJobStatus = (jobId: string, status: JobStatus['status'], message: string, result?: any, error?: string, timing?: { startTime?: number; endTime?: number; duration?: number }, params?: any, source?: string) => {
-    console.log(`=== FRONTEND UPDATE CALLED ===`);
-    console.log(`Updating jobId:`, jobId);
-    console.log(`Status:`, status);
-    console.log(`Message:`, message);
-    console.log(`Result:`, result);
-    console.log(`Error:`, error);
-    console.log(`Timing:`, timing);
-    console.log(`Params:`, params);
-    console.log(`Source:`, source);
-
     setJobs(prevJobs => {
       const existingJobIndex = prevJobs.findIndex(job => job.jobId === jobId);
       
@@ -83,7 +71,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           duration: timing?.duration,
           params
         };
-        console.log(`✅ Updated existing job:`, updatedJobs[existingJobIndex]);
         return updatedJobs;
       } else {
         // Add new job (this shouldn't happen often)
@@ -101,13 +88,11 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           duration: timing?.duration,
           params
         };
-        console.log(`✅ Added new job:`, newJob);
         return [...prevJobs, newJob];
       }
     });
 
     // Remove the database update call - let the worker handle it
-    console.log(`Skipping database update for job ${jobId} - worker will handle it`);
   };
 
   // Format duration for display
@@ -163,17 +148,11 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
   // Cancel a job
   const cancelJob = async (jobId: string) => {
     try {
-      console.log(`=== FRONTEND CANCEL CALLED ===`);
-      console.log(`Cancelling jobId:`, jobId);
-      
       // Find the job to get the action type
       const job = jobs.find(j => j.jobId === jobId);
       if (!job) {
-        console.log(`❌ Job not found in local state:`, jobId);
         return;
       }
-
-      console.log(`✅ Found job in local state:`, job);
 
       const response = await fetch(`/api/queue/cancel-job`, {
         method: 'POST',
@@ -186,18 +165,14 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         })
       });
 
-      console.log(`Cancel response status:`, response.status);
-      console.log(`Cancel response ok:`, response.ok);
-
       if (response.ok) {
-        console.log(`✅ Job cancelled successfully`);
         updateJobStatus(jobId, 'cancelled', 'Job cancelled by user', undefined, undefined, undefined, undefined, 'frontend-cancel');
       } else {
         const errorText = await response.text();
-        console.error('❌ Failed to cancel job:', response.statusText, errorText);
+        console.error('Failed to cancel job:', response.statusText, errorText);
       }
     } catch (error) {
-      console.error('❌ Error cancelling job:', error);
+      console.error('Error cancelling job:', error);
     }
   };
 
@@ -221,16 +196,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
               let message = status.message || 'Processing...';
               let jobStatus: JobStatus['status'] = 'waiting';
 
-              console.log(`Job ${jobId} status update:`, {
-                status: status.status,
-                message: status.message,
-                result: status.result,
-                error: status.error,
-                startTime: status.startTime,
-                endTime: status.endTime,
-                duration: status.duration
-              });
-
               switch (status.status) {
                 case 'waiting':
                   jobStatus = 'waiting';
@@ -250,8 +215,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                   } else {
                     message = 'Job completed successfully';
                   }
-                  console.log(`Job ${jobId} completed with result:`, status.result);
-                  console.log(`Job ${jobId} final message:`, message);
                   break;
                 case 'failed':
                   jobStatus = 'failed';
@@ -276,7 +239,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                   newSet.delete(jobId);
                   return newSet;
                 });
-                console.log(`Removed job ${jobId} from active set (status: ${jobStatus})`);
               }
 
               // Dispatch login-job-complete event for login jobs
@@ -293,12 +255,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
                   }
                 });
                 window.dispatchEvent(loginJobCompleteEvent);
-                console.log(`Dispatched login-job-complete event for ${job.gameName}:`, { 
-                  jobStatus, 
-                  resultSuccess: status.result?.success, 
-                  actualSuccess, 
-                  message 
-                });
               }
             }
           }
@@ -329,16 +285,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         finalMessage = result.success ? 'Operation completed successfully' : 'Operation failed';
       }
       
-      console.log(`Job ${jobId} update received:`, {
-        status,
-        message,
-        result,
-        finalMessage,
-        startTime,
-        endTime,
-        duration
-      });
-      
       updateJobStatus(jobId, status, finalMessage, result, error, { startTime, endTime, duration }, undefined, 'event');
       
       // Remove job from active set if it's completed, failed, or cancelled
@@ -348,7 +294,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           newSet.delete(jobId);
           return newSet;
         });
-        console.log(`Removed job ${jobId} from active set via event (status: ${status})`);
       }
 
       // Dispatch login-job-complete event for login jobs
@@ -366,12 +311,6 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
           }
         });
         window.dispatchEvent(loginJobCompleteEvent);
-        console.log(`Dispatched login-job-complete event for ${job.gameName} via event:`, { 
-          status, 
-          resultSuccess: result?.success, 
-          actualSuccess, 
-          message: finalMessage 
-        });
       }
     };
 

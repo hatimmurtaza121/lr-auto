@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     // Parse request body
     const { action, params } = await request.json();
 
-    console.log('Adding action to queue:', action, 'with params:', params);
+    // console.log('Adding action to queue:', action, 'with params:', params);
 
     // Convert camelCase action names to snake_case for database lookup
     const actionNameForDb = action === 'newAccount' ? 'new_account' : 
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     // Add job to queue
     const jobId = await ActionProducer.addJob(jobData);
 
-    console.log('Job added to queue with ID:', jobId);
+    // console.log('Job added to queue with ID:', jobId);
 
     return NextResponse.json({
       success: true,

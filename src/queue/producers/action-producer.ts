@@ -30,7 +30,7 @@ export class ActionProducer {
       );
 
       const finalJobId = job.id || jobId;
-      console.log(`Job added to action queue with ID: ${finalJobId} (action: ${jobData.action})`);
+      // console.log(`Job added to action queue with ID: ${finalJobId} (action: ${jobData.action})`);
       return finalJobId;
     } catch (error) {
       console.error('Error adding job to queue:', error);
@@ -65,7 +65,7 @@ export class ActionProducer {
       const job = await actionQueue.getJob(jobId);
       
       if (!job) {
-        console.log(`Job ${jobId} not found in action-queue`);
+        // console.log(`Job ${jobId} not found in action-queue`);
         return null;
       }
 
@@ -78,57 +78,57 @@ export class ActionProducer {
 
       // If job is completed, try to get result from job data first, then returnvalue
       if (stateString === 'completed') {
-        console.log(`Job ${jobId} is completed, checking for result...`);
-        console.log(`Job ${jobId} returnvalue:`, job.returnvalue);
-        console.log(`Job ${jobId} returnvalue type:`, typeof job.returnvalue);
-        console.log(`Job ${jobId} returnvalue === null:`, job.returnvalue === null);
-        console.log(`Job ${jobId} returnvalue === undefined:`, job.returnvalue === undefined);
-        console.log(`Job ${jobId} job data:`, job.data);
-        console.log(`Job ${jobId} job data result:`, job.data?.result);
+        // console.log(`Job ${jobId} is completed, checking for result...`);
+        // console.log(`Job ${jobId} returnvalue:`, job.returnvalue);
+        // console.log(`Job ${jobId} returnvalue type:`, typeof job.returnvalue);
+        // console.log(`Job ${jobId} returnvalue === null:`, job.returnvalue === null);
+        // console.log(`Job ${jobId} returnvalue === undefined:`, job.returnvalue === undefined);
+        // console.log(`Job ${jobId} job data:`, job.data);
+        // console.log(`Job ${jobId} job data result:`, job.data?.result);
          
         // First try to get result from job data (backup approach)
         if (job.data && job.data.result) {
-          console.log(`Job ${jobId} found result in job data:`, job.data.result);
+          // console.log(`Job ${jobId} found result in job data:`, job.data.result);
           result = job.data.result;
         } else if (job.returnvalue !== null && job.returnvalue !== undefined) {
-          console.log(`Job ${jobId} found result in returnvalue:`, job.returnvalue);
+          // console.log(`Job ${jobId} found result in returnvalue:`, job.returnvalue);
           result = job.returnvalue;
         } else {
-          console.log(`Job ${jobId} no result found in either job data or returnvalue`);
+          // console.log(`Job ${jobId} no result found in either job data or returnvalue`);
         }
       }
       
-      console.log(`Job ${jobId} status:`, {
-        state: stateString,
-        progress: progressNumber,
-        result: result,
-        failedReason: failedReason
-      });
+      // console.log(`Job ${jobId} status:`, {
+      //   state: stateString,
+      //   progress: progressNumber,
+      //   result: result,
+      //   failedReason: failedReason
+      // });
       
-      console.log(`Job ${jobId} full job object:`, {
-        id: job.id,
-        name: job.name,
-        data: job.data,
-        returnvalue: job.returnvalue,
-        failedReason: job.failedReason,
-        progress: job.progress,
-        state: stateString
-      });
+      // console.log(`Job ${jobId} full job object:`, {
+      //   id: job.id,
+      //   name: job.name,
+      //   data: job.data,
+      //   returnvalue: job.returnvalue,
+      //   failedReason: job.failedReason,
+      //   progress: job.progress,
+      //   state: stateString
+      // });
       
-      console.log(`Job ${jobId} returnvalue type:`, typeof job.returnvalue);
-      console.log(`Job ${jobId} returnvalue JSON:`, JSON.stringify(job.returnvalue));
+      // console.log(`Job ${jobId} returnvalue type:`, typeof job.returnvalue);
+      // console.log(`Job ${jobId} returnvalue JSON:`, JSON.stringify(job.returnvalue));
       
       // Additional debugging for completed jobs
       if (stateString === 'completed') {
-        console.log(`Job ${jobId} is completed, checking returnvalue...`);
-        console.log(`Job ${jobId} returnvalue directly:`, job.returnvalue);
-        console.log(`Job ${jobId} returnvalue === null:`, job.returnvalue === null);
-        console.log(`Job ${jobId} returnvalue === undefined:`, job.returnvalue === undefined);
+        // console.log(`Job ${jobId} is completed, checking returnvalue...`);
+        // console.log(`Job ${jobId} returnvalue directly:`, job.returnvalue);
+        // console.log(`Job ${jobId} returnvalue === null:`, job.returnvalue === null);
+        // console.log(`Job ${jobId} returnvalue === undefined:`, job.returnvalue === undefined);
         
         // Try to get the job again to see if it's a timing issue
         const jobAgain = await actionQueue.getJob(jobId);
         if (jobAgain) {
-          console.log(`Job ${jobId} re-fetched returnvalue:`, jobAgain.returnvalue);
+          // console.log(`Job ${jobId} re-fetched returnvalue:`, jobAgain.returnvalue);
         }
       }
 
@@ -150,8 +150,8 @@ export class ActionProducer {
             break;
           case 'completed':
             statusMessage = result?.message || 'Job completed successfully';
-            console.log(`Job ${jobId} completed status message:`, statusMessage);
-            console.log(`Job ${jobId} result object:`, result);
+            // console.log(`Job ${jobId} completed status message:`, statusMessage);
+            // console.log(`Job ${jobId} result object:`, result);
             break;
           case 'failed':
             statusMessage = failedReason || 'Job failed';
@@ -218,49 +218,49 @@ export class ActionProducer {
    */
   static async cancelJob(jobId: string): Promise<boolean> {
     try {
-      console.log(`=== CANCELLING JOB ${jobId} ===`);
+      // console.log(`=== CANCELLING JOB ${jobId} ===`);
       
-      console.log(`Got action queue, looking for job ${jobId}`);
+      // console.log(`Got action queue, looking for job ${jobId}`);
       
       // Get the specific job by ID
       const job = await actionQueue.getJob(jobId);
       
       if (!job) {
-        console.log(`❌ Job ${jobId} not found in action-queue`);
+        // console.log(`Job ${jobId} not found in action-queue`);
         return false;
       }
 
-      console.log(`✅ Found job ${jobId} in action-queue`);
-      console.log(`Job data:`, job.data);
-      console.log(`Job ID:`, job.id);
-      console.log(`Job name:`, job.name);
+      // console.log(`Found job ${jobId} in action-queue`);
+      // console.log(`Job data:`, job.data);
+      // console.log(`Job ID:`, job.id);
+      // console.log(`Job name:`, job.name);
 
       // Check if job can be cancelled (waiting, prioritized, or active jobs)
       const state = await job.getState();
-      console.log(`Job ${jobId} state:`, state);
+      // console.log(`Job ${jobId} state:`, state);
       
       if (state !== 'waiting' && state !== 'prioritized' && state !== 'active') {
-        console.log(`❌ Job ${jobId} cannot be cancelled - it is in ${state} state`);
+        // console.log(`Job ${jobId} cannot be cancelled - it is in ${state} state`);
         return false;
       }
 
       if (state === 'waiting' || state === 'prioritized') {
-        console.log(`✅ Job ${jobId} is in ${state} state, removing from queue`);
+        // console.log(`Job ${jobId} is in ${state} state, removing from queue`);
         // Remove the specific job from the action queue
-        console.log(`🗑️ Removing job ${jobId} from action-queue...`);
+        // console.log(`Removing job ${jobId} from action-queue...`);
         await job.remove();
       } else if (state === 'active') {
-        console.log(`✅ Job ${jobId} is in active state, marking as cancelled`);
+        // console.log(`Job ${jobId} is in active state, marking as cancelled`);
         // Mark job as cancelled so worker can check and skip processing
         const jobData = { ...job.data, cancelled: true, cancelledAt: Date.now() };
-        console.log(`Marking job ${jobId} as cancelled:`, jobData);
+        // console.log(`Marking job ${jobId} as cancelled:`, jobData);
         await job.updateData(jobData);
       }
       
-      console.log(`✅ Job ${jobId} cancelled successfully`);
+      // console.log(`Job ${jobId} cancelled successfully`);
       return true;
     } catch (error) {
-      console.error('❌ Error cancelling job:', error);
+      console.error('Error cancelling job:', error);
       return false;
     }
   }
@@ -286,4 +286,4 @@ export class ActionProducer {
       return null;
     }
   }
-} 
+}

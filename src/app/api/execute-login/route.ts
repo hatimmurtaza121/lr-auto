@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     // Get team ID from headers
     const teamId = request.headers.get('x-team-id');
-    console.log('Execute-login API - received team ID:', teamId);
+    // console.log('Execute-login API - received team ID:', teamId);
     if (!teamId) {
       return NextResponse.json({ error: 'Team ID required' }, { status: 400 });
     }
@@ -55,10 +55,10 @@ export async function POST(request: NextRequest) {
     if (existingCredential) {
       // Use existing credentials
       gameCredential = existingCredential;
-      console.log(`Using existing game credential: ${gameCredential.id} for team ${teamId} and game ${gameName}`);
+      // console.log(`Using existing game credential: ${gameCredential.id} for team ${teamId} and game ${gameName}`);
     } else {
       // Create new credential record with provided credentials or empty values
-      console.log(`No existing credentials found for team ${teamId} and game ${gameName}, creating new record`);
+      // console.log(`No existing credentials found for team ${teamId} and game ${gameName}, creating new record`);
       
       const { data: newCredential, error: createError } = await supabase
         .from('game_credential')
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       }
 
       gameCredential = newCredential;
-      console.log(`Created new game credential: ${gameCredential.id} for team ${teamId} and game ${gameName}`);
+      // console.log(`Created new game credential: ${gameCredential.id} for team ${teamId} and game ${gameName}`);
     }
 
     // Create job data for login action
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     // Add job to queue
     const jobId = await ActionProducer.addJob(jobData);
     
-    console.log(`Login job added to queue with ID: ${jobId}`);
+    // console.log(`Login job added to queue with ID: ${jobId}`);
 
     return NextResponse.json({
       success: true,

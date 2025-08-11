@@ -10,7 +10,7 @@ export interface ScreenshotOptions {
 export function createWebSocketScreenshotCapture(page: Page, options: ScreenshotOptions) {
   const { gameName, action, interval = 500 } = options;
   
-  console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
+  // console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
   
   // Start screenshot capture
   const screenshotInterval = setInterval(async () => {
@@ -21,7 +21,7 @@ export function createWebSocketScreenshotCapture(page: Page, options: Screenshot
       // Broadcast via WebSocket
       screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
       
-      console.log(`WebSocket screenshot sent: ${new Date().toISOString()}`);
+      // console.log(`WebSocket screenshot sent: ${new Date().toISOString()}`);
     } catch (error) {
       console.log('WebSocket screenshot error:', error);
     }
@@ -29,7 +29,7 @@ export function createWebSocketScreenshotCapture(page: Page, options: Screenshot
 
   // Return cleanup function
   return () => {
-    console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action}`);
+    // console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action}`);
     clearInterval(screenshotInterval);
   };
 } 

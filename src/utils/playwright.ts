@@ -6,9 +6,6 @@ export async function runPlaywrightScript(
   scriptPath: string,
   args?: Record<string, any>
 ): Promise<string> {
-  console.log('Running Playwright script:', scriptPath);
-  console.log('Arguments:', args);
-  
   // Simulate async operation
   await new Promise(resolve => setTimeout(resolve, 1000));
   

@@ -67,13 +67,13 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
   // Debug: Monitor state changes
   useEffect(() => {
-    console.log(`GameWidget ${gameName} state:`, {
-      isLoggedIn,
-      needsLogin,
-      isExpanded,
-      sessionToken,
-      errorMessage
-    });
+    // console.log(`GameWidget ${gameName} state:`, {
+    //   isLoggedIn,
+    //   needsLogin,
+    //   isExpanded,
+    //   sessionToken,
+    //   errorMessage
+    // });
   }, [isLoggedIn, needsLogin, isExpanded, sessionToken, errorMessage, gameName]);
 
   // Listen for session expired events from ActionStatus
@@ -83,7 +83,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       
       // Only trigger login screen if this event is for this specific game widget
       if (expiredGameName === gameName) {
-        console.log(`Session expired for ${gameName}, triggering login screen`);
+        // console.log(`Session expired for ${gameName}, triggering login screen`);
         setIsLoggedIn(false);
         setNeedsLogin(true);
         setIsExpanded(true);
@@ -92,20 +92,20 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
     // Listen for login job completion
     const handleLoginJobComplete = (event: CustomEvent) => {
-      console.log(`Login job completion event received for ${gameName}:`, event.detail);
+      // console.log(`Login job completion event received for ${gameName}:`, event.detail);
       const { gameName: completedGameName, action, success, sessionToken, message } = event.detail;
       
       if (completedGameName === gameName && action === 'login') {
-        console.log(`Login job completed for ${gameName}:`, { success, message });
+        // console.log(`Login job completed for ${gameName}:`, { success, message });
         if (success) {
-          console.log(`Login succeeded for ${gameName}, setting logged in state`);
+          // console.log(`Login succeeded for ${gameName}, setting logged in state`);
           setSessionToken(sessionToken || 'session-token');
           setIsLoggedIn(true);
           setNeedsLogin(false);
           setErrorMessage('');
         } else {
           // Fix: Reset login state when login fails
-          console.log(`Login failed for ${gameName}, resetting state...`);
+          // console.log(`Login failed for ${gameName}, resetting state...`);
           setSessionToken(null);
           setIsLoggedIn(false);
           setNeedsLogin(true);
@@ -153,15 +153,15 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         if (data.hasSession) {
           setSessionToken(data.sessionToken);
           setIsLoggedIn(true);
-          console.log('Found existing session:', data);
+          // console.log('Found existing session:', data);
         } else if (data.hasCredentials) {
           // No session but credentials exist - pre-fill the form but don't show login screen
           setUsername(data.username || '');
           setPassword(data.password || '');
-          console.log('No session but credentials found, pre-filled form');
+          // console.log('No session but credentials found, pre-filled form');
         } else {
           // No credentials found - don't show login screen
-          console.log('No credentials found');
+          // console.log('No credentials found');
         }
       } else {
         // Handle error response
@@ -214,7 +214,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       
       if (data.jobId) {
         // Login job was added to queue successfully
-        console.log('Login job added to queue:', data.jobId);
+        // console.log('Login job added to queue:', data.jobId);
         
         // Dispatch event for ActionStatus component to track this job
         const newJobEvent = new CustomEvent('new-job', {
@@ -256,7 +256,6 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       }
       
       // CRITICAL FIX: Handle login failure immediately by calling the same logic as handleLoginJobComplete
-      console.log(`Login failed for ${gameName}, resetting state immediately...`);
       setSessionToken(null);
       setIsLoggedIn(false);
       setNeedsLogin(true);
@@ -293,7 +292,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       });
 
       if (response.ok) {
-        console.log('Session logged out successfully');
+        // console.log('Session logged out successfully');
       }
     } catch (error) {
       console.error('Error logging out session:', error);

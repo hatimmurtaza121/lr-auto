@@ -143,7 +143,7 @@ export class SessionManager {
     
     // Consider session inactive if expires_at is null or if it has expired
     if (!expiresAt || (expiresAt && now > expiresAt)) {
-      console.log(`Session is inactive - expires_at: ${session.expires_at}`);
+      // console.log(`Session is inactive - expires_at: ${session.expires_at}`);
       
       // Mark session as inactive
       const supabase = getSupabaseClient();
@@ -259,7 +259,7 @@ export class SessionManager {
     const page = await context.newPage();
 
     try {
-      console.log(`Logging into ${game.name} at ${game.login_url}`);
+      // console.log(`Logging into ${game.name} at ${game.login_url}`);
 
       // Navigate to login page
       await page.goto(game.login_url);
@@ -400,7 +400,7 @@ export class SessionManager {
       try {
         const element = page.locator(selector).first();
         if (await element.isVisible()) {
-          console.log(`Captcha detected using selector: ${selector}`);
+          // console.log(`Captcha detected using selector: ${selector}`);
           return true;
         }
       } catch {
@@ -474,7 +474,7 @@ export class SessionManager {
         try {
           const element = page.locator(indicator).first();
           if (await element.isVisible()) {
-            console.log(`Session expired indicator found: ${indicator}`);
+            // console.log(`Session expired indicator found: ${indicator}`);
             return false; // Session appears to be expired
           }
         } catch {
@@ -485,7 +485,7 @@ export class SessionManager {
       // Check if we're on a login page by URL
       const currentUrl = page.url();
       if (currentUrl.includes('/login') || currentUrl.includes('/signin') || currentUrl.includes('/auth')) {
-        console.log('Currently on login page, session appears expired');
+        // console.log('Currently on login page, session appears expired');
         return false;
       }
 

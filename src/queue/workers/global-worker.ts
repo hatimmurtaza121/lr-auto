@@ -21,7 +21,7 @@ export class GlobalWorker {
 
     // Set up event handlers
     this.worker.on('completed', (job) => {
-      console.log(`Job ${job.id} completed successfully`);
+      // console.log(`Job ${job.id} completed successfully`);
       this.broadcastWorkerStatus(false);
     });
 
@@ -48,9 +48,6 @@ export class GlobalWorker {
 
   private dispatchScriptResult(jobId: string, result: any) {
     // Log the script result for debugging
-    console.log(`Job ${jobId}: Script result to be dispatched:`, result);
-    console.log(`Job ${jobId}: Script message:`, result?.message);
-    
     // The result will be passed through the existing job status polling system
     // The ActionStatus component will receive it via the job status API
   }
@@ -59,23 +56,14 @@ export class GlobalWorker {
     const data = job.data;
     let result: any;
 
-    console.log(`=== WORKER PICKING UP JOB ${job.id} ===`);
-    console.log(`Processing ${data.action} job for user ${data.userId}`);
-    console.log(`Job ${job.id} state:`, await job.getState());
-    console.log(`Job ${job.id} data:`, data);
-    console.log(`Job ${job.id} timestamp:`, job.timestamp);
-    console.log(`Job ${job.id} name:`, job.name);
-    
     // Broadcast that worker is starting execution
     this.broadcastWorkerStatus(true, `Starting ${data.action}...`, [`Starting ${data.action}...`]);
 
     try {
       await job.updateProgress(10);
-      console.log(`Job ${job.id}: Processing...`);
 
       // Handle all actions dynamically
       await job.updateProgress(20);
-      console.log(`Job ${job.id}: Processing action: ${data.action}...`);
       this.broadcastWorkerStatus(true, `Processing ${data.action}...`, [`Processing ${data.action}...`]);
       
       if (data.action === 'login') {
@@ -97,17 +85,11 @@ export class GlobalWorker {
       }
 
       await job.updateProgress(100);
-      console.log(`Job ${job.id}: Completed successfully`);
-      console.log(`Job ${job.id}: Result:`, result);
-      console.log(`Job ${job.id}: Result type:`, typeof result);
-      console.log(`Job ${job.id}: Result JSON:`, JSON.stringify(result));
       
       // Calculate execution time using BullMQ's built-in timing
       const processedOn = job.processedOn;
       const finishedOn = job.finishedOn || Date.now();
       const executionTimeSecs = processedOn && finishedOn ? (finishedOn - processedOn) / 1000 : undefined;
-      
-      console.log(`Job ${job.id}: BullMQ timing - processedOn: ${processedOn}, finishedOn: ${finishedOn}, executionTime: ${executionTimeSecs}s`);
       
       // Save action status to database
       try {
@@ -127,7 +109,6 @@ export class GlobalWorker {
             executionTimeSecs: executionTimeSecs
           });
           
-          console.log(`Job ${job.id}: Action status saved to database (execution time: ${executionTimeSecs}s)`);
         }
       } catch (statusError) {
         console.error(`Job ${job.id}: Failed to save action status:`, statusError);
@@ -141,20 +122,16 @@ export class GlobalWorker {
       this.broadcastWorkerStatus(false, completionMessage, [completionMessage]);
 
       // Ensure the result is properly returned and stored
-      console.log(`Job ${job.id}: Returning result to BullMQ:`, result);
       
       // Make sure result is serializable and explicitly return it
       const serializedResult = JSON.parse(JSON.stringify(result));
-      console.log(`Job ${job.id}: Serialized result:`, serializedResult);
-      console.log(`Job ${job.id}: About to return result...`);
       
       // Store result in job data as backup
       try {
         const jobData = { ...job.data, result: serializedResult };
         await job.updateData(jobData);
-        console.log(`Job ${job.id}: Stored result in job data:`, jobData.result);
       } catch (updateError) {
-        console.log(`Job ${job.id}: Failed to update job data:`, updateError);
+        // console.log(`Job ${job.id}: Failed to update job data:`, updateError);
       }
       
       // Explicitly return the result
@@ -166,8 +143,6 @@ export class GlobalWorker {
       const processedOn = job.processedOn;
       const finishedOn = job.finishedOn || Date.now();
       const executionTimeSecs = processedOn && finishedOn ? (finishedOn - processedOn) / 1000 : undefined;
-      
-      console.log(`Job ${job.id}: BullMQ timing for failed job - processedOn: ${processedOn}, finishedOn: ${finishedOn}, executionTime: ${executionTimeSecs}s`);
       
       // Save failed action status to database
       try {
@@ -186,7 +161,6 @@ export class GlobalWorker {
             executionTimeSecs: executionTimeSecs
           });
           
-          console.log(`Job ${job.id}: Failed action status saved to database (execution time: ${executionTimeSecs}s)`);
         }
       } catch (statusError) {
         console.error(`Job ${job.id}: Failed to save failed action status:`, statusError);

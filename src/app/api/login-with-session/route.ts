@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log(`Logging into ${gameName} for user ${user.id}, team ${teamId}`);
+    // console.log(`Logging into ${gameName} for user ${user.id}, team ${teamId}`);
 
     // Get game from database
     const game = await getGame(gameName);
@@ -36,12 +36,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Game not found' }, { status: 400 });
     }
 
-    console.log(`Found game: ${game.name} with login URL: ${game.login_url}`);
+    // console.log(`Found game: ${game.name} with login URL: ${game.login_url}`);
 
     // Get or create game credential
     let gameCredentialId: number;
     
-    console.log(`Looking for existing credential for team ${teamId} and game ${gameName}`);
+    // console.log(`Looking for existing credential for team ${teamId} and game ${gameName}`);
     
     // First check if credential already exists
     const existingCredential = await getGameCredential(gameName, teamId);
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       }
 
       gameCredentialId = existingCredential.id;
-      console.log(`Updated existing game credential: ${gameCredentialId}`);
+      // console.log(`Updated existing game credential: ${gameCredentialId}`);
     } else {
       // Create new game credential
       const { data: newCredential, error: createError } = await supabase
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
       }
 
       gameCredentialId = newCredential.id;
-      console.log(`Created new game credential: ${gameCredentialId}`);
+      // console.log(`Created new game credential: ${gameCredentialId}`);
     }
 
     // Run the existing login script (disable Supabase saving since we handle it here)
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to update session: ${sessionError.message}`);
       }
 
-      console.log(`Updated existing session: ${existingSession.id}`);
+      // console.log(`Updated existing session: ${existingSession.id}`);
     } else {
       // Create new session
       sessionToken = crypto.randomBytes(32).toString('hex');
@@ -140,10 +140,10 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to save session: ${sessionError.message}`);
       }
 
-      console.log('Created new session');
+      // console.log('Created new session');
     }
 
-    console.log(`Session saved successfully for game credential ${gameCredentialId}`);
+    // console.log(`Session saved successfully for game credential ${gameCredentialId}`);
 
     return NextResponse.json({
       success: true,
@@ -172,9 +172,9 @@ async function runLoginScript(scriptDir: string, username: string, password: str
     const scriptPath = path.join(process.cwd(), scriptDir, 'login.js');
     const args = [username, password, loginUrl, saveToSupabase.toString()];
     
-    console.log(`Running login script: ${scriptPath} with args: ${args}`);
-    console.log(`Current working directory: ${process.cwd()}`);
-    console.log(`Script exists: ${require('fs').existsSync(scriptPath)}`);
+    // console.log(`Running login script: ${scriptPath} with args: ${args}`);
+    // console.log(`Current working directory: ${process.cwd()}`);
+    // console.log(`Script exists: ${require('fs').existsSync(scriptPath)}`);
 
     const proc = spawn('node', [scriptPath, ...args], {
       cwd: process.cwd(),
@@ -186,24 +186,24 @@ async function runLoginScript(scriptDir: string, username: string, password: str
 
     proc.stdout.on('data', (data) => { 
       output += data.toString(); 
-      console.log('Login script stdout:', data.toString());
+      // console.log('Login script stdout:', data.toString());
     });
     
     proc.stderr.on('data', (data) => { 
       errorOutput += data.toString(); 
-      console.log('Login script stderr:', data.toString());
+      // console.log('Login script stderr:', data.toString());
     });
     
     proc.on('close', (code) => {
-      console.log(`Login script process closed with code: ${code}`);
-      console.log(`Total stdout: ${output}`);
-      console.log(`Total stderr: ${errorOutput}`);
+      // console.log(`Login script process closed with code: ${code}`);
+      // console.log(`Total stdout: ${output}`);
+      // console.log(`Total stderr: ${errorOutput}`);
       
       if (code === 0) {
-        console.log('Login script completed successfully');
+        // console.log('Login script completed successfully');
         resolve({ success: true });
       } else {
-        console.log(`Login script failed with code: ${code}`);
+        // console.log(`Login script failed with code: ${code}`);
         resolve({ 
           success: false, 
           error: errorOutput || `Login script failed with exit code ${code}` 
@@ -236,7 +236,7 @@ async function captureSessionDataFromAuthState(loginUrl: string): Promise<any> {
 
     // Load the auth state file created by the login script
     const authStatePath = path.join(process.cwd(), 'auth-state.json');
-    console.log(`Loading auth state from: ${authStatePath}`);
+    // console.log(`Loading auth state from: ${authStatePath}`);
     
     if (!require('fs').existsSync(authStatePath)) {
       throw new Error('Auth state file not found. Login script must run first.');
@@ -246,7 +246,7 @@ async function captureSessionDataFromAuthState(loginUrl: string): Promise<any> {
     context = await browser.newContext({ storageState: authStatePath });
     const page = await context.newPage();
 
-    console.log(`Capturing session data from logged-in session: ${loginUrl}`);
+    // console.log(`Capturing session data from logged-in session: ${loginUrl}`);
 
     // Navigate to the login URL (should redirect to dashboard if logged in)
     await page.goto(loginUrl);
@@ -257,7 +257,7 @@ async function captureSessionDataFromAuthState(loginUrl: string): Promise<any> {
 
     // Capture cookies from the logged-in session
     let cookies = await context.cookies();
-    console.log(`Cookies captured from logged-in session: ${cookies.length}`);
+    // console.log(`Cookies captured from logged-in session: ${cookies.length}`);
     
     // If no cookies with expiration found, wait a bit more and try again
     const cookiesWithExpiration = cookies.filter(cookie => 
@@ -265,27 +265,27 @@ async function captureSessionDataFromAuthState(loginUrl: string): Promise<any> {
     );
     
     if (cookiesWithExpiration.length === 0) {
-      console.log('No cookies with expiration found initially, waiting longer...');
+      // console.log('No cookies with expiration found initially, waiting longer...');
       await page.waitForTimeout(5000); // Wait 5 more seconds
       cookies = await context.cookies();
-      console.log(`Cookies after additional wait: ${cookies.length}`);
+      // console.log(`Cookies after additional wait: ${cookies.length}`);
     }
     
     // Log the full cookie structure to see what fields are available
-    console.log('Full cookie structure:', JSON.stringify(cookies, null, 2));
+    // console.log('Full cookie structure:', JSON.stringify(cookies, null, 2));
     
     // Log each cookie individually for better debugging
-    cookies.forEach((cookie, index) => {
-      console.log(`Cookie ${index + 1}:`, {
-        name: cookie.name,
-        domain: cookie.domain,
-        expires: cookie.expires,
-        expiresDate: cookie.expires ? new Date(cookie.expires * 1000).toISOString() : 'No expiration',
-        httpOnly: cookie.httpOnly,
-        secure: cookie.secure,
-        path: cookie.path
-      });
-    });
+    // cookies.forEach((cookie, index) => {
+    //   console.log(`Cookie ${index + 1}:`, {
+    //     name: cookie.name,
+    //     domain: cookie.domain,
+    //     expires: cookie.expires,
+    //     expiresDate: cookie.expires ? new Date(cookie.expires * 1000).toISOString() : 'No expiration',
+    //     httpOnly: cookie.httpOnly,
+    //     secure: cookie.secure,
+    //     path: cookie.path
+    //   });
+    // });
     
     // Extract cookie expiration information from the actual cookie structure
     const cookieExpirations = cookies
@@ -318,12 +318,12 @@ async function captureSessionDataFromAuthState(loginUrl: string): Promise<any> {
       earliestExpirationDate: earliestExpiration ? new Date(earliestExpiration * 1000).toISOString() : null
     };
 
-    console.log(`Captured ${cookies.length} cookies from logged-in session`);
-    console.log(`Cookies with expiration:`, cookieExpirations.length);
-    cookieExpirations.forEach(cookie => {
-      console.log(`  - ${cookie.name}: expires ${cookie.expiresDate}`);
-    });
-    console.log(`Earliest expiration: ${sessionData.earliestExpirationDate}`);
+    // console.log(`Captured ${cookies.length} cookies from logged-in session`);
+    // console.log(`Cookies with expiration:`, cookieExpirations.length);
+    // cookieExpirations.forEach(cookie => {
+    //   console.log(`  - ${cookie.name}: expires ${cookie.expiresDate}`);
+    // });
+    // console.log(`Earliest expiration: ${sessionData.earliestExpirationDate}`);
 
     return sessionData;
 

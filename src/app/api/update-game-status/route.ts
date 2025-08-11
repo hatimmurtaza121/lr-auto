@@ -8,7 +8,7 @@ const supabase = createClient(
 );
 
 export async function POST(request: NextRequest) {
-  console.log(`API route called at ${new Date().toISOString()}`);
+  // console.log(`API route called at ${new Date().toISOString()}`);
   
   try {
     // Get authenticated user
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { teamId, gameId, action, status, inputs, execution_time_secs } = body;
 
-    console.log(`Processing request: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
+    // console.log(`Processing request: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
 
     // Validate required fields
     if (!teamId || !gameId || !action || !status) {
@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`Updating game status: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
-    if (inputs) console.log('Inputs:', inputs);
-    if (execution_time_secs) console.log('Execution time:', execution_time_secs, 'seconds');
+    // console.log(`Updating game status: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
+    // if (inputs) console.log('Inputs:', inputs);
+    // if (execution_time_secs) console.log('Execution time:', execution_time_secs, 'seconds');
 
     // Prepare insert data
     const insertData: any = {
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log('Game status updated successfully:', data);
+    // console.log('Game status updated successfully:', data);
 
     return NextResponse.json({
       success: true,
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
     }
 
-    console.log(`Fetching game status for team: ${teamId}`);
+    // console.log(`Fetching game status for team: ${teamId}`);
 
     // Get the latest status for each game and action for this team using the stored function
     const { data, error } = await supabase
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
 
     const gameStatuses = Array.from(gameStatusMap.values());
 
-    console.log('Game statuses fetched successfully:', gameStatuses);
+    // console.log('Game statuses fetched successfully:', gameStatuses);
 
     return NextResponse.json({
       success: true,

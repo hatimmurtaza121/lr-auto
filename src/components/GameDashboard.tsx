@@ -207,7 +207,6 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
       }
 
       const result = await response.json();
-      console.log('Job submission response:', result);
       
       // Check if this is a queued job response
       if (result.jobId) {

@@ -14,7 +14,7 @@ export interface GameStatusUpdate {
  */
 export async function updateGameStatus(update: GameStatusUpdate): Promise<void> {
   try {
-    console.log(`Updating game status:`, update);
+    // console.log(`Updating game status:`, update);
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -45,7 +45,7 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
       throw new Error(`Failed to update game status: ${error.message}`);
     }
 
-    console.log('Game status updated successfully');
+    // console.log('Game status updated successfully');
   } catch (error) {
     console.error('Error in updateGameStatus:', error);
     throw error;

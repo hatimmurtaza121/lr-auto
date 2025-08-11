@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Game not found' }, { status: 400 });
     }
 
-    console.log(`Logging into ${gameName} for user ${user.id}, team ${teamId}`);
+    // console.log(`Logging into ${gameName} for user ${user.id}, team ${teamId}`);
 
     // Run the login script
     const scriptPath = `scripts/login.js`;

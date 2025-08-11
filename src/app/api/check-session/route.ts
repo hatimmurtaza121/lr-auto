@@ -24,14 +24,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Game name is required' }, { status: 400 });
     }
 
-    console.log(`Checking session for user ${user.id}, team ${teamId}, game ${gameName}`);
+    // console.log(`Checking session for user ${user.id}, team ${teamId}, game ${gameName}`);
 
     // Get game credential for this team and game
     const gameCredential = await getGameCredential(gameName, teamId);
     
     if (!gameCredential) {
-      console.log(`No game credential found for game ${gameName} in team ${teamId}`);
-      console.log(`Available credentials for team ${teamId}:`);
+      // console.log(`No game credential found for game ${gameName} in team ${teamId}`);
+      // console.log(`Available credentials for team ${teamId}:`);
       const { data: allCredentials } = await supabase
         .from('game_credential')
         .select(`
@@ -39,14 +39,14 @@ export async function GET(request: NextRequest) {
           game:game_id (name)
         `)
         .eq('team_id', teamId);
-      console.log('All credentials for this team:', allCredentials);
+      // console.log('All credentials for this team:', allCredentials);
       return NextResponse.json({
         hasSession: false,
         hasCredentials: false
       });
     }
 
-    console.log(`Found game credential: ${gameCredential.game.name} (ID: ${gameCredential.id})`);
+    // console.log(`Found game credential: ${gameCredential.game.name} (ID: ${gameCredential.id})`);
 
     // Check for existing active session for this game credential
     const { data: session, error } = await supabase
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       
       // Consider session inactive if expires_at is null or if it has expired
       if (!expiresAt || (expiresAt && now > expiresAt)) {
-        console.log(`Session for game ${gameName} is inactive - expires_at: ${session.expires_at}`);
+        // console.log(`Session for game ${gameName} is inactive - expires_at: ${session.expires_at}`);
         
         // Mark session as inactive
         await supabase
@@ -104,8 +104,8 @@ export async function GET(request: NextRequest) {
         });
       }
       
-      console.log(`Found active session for game ${gameName}:`, session);
-      console.log(`Session expires at: ${expiresAt}`);
+      // console.log(`Found active session for game ${gameName}:`, session);
+      // console.log(`Session expires at: ${expiresAt}`);
       
       return NextResponse.json({
         hasSession: true,
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
         expiresAt: session.expires_at
       });
     } else {
-      console.log(`No active session found for game ${gameName}`);
+      // console.log(`No active session found for game ${gameName}`);
       return NextResponse.json({
         hasSession: false,
         hasCredentials: true,
