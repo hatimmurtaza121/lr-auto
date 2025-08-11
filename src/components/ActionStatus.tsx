@@ -281,17 +281,24 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
 
               // Dispatch login-job-complete event for login jobs
               if (job.action === 'login' && (jobStatus === 'completed' || jobStatus === 'failed')) {
+                // Determine actual login success from the result, not just job status
+                const actualSuccess = jobStatus === 'completed' && status.result && status.result.success === true;
                 const loginJobCompleteEvent = new CustomEvent('login-job-complete', {
                   detail: {
                     gameName: job.gameName,
                     action: 'login',
-                    success: jobStatus === 'completed',
-                    sessionToken: jobStatus === 'completed' ? 'session-token' : null,
+                    success: actualSuccess,
+                    sessionToken: actualSuccess ? 'session-token' : null,
                     message: message
                   }
                 });
                 window.dispatchEvent(loginJobCompleteEvent);
-                console.log(`Dispatched login-job-complete event for ${job.gameName}:`, { success: jobStatus === 'completed', message });
+                console.log(`Dispatched login-job-complete event for ${job.gameName}:`, { 
+                  jobStatus, 
+                  resultSuccess: status.result?.success, 
+                  actualSuccess, 
+                  message 
+                });
               }
             }
           }
@@ -347,17 +354,24 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
       // Dispatch login-job-complete event for login jobs
       const job = jobs.find(j => j.jobId === jobId);
       if (job && job.action === 'login' && (status === 'completed' || status === 'failed')) {
+        // Determine actual login success from the result, not just job status
+        const actualSuccess = status === 'completed' && result && result.success === true;
         const loginJobCompleteEvent = new CustomEvent('login-job-complete', {
           detail: {
             gameName: job.gameName,
             action: 'login',
-            success: status === 'completed',
-            sessionToken: status === 'completed' ? 'session-token' : null,
+            success: actualSuccess,
+            sessionToken: actualSuccess ? 'session-token' : null,
             message: finalMessage
           }
         });
         window.dispatchEvent(loginJobCompleteEvent);
-        console.log(`Dispatched login-job-complete event for ${job.gameName} via event:`, { success: status === 'completed', message: finalMessage });
+        console.log(`Dispatched login-job-complete event for ${job.gameName} via event:`, { 
+          status, 
+          resultSuccess: result?.success, 
+          actualSuccess, 
+          message: finalMessage 
+        });
       }
     };
 

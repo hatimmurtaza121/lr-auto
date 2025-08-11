@@ -65,6 +65,17 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
     }
   }, [credential]);
 
+  // Debug: Monitor state changes
+  useEffect(() => {
+    console.log(`GameWidget ${gameName} state:`, {
+      isLoggedIn,
+      needsLogin,
+      isExpanded,
+      sessionToken,
+      errorMessage
+    });
+  }, [isLoggedIn, needsLogin, isExpanded, sessionToken, errorMessage, gameName]);
+
   // Listen for session expired events from ActionStatus
   useEffect(() => {
     const handleSessionExpired = (event: CustomEvent) => {
@@ -81,16 +92,24 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
     // Listen for login job completion
     const handleLoginJobComplete = (event: CustomEvent) => {
+      console.log(`Login job completion event received for ${gameName}:`, event.detail);
       const { gameName: completedGameName, action, success, sessionToken, message } = event.detail;
       
       if (completedGameName === gameName && action === 'login') {
         console.log(`Login job completed for ${gameName}:`, { success, message });
         if (success) {
+          console.log(`Login succeeded for ${gameName}, setting logged in state`);
           setSessionToken(sessionToken || 'session-token');
           setIsLoggedIn(true);
           setNeedsLogin(false);
           setErrorMessage('');
         } else {
+          // Fix: Reset login state when login fails
+          console.log(`Login failed for ${gameName}, resetting state...`);
+          setSessionToken(null);
+          setIsLoggedIn(false);
+          setNeedsLogin(true);
+          setIsExpanded(true);
           setErrorMessage(message || 'Login failed');
         }
       }
@@ -236,6 +255,12 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         }
       }
       
+      // CRITICAL FIX: Handle login failure immediately by calling the same logic as handleLoginJobComplete
+      console.log(`Login failed for ${gameName}, resetting state immediately...`);
+      setSessionToken(null);
+      setIsLoggedIn(false);
+      setNeedsLogin(true);
+      setIsExpanded(true);
       setErrorMessage(userFriendlyMessage);
     } finally {
       setIsLoading(false);
@@ -338,8 +363,6 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                   setUsername(e.target.value);
                   setErrorMessage(''); // Clear error when user types
                 }}
-                error={!!errorMessage}
-                helperText={errorMessage}
                 disabled={isLoading}
                 sx={{
                   "& .MuiOutlinedInput-root": {
@@ -374,8 +397,6 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                   setPassword(e.target.value);
                   setErrorMessage(''); // Clear error when user types
                 }}
-                error={!!errorMessage}
-                helperText={errorMessage}
                 disabled={isLoading}
                 sx={{
                   "& .MuiOutlinedInput-root": {

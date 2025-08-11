@@ -276,7 +276,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
       <div className="space-y-6">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-          <span className="ml-2 text-content-primary">Loading actions...</span>
+          {/* <span className="ml-2 text-content-primary">Loading actions...</span> */}
         </div>
       </div>
     );

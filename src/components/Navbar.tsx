@@ -1,14 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { clearSelectedTeamId, getSelectedTeamId } from '@/utils/team';
+import { clearSelectedTeamId, getSelectedTeamId, setSelectedTeamId } from '@/utils/team';
+
+interface Team {
+  id: number;
+  name: string;
+  code: string;
+}
 
 export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedTeamName, setSelectedTeamName] = useState<string>('');
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamsDropdownOpen, setTeamsDropdownOpen] = useState(false);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const teamsDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -21,8 +31,11 @@ export default function Navbar() {
       if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
         setSidebarOpen(false);
       }
+      if (teamsDropdownRef.current && !teamsDropdownRef.current.contains(event.target as Node)) {
+        setTeamsDropdownOpen(false);
+      }
     }
-    if (dropdownOpen || sidebarOpen) {
+    if (dropdownOpen || sidebarOpen || teamsDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     } else {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -30,7 +43,7 @@ export default function Navbar() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [dropdownOpen, sidebarOpen]);
+  }, [dropdownOpen, sidebarOpen, teamsDropdownOpen]);
 
   // Fetch selected team name
   useEffect(() => {
@@ -51,6 +64,34 @@ export default function Navbar() {
 
     fetchTeamName();
   }, []);
+
+  // Fetch teams for dropdown
+  const fetchTeams = async () => {
+    if (teams.length > 0) return; // Don't refetch if we already have teams
+    
+    setIsLoadingTeams(true);
+    try {
+      const response = await fetch('/api/team');
+      if (response.ok) {
+        const data = await response.json();
+        setTeams(data.teams || []);
+      }
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    } finally {
+      setIsLoadingTeams(false);
+    }
+  };
+
+  const handleTeamSelect = async (team: Team) => {
+    console.log('Team selected:', team);
+    setSelectedTeamId(team.id);
+    setSelectedTeamName(team.name);
+    setTeamsDropdownOpen(false);
+    // Force a hard refresh to ensure the new team context is loaded
+    console.log('Reloading page...');
+    window.location.reload();
+  };
 
   const handleLogout = async () => {
     setDropdownOpen(false);
@@ -112,17 +153,57 @@ export default function Navbar() {
             Status
           </button>
 
-          {/* Team Display */}
+          {/* Team Dropdown */}
           {selectedTeamName && (
-            <button
-              onClick={() => router.push('/choose-team')}
-              className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group border border-gray-300 hover:border-gray-400"
-            >
-              <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <span className="whitespace-nowrap">{selectedTeamName}</span>
-            </button>
+            <div className="relative" ref={teamsDropdownRef}>
+              <button
+                onClick={() => {
+                  setTeamsDropdownOpen(!teamsDropdownOpen);
+                  if (!teamsDropdownOpen) {
+                    fetchTeams();
+                  }
+                }}
+                className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group border border-gray-300 hover:border-gray-400"
+              >
+                <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="whitespace-nowrap">{selectedTeamName}</span>
+                <svg className={`w-4 h-4 transition-transform ${teamsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {teamsDropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-2 animate-in fade-in z-50 max-h-60 overflow-y-auto scrollbar-hide [&::-webkit-scrollbar]:hidden">
+                  {isLoadingTeams ? (
+                    <div className="px-4 py-3 text-gray-500 text-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mx-auto"></div>
+                      <span className="ml-2">Loading teams...</span>
+                    </div>
+                  ) : teams.length > 0 ? (
+                    teams.map((team) => (
+                      <button
+                        key={team.id}
+                        onClick={() => handleTeamSelect(team)}
+                        className={`w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                          team.id === getSelectedTeamId() ? 'bg-blue-50 text-blue-700 font-medium' : ''
+                        }`}
+                      >
+                        <span className="truncate">{team.name}</span>
+                        {team.id === getSelectedTeamId() && (
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-gray-500 text-center">No teams found</div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -217,17 +298,59 @@ export default function Navbar() {
                 Status
               </button>
 
-              {/* Team */}
+              {/* Team - Mobile version with dropdown */}
               {selectedTeamName && (
-                <button
-                  onClick={() => handleNavigation('/choose-team')}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors border-2 border-gray-300"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <span className="truncate">{selectedTeamName}</span>
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      if (!teamsDropdownOpen) {
+                        fetchTeams();
+                      }
+                      setTeamsDropdownOpen(!teamsDropdownOpen);
+                    }}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors border-2 border-gray-300"
+                  >
+                    <div className="flex items-center gap-3">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <span className="truncate">{selectedTeamName}</span>
+                    </div>
+                    <svg className={`w-4 h-4 transition-transform ${teamsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {teamsDropdownOpen && (
+                    <div className="mt-2 bg-gray-50 rounded-lg py-2 max-h-40 overflow-y-auto scrollbar-hide [&::-webkit-scrollbar]:hidden">
+                      {isLoadingTeams ? (
+                        <div className="px-4 py-2 text-gray-500 text-center text-sm">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-900 mx-auto"></div>
+                          <span className="ml-2">Loading...</span>
+                        </div>
+                      ) : teams.length > 0 ? (
+                        teams.map((team) => (
+                          <button
+                            key={team.id}
+                            onClick={() => handleTeamSelect(team)}
+                            className={`w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-between ${
+                              team.id === getSelectedTeamId() ? 'bg-blue-100 text-blue-700 font-medium' : ''
+                            }`}
+                          >
+                            <span className="truncate">{team.name}</span>
+                            {team.id === getSelectedTeamId() && (
+                              <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-gray-500 text-center text-sm">No teams found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
