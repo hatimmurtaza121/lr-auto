@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { gameId, name, inputsJson } = body;
+    const { gameId, name, inputsJson, script_code } = body;
     // Accept either display_name or displayName from clients
     const display_name: string | undefined = body.display_name ?? body.displayName;
 
@@ -64,6 +64,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: 'Action name must be in snake_case format (e.g., "new_account", "ban_user")' 
       }, { status: 400 });
+    }
+
+    // Validate script code if provided
+    if (script_code) {
+      try {
+        const { validateScriptCode } = await import('@/utils/script-executor');
+        const validation = validateScriptCode(script_code);
+        if (!validation.isValid) {
+          return NextResponse.json({ 
+            error: 'Invalid script code',
+            details: validation.error
+          }, { status: 400 });
+        }
+      } catch (validationError) {
+        return NextResponse.json({ 
+          error: 'Script validation failed',
+          details: 'Could not validate script code'
+        }, { status: 400 });
+      }
     }
 
     const supabase = createClient(cookies());
@@ -87,7 +106,8 @@ export async function POST(request: NextRequest) {
         game_id: parseInt(gameId),
         name,
         display_name: display_name || null,
-        inputs_json: inputsJson || null
+        inputs_json: inputsJson || null,
+        script_code: script_code || null
       })
       .select()
       .single();

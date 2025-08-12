@@ -37,12 +37,12 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
 
 async function run(page, context, params = {}) {
     // Handle both old camelCase and new snake_case parameter names
-    const accountName = params.account_name || params.newAccountName || 'testing01';
-    const password = params.new_password || params.newPassword || 'password01';
+    const account_name = params.account_name || params.newaccount_name || 'testing01';
+    const new_password = params.new_password || params.newPassword || 'password01';
     
     console.log('Starting account creation process...');
-    console.log(`Account Name: ${accountName}`);
-    console.log(`Password: ${password}`);
+    console.log(`Account Name: ${account_name}`);
+    console.log(`Password: ${new_password}`);
     
     // Start WebSocket screenshot capture
     const stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'new_account', 500);
@@ -56,9 +56,9 @@ async function run(page, context, params = {}) {
 
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('button', { name: '  New' }).click();
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Account' }).click();
-        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Account' }).fill(accountName);
+        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Account' }).fill(account_name);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Password' }).click();
-        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Password' }).fill(password);
+        await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input Password' }).fill(new_password);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByText('Submit').click();
 
         // Checking errors and success message
@@ -75,8 +75,7 @@ async function run(page, context, params = {}) {
           console.log('Account created successfully');
           return {
             success: true,
-            message: 'Account created successfully',
-            accountName: accountName
+            message: 'Account created successfully'
           };
         } catch (successError) {
           try {
@@ -87,26 +86,22 @@ async function run(page, context, params = {}) {
             console.log('Account has already been created');
             return {
               success: false,
-              message: 'Account has already been created',
-              accountName: accountName
+              message: 'Account has already been created'
             };
           } catch (errorError) {
             // If neither success nor specific error found, return generic error
             console.log('Try again');
             return {
               success: false,
-              message: 'Try again',
-              accountName: accountName
+              message: 'Try again'
             };
           }
         }
     } catch (error) {
         console.error('Error during account creation:', error);
-        stopScreenshotCapture();
         return {
           success: false,
-          message: `Error creating account: ${error.message || error}`,
-          accountName: accountName
+          message: `Error creating account: ${error.message || error}`
         };
     } finally {
         // Stop WebSocket screenshot capture

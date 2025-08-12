@@ -69,9 +69,6 @@ async function run(page, context, params = {}) {
         await page.waitForTimeout(1000);
         console.log('Waiting for search results to load...');
         
-        // Validate account exists and is accessible
-        let accountValidationError = null;
-        
         // Wait for either data to appear OR "No data" message to appear
         try {
             // First, wait for the table to stop loading (either data or no data)
@@ -84,49 +81,49 @@ async function run(page, context, params = {}) {
             const noData = listFrame
                 .locator('tbody > tr > td[colspan="16"] span.help-block')
                 .filter({ hasText: 'No data.' });
-            
+
             if (await noData.count() > 0) {
                 console.log('No user exists. Aborting.');
-                accountValidationError = 'No account found';
-            } else {
-                // 3.5b. Now safely grab the first data row
-                const firstRow = listFrame.locator('tbody > tr').first();
-                try {
-                    await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
-                    const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
-                    const foundName = (await accountCell.textContent()).trim();
-                    console.log(foundName, '---', target_username);
-                    if (foundName !== target_username) {
-                        console.log('Account in row does not match. Aborting.');
-                        accountValidationError = 'No account found';
-                    }
-                } catch {
-                    console.log('No rows found. Aborting.');
-                    accountValidationError = 'No account found';
+                return {
+                    success: false,
+                    message: 'No account found'
+                };
+            }
+
+            // 3.5b. Now safely grab the first data row
+            const firstRow = listFrame.locator('tbody > tr').first();
+            try {
+                await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
+                const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
+                const foundName = (await accountCell.textContent()).trim();
+                console.log(foundName, '---', target_username);
+                if (foundName !== target_username) {
+                  console.log('Account in row does not match. Aborting.');
+                  return {
+                    success: false,
+                    message: 'No account found'
+                  };
                 }
+            } catch {
+              console.log('No rows found. Aborting.');
+              return {
+                success: false,
+                message: 'No account found'
+              };
             }
         } catch (error) {
             console.log('Table loading timeout. Aborting.');
             return {
                 success: false,
-                message: 'Table loading timeout',
-                username: target_username
+                message: 'Table loading timeout'
             };
         }
 
-        // Early return if validation failed
-        if (accountValidationError) {
-            return { success: false, message: accountValidationError, username: target_username };
-        }
-
         
-        // 4. Open the "editor" dropdown and click "Reset Password"
-        await listFrame.getByRole('button', { name: 'editor' }).click();
-        await listFrame
-            .locator('a')
-            .filter({ hasText: 'Reset Password' })
-            .click();
-        
+        // 4. Open the "editor" dropdown
+        await listFrame.locator('tbody > tr').first().getByRole('button', { name: 'editor' }).click();
+        await listFrame.locator('tbody > tr').first().locator('a').filter({ hasText: 'Reset Password' }).click();
+                
         // 5. Fill in the new password and submit
         await listFrame.getByRole('textbox', { name: 'Input Password' }).fill(new_password);
         await listFrame.getByRole('button', { name: ' Submit' }).click();
@@ -143,8 +140,7 @@ async function run(page, context, params = {}) {
             console.log('Password reset successful');
             return {
                 success: true,
-                message: 'Password reset successful',
-                username: target_username
+                message: 'Password reset successful'
             };
         } catch (successError) {
             try {
@@ -158,27 +154,23 @@ async function run(page, context, params = {}) {
                 console.log('Old password cannot be the new password');
                 return {
                     success: false,
-                    message: 'Old password cannot be the new password',
-                    username: target_username
+                    message: 'Old password cannot be the new password'
                 };
             } catch (errorError) {
                 // If neither success nor specific error found, return generic error
                 console.log('Try again');
                 return {
                     success: false,
-                    message: 'Try again',
-                    username: target_username
+                    message: 'Try again'
                 };
             }
         }
      
     } catch (error) {
         console.error('Error during password reset:', error);
-        stopScreenshotCapture();
         return {
             success: false,
-            message: `Error resetting password: ${error}`,
-            username: target_username
+            message: `Error resetting password: ${error}`
         };
     } finally {
         // Stop WebSocket screenshot capture

@@ -17,6 +17,10 @@ export class GlobalWorker {
       concurrency: 1, // Process one job at a time (FIFO)
       removeOnComplete: { count: 10 },
       removeOnFail: { count: 10 },
+      settings: {
+        stalledInterval: 30000, // Check for stalled jobs every 30 seconds
+        maxStalledCount: 1, // Max number of times a job can be stalled
+      }
     });
 
     // Set up event handlers
@@ -66,23 +70,60 @@ export class GlobalWorker {
       await job.updateProgress(20);
       this.broadcastWorkerStatus(true, `Processing ${data.action}...`, [`Processing ${data.action}...`]);
       
-      if (data.action === 'login') {
-        // Special handling for login (needs teamId)
-        result = await loginWithSession(
-          data.userId,
-          data.gameCredentialId,
-          data.params || {},
-          data.teamId
-        );
-      } else {
-        // Use dynamic executor for all other actions
-        result = await executeDynamicActionWithSession(
-          data.userId,
-          data.gameCredentialId,
-          data.action,
-          data.params || {}
-        );
-      }
+      // Create timeout for job execution (60 seconds)
+      const timeoutMs = 60000;
+      let executionAborted = false;
+      
+      // Create AbortController for proper cleanup
+      const abortController = new AbortController();
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          executionAborted = true;
+          abortController.abort(); // Signal abort to any listening operations
+          reject(new Error(`Job execution timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+      
+      // Create execution promise with cleanup
+      const executionPromise = (async () => {
+        try {
+          if (data.action === 'login') {
+            // Special handling for login (needs teamId)
+            return await loginWithSession(
+              data.userId,
+              data.gameCredentialId,
+              data.params || {},
+              data.teamId
+            );
+          } else {
+            // Use dynamic executor for all other actions
+            return await executeDynamicActionWithSession(
+              data.userId,
+              data.gameCredentialId,
+              data.action,
+              data.params || {}
+            );
+          }
+        } catch (error) {
+          // If execution was aborted due to timeout, ensure cleanup
+          if (executionAborted) {
+            console.log(`Job ${job.id}: Execution aborted due to timeout, cleaning up resources...`);
+            // Force cleanup of any remaining browser resources
+            try {
+              // Import and call cleanup function if available
+              const { cleanupBrowserResources } = await import('@/utils/browser-cleanup');
+              await cleanupBrowserResources();
+            } catch (cleanupError) {
+              console.error(`Job ${job.id}: Failed to cleanup browser resources:`, cleanupError);
+            }
+          }
+          throw error;
+        }
+      })();
+      
+      // Race between execution and timeout
+      result = await Promise.race([executionPromise, timeoutPromise]);
 
       await job.updateProgress(100);
       

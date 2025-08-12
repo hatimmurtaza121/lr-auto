@@ -27,6 +27,7 @@ interface Action {
   name: string;
   display_name?: string | null;
   inputs_json: any;
+  script_code?: string | null;
   updated_at: string;
 }
 

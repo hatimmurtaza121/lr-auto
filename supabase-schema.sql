@@ -73,6 +73,7 @@ CREATE TABLE actions (
   name          TEXT         NOT NULL,                    -- "new_account", "ban_user"
   display_name  TEXT
   inputs_json   JSONB,                                    -- Field definitions (can be null)
+  script_code   TEXT,                                     -- JavaScript code for the action
   updated_at    TIMESTAMPTZ  DEFAULT now(),
 );
 

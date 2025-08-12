@@ -444,6 +444,14 @@ export class SessionManager {
         await context.addCookies(sessionData.cookies);
       }
 
+      // Register context for cleanup
+      try {
+        const { registerContextForCleanup } = await import('@/utils/browser-cleanup');
+        registerContextForCleanup(context);
+      } catch (error) {
+        console.log('Could not register context for cleanup:', error);
+      }
+
       return context;
     } catch (error) {
       throw new Error(`Failed to create authenticated context: ${error}`);
@@ -566,6 +574,14 @@ export class SessionManager {
    */
   async cleanup() {
     if (this.browser) {
+      // Unregister browser from cleanup registry
+      try {
+        const { unregisterBrowser } = await import('@/utils/browser-cleanup');
+        unregisterBrowser(this.browser);
+      } catch (error) {
+        console.log('Could not unregister browser from cleanup:', error);
+      }
+      
       await this.browser.close();
       this.browser = null;
     }
@@ -581,6 +597,8 @@ export async function executeWithSession<T>(
   actionFunction: (page: Page, context: BrowserContext) => Promise<T>
 ): Promise<T | { needsLogin: boolean; gameInfo: any }> {
   const sessionManager = new SessionManager();
+  let page: Page | undefined;
+  let context: BrowserContext | undefined;
   
   try {
     // Get or create session
@@ -591,8 +609,16 @@ export async function executeWithSession<T>(
     }
     
     // Create authenticated browser context
-    const context = await sessionManager.createAuthenticatedContext(sessionData);
-    const page = await context.newPage();
+    context = await sessionManager.createAuthenticatedContext(sessionData);
+    page = await context.newPage();
+    
+    // Register page for cleanup
+    try {
+      const { registerPageForCleanup } = await import('@/utils/browser-cleanup');
+      registerPageForCleanup(page);
+    } catch (error) {
+      console.log('Could not register page for cleanup:', error);
+    }
     
     // Navigate to the game dashboard
     if (gameInfo.dashboard_url) {
@@ -615,6 +641,17 @@ export async function executeWithSession<T>(
     console.error('Error in executeWithSession:', error);
     throw error;
   } finally {
+    // Unregister resources from cleanup registry
+    try {
+      if (page && context) {
+        const { unregisterPage, unregisterContext } = await import('@/utils/browser-cleanup');
+        unregisterPage(page);
+        unregisterContext(context);
+      }
+    } catch (error) {
+      console.log('Could not unregister resources from cleanup:', error);
+    }
+    
     await sessionManager.cleanup();
   }
 } 

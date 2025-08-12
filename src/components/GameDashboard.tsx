@@ -29,6 +29,7 @@ interface Action {
       required?: boolean;
     }>;
   };
+  script_code?: string | null;
 }
 
 // Import game mapping utility

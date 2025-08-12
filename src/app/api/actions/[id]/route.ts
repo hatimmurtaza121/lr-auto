@@ -20,7 +20,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, inputsJson } = body;
+    const { name, inputsJson, script_code } = body;
     // Accept either display_name or displayName from clients
     const display_name: string | undefined = body.display_name ?? body.displayName;
 
@@ -33,6 +33,25 @@ export async function PUT(
       return NextResponse.json({ 
         error: 'Action name must be in snake_case format (e.g., "new_account", "ban_user")' 
       }, { status: 400 });
+    }
+
+    // Validate script code if provided
+    if (body.script_code) {
+      try {
+        const { validateScriptCode } = await import('@/utils/script-executor');
+        const validation = validateScriptCode(body.script_code);
+        if (!validation.isValid) {
+          return NextResponse.json({ 
+            error: 'Invalid script code',
+            details: validation.error
+          }, { status: 400 });
+        }
+      } catch (validationError) {
+        return NextResponse.json({ 
+          error: 'Script validation failed',
+          details: 'Could not validate script code'
+        }, { status: 400 });
+      }
     }
 
     const supabase = createClient(cookies());
@@ -69,6 +88,7 @@ export async function PUT(
         name,
         display_name: display_name ?? existingAction.display_name ?? null,
         inputs_json: inputsJson || null,
+        script_code: script_code ?? existingAction.script_code ?? null,
         updated_at: new Date().toISOString()
       })
       .eq('id', actionId)

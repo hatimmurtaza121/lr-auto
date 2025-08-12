@@ -82,8 +82,7 @@ async function run(page, context, params = {}) {
                 console.log('No user exists. Aborting.');
                 return {
                     success: false,
-                    message: 'No account found',
-                    username: target_username
+                    message: 'No account found'
                 };
             }
 
@@ -98,29 +97,27 @@ async function run(page, context, params = {}) {
                   console.log('Account in row does not match. Aborting.');
                   return {
                     success: false,
-                    message: 'No account found',
-                    username: target_username
+                    message: 'No account found'
                   };
                 }
             } catch {
               console.log('No rows found. Aborting.');
               return {
                 success: false,
-                message: 'No account found',
-                username: target_username
+                message: 'No account found'
               };
             }
         } catch (error) {
             console.log('Table loading timeout. Aborting.');
             return {
                 success: false,
-                message: 'Table loading timeout',
-                username: target_username
+                message: 'Table loading timeout'
             };
         }
 
-        await listFrame.getByRole('button', { name: 'editor' }).click();
-        await listFrame.locator('a').filter({ hasText: 'Redeem' }).click();
+        // 4. Open the "editor" dropdown
+        await listFrame.locator('tbody > tr').first().getByRole('button', { name: 'editor' }).click();
+        await listFrame.locator('tbody > tr').first().locator('a').filter({ hasText: 'Redeem' }).click();
 
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByPlaceholder('Input score').fill(amount);
         await page.getByRole('tabpanel', { name: ' Player List' }).locator('iframe').contentFrame().getByRole('textbox', { name: 'Input remark' }).fill(remark);
@@ -138,9 +135,7 @@ async function run(page, context, params = {}) {
             console.log('Redeem successful');
             return {
                 success: true,
-                message: 'Redeem successful',
-                username: target_username,
-                amount: parseFloat(amount)
+                message: 'Redeem successful'
             };
         } catch (successError) {
             try {
@@ -151,9 +146,7 @@ async function run(page, context, params = {}) {
                 console.log('Amount should be greater than 0');
                 return {
                     success: false,
-                    message: 'Amount should be greater than 0',
-                    username: target_username,
-                    amount: parseFloat(amount)
+                    message: 'Amount should be greater than 0'
                 };
             } catch (zeroError) {
                 try {
@@ -164,17 +157,13 @@ async function run(page, context, params = {}) {
                     console.log('Amount is insufficient');
                     return {
                         success: false,
-                        message: 'Amount is insufficient',
-                        username: target_username,
-                        amount: parseFloat(amount)
+                        message: 'Amount is insufficient'
                     };
                 } catch (insufficientError) {
                     console.log('Try again, maybe the amount is insufficient');
                     return {
                         success: false,
-                        message: 'Try again, maybe the amount is insufficient',
-                        username: target_username,
-                        amount: parseFloat(amount)
+                        message: 'Try again, maybe the amount is insufficient'
                     };
                 }
             }
@@ -183,9 +172,7 @@ async function run(page, context, params = {}) {
         console.error('Error during redeem:', error);
         return {
             success: false,
-            message: `Error during redeem: ${error}`,
-            username: target_username,
-            amount: parseFloat(amount)
+            message: `Error during redeem: ${error}`
         };
     } finally {
         stopScreenshotCapture();

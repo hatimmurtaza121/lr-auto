@@ -428,24 +428,42 @@ export async function executeDynamicActionWithSession(
       ensureWebSocketServerInitialized();
       (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
       
-      // Build script path based on game name and action name
-      const gameSlug = gameInfo.name.toLowerCase().replace(/\s+/g, '');
-      const scriptPath = `../../scripts/scripts_${gameSlug}/${actionName}.js`;
-      
-      // console.log(`Loading script from: ${scriptPath}`);
-      
-      // Import and execute the script function with authenticated page
-      const scriptModule = require(scriptPath);
-      
-      // Try to find the run function (preferred) or fallback to actionName function
-      const runFunction = scriptModule.run || scriptModule[actionName] || scriptModule.default;
-      
-      if (!runFunction || typeof runFunction !== 'function') {
-        throw new Error(`Script ${actionName}.js must export a 'run' function or '${actionName}' function`);
+      // Try to fetch script from database first
+      let databaseScript: string | null = null;
+      try {
+        // Use direct Supabase client for worker process
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        
+        const { data: actionDefinition, error } = await supabase
+          .from('actions')
+          .select('script_code')
+          .eq('game_id', gameInfo.game.id)
+          .eq('name', actionName)
+          .single();
+        
+        if (error) {
+          console.log(`Database error fetching script for ${actionName}:`, error);
+        } else if (actionDefinition?.script_code) {
+          databaseScript = actionDefinition.script_code;
+          console.log(`Successfully fetched script from database for ${actionName}`);
+        } else {
+          console.log(`No script found in database for ${actionName}`);
+        }
+      } catch (dbError) {
+        console.log(`Could not fetch script from database for ${actionName}, falling back to hardcoded script:`, dbError);
       }
       
-      // console.log(`Executing ${actionName} with params:`, params);
-      const result = await runFunction(page, context, params);
+      // Use the unified script execution system
+      const { executeActionScript } = await import('@/utils/script-executor');
+      const result = await executeActionScript(
+        page, 
+        context, 
+        actionName, 
+        gameInfo.name.toLowerCase().replace(/\s+/g, ''),
+        params,
+        databaseScript
+      );
       
       return result;
     } catch (error) {
