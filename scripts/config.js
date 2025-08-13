@@ -1,4 +1,7 @@
 // Configuration file for automation scripts
+// Load environment variables from .env.local
+require('dotenv').config({ path: '.env.local' });
+
 module.exports = {
   // Gemini API Key for captcha solving
   // Get your API key from: https://makersuite.google.com/app/apikey
