@@ -16,26 +16,26 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
     const screenshotInterval = setInterval(async () => {
         try {
             screenshotCount++;
-            console.log(`Taking screenshot #${screenshotCount} for ${gameName} - ${action}...`);
+            // console.log(`Taking screenshot #${screenshotCount} for ${gameName} - ${action}...`);
             
             // Take screenshot as buffer
             const screenshotBuffer = await page.screenshot();
-            console.log(`Screenshot #${screenshotCount} taken, size: ${screenshotBuffer.length} bytes`);
+            // console.log(`Screenshot #${screenshotCount} taken, size: ${screenshotBuffer.length} bytes`);
             
             // Convert to base64 for WebSocket transmission
             const base64Image = screenshotBuffer.toString('base64');
             
             // Send via WebSocket (this will be handled by the parent process)
-            console.log(`WebSocket screenshot #${screenshotCount} ready: ${new Date().toISOString()}`);
+            // console.log(`WebSocket screenshot #${screenshotCount} ready: ${new Date().toISOString()}`);
             
             // Emit custom event that parent can listen to
             if (global.screenshotWebSocketServer) {
-                console.log(`Broadcasting screenshot #${screenshotCount} via WebSocket server...`);
-                console.log('WebSocket server connection count:', global.screenshotWebSocketServer.getConnectionCount());
+                // console.log(`Broadcasting screenshot #${screenshotCount} via WebSocket server...`);
+                // console.log('WebSocket server connection count:', global.screenshotWebSocketServer.getConnectionCount());
                 global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
-                console.log(`Screenshot #${screenshotCount} broadcasted successfully`);
+                // console.log(`Screenshot #${screenshotCount} broadcasted successfully`);
             } else {
-                console.log('WebSocket server not available for screenshot broadcasting');
+                // console.log('WebSocket server not available for screenshot broadcasting');
             }
         } catch (error) {
             console.log(`WebSocket screenshot #${screenshotCount} error:`, error);
@@ -279,6 +279,7 @@ async function checkForCaptchaError(page) {
   const captchaKeywords = [
     'verification code is incorrect',
     'validation code you filled in is incorrect',
+    'The verification code is incorrect!',
     'please re_enter',
     'captcha is incorrect',
     'verification code error',
@@ -323,7 +324,7 @@ async function checkForCaptchaError(page) {
             console.log(`Checking error text: "${errorText}"`);
             
             for (const keyword of captchaKeywords) {
-              if (lowerText.includes(keyword)) {
+              if (lowerText.includes(keyword.toLowerCase())) {
                 console.log(`Found captcha error keyword: "${keyword}" in text: "${errorText}"`);
                 return true;
               }

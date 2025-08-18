@@ -7,23 +7,23 @@ export function createWebSocketScreenshotCapture(page: Page, gameName: string, a
     
     const screenshotInterval = setInterval(async () => {
         try {
-            console.log(`Taking screenshot for ${gameName} - ${action}...`);
+            // console.log(`Taking screenshot for ${gameName} - ${action}...`);
             // Take screenshot as buffer
             const screenshotBuffer = await page.screenshot();
-            console.log(`Screenshot taken, size: ${screenshotBuffer.length} bytes`);
+            // console.log(`Screenshot taken, size: ${screenshotBuffer.length} bytes`);
             
             // Convert to base64 for WebSocket transmission
             const base64Image = screenshotBuffer.toString('base64');
             
             // Send via WebSocket (this will be handled by the parent process)
-            console.log(`WebSocket screenshot ready: ${new Date().toISOString()}`);
+            // console.log(`WebSocket screenshot ready: ${new Date().toISOString()}`);
             
             // Emit custom event that parent can listen to
             if ((global as any).screenshotWebSocketServer) {
-                console.log('Broadcasting screenshot via WebSocket...');
+                // console.log('Broadcasting screenshot via WebSocket...');
                 (global as any).screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
             } else {
-                console.log('WebSocket server not available for screenshot broadcast');
+                // console.log('WebSocket server not available for screenshot broadcast');
             }
         } catch (error) {
             console.log('WebSocket screenshot error:', error);

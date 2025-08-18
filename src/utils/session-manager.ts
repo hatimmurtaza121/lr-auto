@@ -629,13 +629,68 @@ export async function executeWithSession<T>(
     
     await page.waitForLoadState('networkidle');
     
-    // Execute the action function
-    const result = await actionFunction(page, context);
+    // Check if we got redirected to login page after navigation
+    const currentUrl = page.url();
+    const expectedUrl = gameInfo.dashboard_url || gameInfo.login_url;
     
-    // Wait a bit so you can see the final state
-    await page.waitForTimeout(3000);
+         console.log(`Expected URL: ${expectedUrl}`);
+     console.log(`Current URL: ${currentUrl}`);
     
-    return result;
+         // Check if we're still on the expected page (not redirected to login)
+     // Strict URL matching - any URL with login/auth indicators means login required
+     const isOnExpectedPage = 
+       // Exact match only
+       currentUrl === expectedUrl ||
+       // Common dashboard indicators (but not if they contain login/auth)
+       (currentUrl.includes('dashboard') && !currentUrl.includes('/login') && !currentUrl.includes('/auth')) || 
+       (currentUrl.includes('home') && !currentUrl.includes('/login') && !currentUrl.includes('/auth')) ||
+       (currentUrl.includes('main') && !currentUrl.includes('/login') && !currentUrl.includes('/auth'));
+    
+    if (!isOnExpectedPage) {
+             console.log('Got redirected to login page! Running only_login.js...');
+      
+      try {
+        // Import and run the login functionality from only_login.js
+        const { handleLoginIfNeeded } = require('../../scripts/only_login.js');
+        
+        // Get team_id from game credential
+        const supabase = getSupabaseClient();
+        const { data: credential } = await supabase
+          .from('game_credential')
+          .select('team_id')
+          .eq('id', gameCredentialId)
+          .single();
+        
+        if (credential?.team_id) {
+          const loginResult = await handleLoginIfNeeded(page, credential.team_id, gameInfo.id);
+          
+          if (loginResult.success) {
+                         console.log('Login successful! Continuing with action...');
+            // Wait a bit for the page to fully load after login
+            await page.waitForTimeout(2000);
+                     } else {
+             console.log('Login failed:', loginResult.message);
+             throw new Error(loginResult.message);
+           }
+        } else {
+          throw new Error('Could not determine team_id for auto-login');
+        }
+        
+             } catch (loginError: any) {
+         console.error('Error during auto-login:', loginError);
+         throw loginError; // Re-throw the original error without wrapping
+       }
+    } else {
+             console.log('Still on expected page - no login required');
+    }
+    
+         // Execute the action function
+     const result = await actionFunction(page, context);
+     
+     // Wait a bit so you can see the final state
+     await page.waitForTimeout(3000);
+     
+     return result;
     
   } catch (error) {
     console.error('Error in executeWithSession:', error);
