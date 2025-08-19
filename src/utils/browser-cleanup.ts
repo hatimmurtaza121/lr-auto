@@ -54,10 +54,8 @@ class BrowserRegistry {
     // Close all contexts
     for (const context of this.contexts) {
       try {
-        if (!context.isClosed()) {
-          await context.close();
-          console.log('BrowserRegistry: Closed context');
-        }
+        await context.close();
+        console.log('BrowserRegistry: Closed context');
       } catch (error) {
         console.error('BrowserRegistry: Error closing context:', error);
       }

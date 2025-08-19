@@ -59,10 +59,12 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
     login_url: '',
     dashboard_url: '',
     game_id: '',
-    inputs_json: { fields: [] }
+    inputs_json: { fields: [] },
+    script_code: ''
   });
 
   const [actionFields, setActionFields] = useState<Array<{ label: string }>>([]);
+  const [showScriptEditor, setShowScriptEditor] = useState(false);
 
   // Update form data when editData changes or when modal opens
   useEffect(() => {
@@ -77,7 +79,8 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
           login_url: '',
           dashboard_url: '',
           game_id: '',
-          inputs_json: { fields: [] }
+          inputs_json: { fields: [] },
+          script_code: ''
         });
       } else if (type === 'game') {
         const game = editData as Game;
@@ -88,7 +91,8 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
           login_url: game.login_url,
           dashboard_url: game.dashboard_url,
           game_id: '',
-          inputs_json: { fields: [] }
+          inputs_json: { fields: [] },
+          script_code: ''
         });
       } else if (type === 'action') {
         const action = editData as Action;
@@ -99,12 +103,14 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
           login_url: '',
           dashboard_url: '',
           game_id: action.game_id.toString(),
-          inputs_json: action.inputs_json || { fields: [] }
+          inputs_json: action.inputs_json || { fields: [] },
+          script_code: action.script_code || ''
         });
         setActionFields((action.inputs_json?.fields || []).map((f: any) => ({ label: f.label })));
+        setShowScriptEditor(false);
       }
     } else {
-      setFormData({ name: '', display_name: '', code: '', login_url: '', dashboard_url: '', game_id: '', inputs_json: { fields: [] } });
+      setFormData({ name: '', display_name: '', code: '', login_url: '', dashboard_url: '', game_id: '', inputs_json: { fields: [] }, script_code: '' });
       setActionFields([]);
     }
   }, [editData, type, isOpen]);
@@ -141,14 +147,16 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
         name: generatedName,
         display_name: formData.display_name || formData.name.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
         game_id: parseInt(formData.game_id),
-        inputs_json: { fields: normalizedFields }
+        inputs_json: { fields: normalizedFields },
+        script_code: formData.script_code
       });
     }
   };
 
   const handleClose = () => {
-    setFormData({ name: '', display_name: '', code: '', login_url: '', dashboard_url: '', game_id: '', inputs_json: { fields: [] } });
+    setFormData({ name: '', display_name: '', code: '', login_url: '', dashboard_url: '', game_id: '', inputs_json: { fields: [] }, script_code: '' });
     setActionFields([]);
+    setShowScriptEditor(false);
     onClose();
   };
 
@@ -170,7 +178,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => { e.stopPropagation(); }}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => { e.stopPropagation(); }}>
         <h2 className="text-xl font-semibold mb-4">
           {editData ? 'Edit' : 'Add New'} {type === 'team' ? 'Team' : type === 'game' ? 'Game' : 'Action'}
         </h2>
@@ -321,6 +329,48 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                     + Add Field
                   </button>
                 </div>
+              </div>
+
+              {/* Script Code Editor */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Script Code
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowScriptEditor(!showScriptEditor)}
+                    className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                  >
+                    {showScriptEditor ? 'Hide Editor' : 'Edit Script'}
+                  </button>
+                </div>
+                
+                {showScriptEditor && (
+                  <div className="space-y-2">
+                    <textarea
+                      value={formData.script_code}
+                      onChange={(e) => setFormData({...formData, script_code: e.target.value})}
+                      placeholder="// Enter your Playwright automation script here...&#10;// await page.goto('https://example.com');&#10;// await page.fill('input[name=&quot;username&quot;]', username);&#10;// await page.click('button[type=&quot;submit&quot;]');"
+                      className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
+                      rows={12}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Write your Playwright automation script here. The script will be executed when this action is triggered.
+                    </p>
+                  </div>
+                )}
+                
+                {!showScriptEditor && formData.script_code && (
+                  <div className="p-3 bg-gray-50 rounded-md border">
+                    <p className="text-sm text-gray-600 mb-2">Script code is set (click "Edit Script" to view/edit)</p>
+                    <div className="text-xs text-gray-500 font-mono bg-white p-2 rounded border overflow-hidden">
+                      {formData.script_code.length > 100 
+                        ? `${formData.script_code.substring(0, 100)}...` 
+                        : formData.script_code}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           ) : null}
@@ -632,7 +682,7 @@ export default function Settings() {
     });
   };
 
-  const handleAddAction = async (data: { name: string; display_name?: string; game_id: number; inputs_json: any }) => {
+  const handleAddAction = async (data: { name: string; display_name?: string; game_id: number; inputs_json: any; script_code?: string }) => {
     try {
       setModalLoading(true);
       const { error } = await supabase
@@ -655,7 +705,7 @@ export default function Settings() {
     }
   };
 
-  const handleUpdateAction = async (data: { name: string; display_name?: string; game_id: number; inputs_json: any }) => {
+  const handleUpdateAction = async (data: { name: string; display_name?: string; game_id: number; inputs_json: any; script_code?: string }) => {
     try {
       setModalLoading(true);
       const action = editData as Action;
