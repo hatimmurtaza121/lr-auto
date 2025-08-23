@@ -17,10 +17,7 @@ export class GlobalWorker {
       concurrency: 1, // Process one job at a time (FIFO)
       removeOnComplete: { count: 10 },
       removeOnFail: { count: 10 },
-      settings: {
-        stalledInterval: 30000, // Check for stalled jobs every 30 seconds
-        maxStalledCount: 1, // Max number of times a job can be stalled
-      }
+      
     });
 
     // Set up event handlers
@@ -147,7 +144,8 @@ export class GlobalWorker {
             action: actionName,
             status: result?.success ? 'success' : 'fail',
             inputs: inputs,
-            executionTimeSecs: executionTimeSecs
+            executionTimeSecs: executionTimeSecs,
+            message: result?.message || null
           });
           
         }
@@ -185,30 +183,31 @@ export class GlobalWorker {
       const finishedOn = job.finishedOn || Date.now();
       const executionTimeSecs = processedOn && finishedOn ? (finishedOn - processedOn) / 1000 : undefined;
       
-      // Save failed action status to database
-      try {
-        const { getGame } = await import('@/utils/game-mapping');
-        const game = await getGame(data.gameName);
-        if (game) {
-          // Use params as-is since they're already in snake_case from the API
-          const inputs = data.params || {};
-          
-          await updateGameStatus({
-            teamId: data.teamId,
-            gameId: game.id,
-            action: data.action, // Already in snake_case from API
-            status: 'fail',
-            inputs: inputs,
-            executionTimeSecs: executionTimeSecs
-          });
-          
-        }
-      } catch (statusError) {
-        console.error(`Job ${job.id}: Failed to save failed action status:`, statusError);
-      }
-      
-      // Determine if this is an expected error or unexpected error
-      const errorMessage = error instanceof Error ? error.message : String(error);
+             // Determine if this is an expected error or unexpected error
+       const errorMessage = error instanceof Error ? error.message : String(error);
+       
+       // Save failed action status to database
+       try {
+         const { getGame } = await import('@/utils/game-mapping');
+         const game = await getGame(data.gameName);
+         if (game) {
+           // Use params as-is since they're already in snake_case from the API
+           const inputs = data.params || {};
+           
+           await updateGameStatus({
+             teamId: data.teamId,
+             gameId: game.id,
+             action: data.action, // Already in snake_case from API
+             status: 'fail',
+             inputs: inputs,
+             executionTimeSecs: executionTimeSecs,
+             message: errorMessage
+           });
+           
+         }
+       } catch (statusError) {
+         console.error(`Job ${job.id}: Failed to save failed action status:`, statusError);
+       }
       const isUnexpectedError = !errorMessage.includes('Session expired') && 
                                !errorMessage.includes('Game credential not found') &&
                                !errorMessage.includes('Target username is required') &&

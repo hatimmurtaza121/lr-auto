@@ -151,6 +151,17 @@ export default function Navbar() {
             Status
           </button>
 
+          {/* Logs Link */}
+          <button
+            onClick={() => router.push('/logs')}
+            className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
+          >
+            <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Logs
+          </button>
+
           {/* Team Dropdown */}
           {selectedTeamName && (
             <div className="relative" ref={teamsDropdownRef}>
@@ -175,7 +186,7 @@ export default function Navbar() {
               {teamsDropdownOpen && (
                 <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-2 animate-in fade-in z-50 max-h-60 overflow-y-auto scrollbar-hide [&::-webkit-scrollbar]:hidden">
                   {isLoadingTeams ? (
-                    <div className="px-4 py-3 text-gray-500 text-center">
+                    <div className="px-3 py-2 text-sm text-gray-500 text-center">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mx-auto"></div>
                       <span className="ml-2">Loading teams...</span>
                     </div>
@@ -184,7 +195,7 @@ export default function Navbar() {
                       <button
                         key={team.id}
                         onClick={() => handleTeamSelect(team)}
-                        className={`w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                        className={`w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between ${
                           team.id === getSelectedTeamId() ? 'bg-blue-50 text-blue-700 font-medium' : ''
                         }`}
                       >
@@ -197,7 +208,7 @@ export default function Navbar() {
                       </button>
                     ))
                   ) : (
-                    <div className="px-4 py-3 text-gray-500 text-center">No teams found</div>
+                    <div className="px-3 py-2 text-sm text-gray-500 text-center">No teams found</div>
                   )}
                 </div>
               )}
@@ -294,6 +305,17 @@ export default function Navbar() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Status
+              </button>
+
+              {/* Logs */}
+              <button
+                onClick={() => handleNavigation('/logs')}
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Logs
               </button>
 
               {/* Team - Mobile version with dropdown */}

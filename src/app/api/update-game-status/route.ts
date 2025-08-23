@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { teamId, gameId, action, status, inputs, execution_time_secs } = body;
+    const { teamId, gameId, action, status, inputs, execution_time_secs, message } = body;
 
     // console.log(`Processing request: Team ${teamId}, Game ${gameId}, Action ${action}, Status ${status}`);
 
@@ -65,6 +65,10 @@ export async function POST(request: NextRequest) {
     
     if (execution_time_secs !== undefined) {
       insertData.execution_time_secs = execution_time_secs;
+    }
+
+    if (message !== undefined) {
+      insertData.message = message;
     }
 
     // Insert new status record

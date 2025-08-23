@@ -65,6 +65,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
 
   const [actionFields, setActionFields] = useState<Array<{ label: string }>>([]);
   const [showScriptEditor, setShowScriptEditor] = useState(false);
+  const [gameDropdownOpen, setGameDropdownOpen] = useState(false);
 
   // Update form data when editData changes or when modal opens
   useEffect(() => {
@@ -112,6 +113,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
     } else {
       setFormData({ name: '', display_name: '', code: '', login_url: '', dashboard_url: '', game_id: '', inputs_json: { fields: [] }, script_code: '' });
       setActionFields([]);
+      setGameDropdownOpen(false);
     }
   }, [editData, type, isOpen]);
 
@@ -125,6 +127,19 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.game-dropdown-container')) {
+        setGameDropdownOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -255,19 +270,48 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Game *
                 </label>
-                <select
-                  value={formData.game_id}
-                  onChange={(e) => setFormData({...formData, game_id: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                  required
-                >
-                  <option value="">Select a game</option>
-                  {games?.map((game) => (
-                    <option key={game.id} value={game.id}>
-                      {game.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative game-dropdown-container">
+                  <button
+                    type="button"
+                    onClick={() => setGameDropdownOpen(!gameDropdownOpen)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="text-gray-700">
+                      {formData.game_id ? games?.find(g => g.id.toString() === formData.game_id)?.name || 'Select a game' : 'Select a game'}
+                    </span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${gameDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {gameDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-xl py-2 animate-in fade-in z-50 max-h-60 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({...formData, game_id: ''});
+                          setGameDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Select a game
+                      </button>
+                      {games?.map((game) => (
+                        <button
+                          key={game.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData({...formData, game_id: game.id.toString()});
+                            setGameDropdownOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          {game.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

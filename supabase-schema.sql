@@ -63,6 +63,7 @@ CREATE TABLE game_action_status (
   status              TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('success', 'fail', 'unknown')),
   inputs              JSONB,
   execution_time_secs NUMERIC(10,2),
+  message             TEXT,
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -71,10 +72,10 @@ CREATE TABLE actions (
   id            SERIAL       PRIMARY KEY,
   game_id       INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
   name          TEXT         NOT NULL,                    -- "new_account", "ban_user"
-  display_name  TEXT
+  display_name  TEXT,
   inputs_json   JSONB,                                    -- Field definitions (can be null)
   script_code   TEXT,                                     -- JavaScript code for the action
-  updated_at    TIMESTAMPTZ  DEFAULT now(),
+  updated_at    TIMESTAMPTZ  DEFAULT now()
 );
 
 CREATE INDEX ON session(user_id);
@@ -94,9 +95,7 @@ CREATE TABLE captcha_log (
   solved_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
-
-
-
+DROP FUNCTION IF EXISTS get_latest_game_action_status(integer);
 -- Function to get latest game action status for each team_id, game_id, action combination
 CREATE OR REPLACE FUNCTION get_latest_game_action_status(team_id_param INTEGER)
 RETURNS TABLE (
@@ -105,6 +104,7 @@ RETURNS TABLE (
   game_id INTEGER,
   action TEXT,
   status TEXT,
+  message TEXT,
   inputs JSONB,
   execution_time_secs NUMERIC(10,2),
   updated_at TIMESTAMPTZ,
@@ -120,6 +120,7 @@ BEGIN
       gas.game_id,
       gas.action,
       gas.status,
+      gas.message,
       gas.inputs,
       gas.execution_time_secs,
       gas.updated_at,
@@ -136,6 +137,7 @@ BEGIN
     lr.game_id,
     lr.action,
     lr.status,
+    lr.message,
     lr.inputs,
     lr.execution_time_secs,
     lr.updated_at,
