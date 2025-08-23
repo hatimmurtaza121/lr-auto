@@ -271,7 +271,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Display Name *
+                  Name *
                 </label>
                 <input
                   type="text"
@@ -300,7 +300,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                       <div className="flex-1 mr-2">
                         <input
                           type="text"
-                          placeholder="Label (e.g., Target Username)"
+                          placeholder="e.g. Account Name"
                           value={field.label}
                           onChange={(e) => updateActionField(index, e.target.value)}
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
@@ -351,13 +351,10 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                     <textarea
                       value={formData.script_code}
                       onChange={(e) => setFormData({...formData, script_code: e.target.value})}
-                      placeholder="// Enter your Playwright automation script here...&#10;// await page.goto('https://example.com');&#10;// await page.fill('input[name=&quot;username&quot;]', username);&#10;// await page.click('button[type=&quot;submit&quot;]');"
+                      placeholder="// Enter your Playwright automation script here..."
                       className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
                       rows={12}
                     />
-                    <p className="text-xs text-gray-500">
-                      Write your Playwright automation script here. The script will be executed when this action is triggered.
-                    </p>
                   </div>
                 )}
                 
@@ -522,7 +519,8 @@ export default function Settings() {
           *,
           game:game_id (id, name)
         `)
-        .order('updated_at', { ascending: false });
+        .order('game_id')
+        .order('name');
 
       if (actionsError) {
         console.error('Error fetching actions:', actionsError);

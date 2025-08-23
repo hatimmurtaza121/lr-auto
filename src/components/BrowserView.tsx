@@ -204,7 +204,7 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
   return (
     <div className="h-full bg-gray-100 rounded-2xl p-4 flex flex-col">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Live Browser View</h3>
+        <h3 className="text-lg font-semibold text-gray-800">Live View</h3>
         <div className="flex items-center space-x-2">
           {isExecuting && (
             <>
@@ -216,23 +216,23 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
             connectionStatus === 'connected' ? 'bg-green-500' : 
             connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
           }`}></div>
-          <span className="text-xs text-gray-500">
+          {/* <span className="text-xs text-gray-500">
             {connectionStatus === 'connected' ? 'WS Connected' : 
              connectionStatus === 'connecting' ? 'WS Connecting' : 'WS Disconnected'}
-          </span>
-          {connectionStatus === 'disconnected' && reconnectAttempts > 0 && (
+          </span> */}
+          {/* {connectionStatus === 'disconnected' && reconnectAttempts > 0 && (
             <span className="text-xs text-orange-500">
               (Reconnecting: {reconnectAttempts}/10)
             </span>
-          )}
-          {connectionStatus === 'disconnected' && reconnectAttempts >= 10 && (
+          )} */}
+          {/* {connectionStatus === 'disconnected' && reconnectAttempts >= 0 && (
             <button
               onClick={handleManualReconnect}
               className="text-xs text-blue-500 hover:text-blue-700 underline"
             >
               Reconnect
             </button>
-          )}
+          )} */}
         </div>
       </div>
       
@@ -240,7 +240,7 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
         {imageSrc ? (
           <img 
             src={imageSrc} 
-            alt="Live browser view" 
+            alt="Live view" 
             className="max-w-full max-h-full object-contain"
             onLoad={(e) => {
               // Image loaded successfully
@@ -253,24 +253,20 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
         ) : (
           <div className="text-center text-gray-500">
             <div className="text-6xl mb-4">🖥️</div>
-            <p className="text-lg font-medium">Browser View</p>
-            <p className="text-sm">
-              {isExecuting && connectionStatus === 'connected' ? 'Ready for screenshots!' :
-               connectionStatus === 'connected' ? 'Waiting for screenshots...' : 
-               connectionStatus === 'connecting' ? 'Connecting to WebSocket...' : 
+            <p className="text-lg font-medium">Live View</p>
+            {/* <p className="text-sm">
+              {isExecuting && connectionStatus === 'connected' ? 'Ready!' :
+               connectionStatus === 'connected' ? 'Waiting...' : 
+               connectionStatus === 'connecting' ? 'Connecting...' : 
                reconnectAttempts >= 10 ? 'Connection failed. Click Reconnect.' : 
-               'Connecting to WebSocket...'}
-            </p>
-            {isExecuting && connectionStatus === 'connected' && (
-              <p className="text-xs text-green-500 mt-2">
-                Screenshots will appear here during login process
-              </p>
-            )}
-            {connectionStatus !== 'connected' && reconnectAttempts < 10 && (
+               'Connecting...'}
+            </p> */}
+
+            {/* {connectionStatus !== 'connected' && reconnectAttempts < 10 && (
               <p className="text-xs text-orange-500 mt-2">
                 Attempting to reconnect... ({reconnectAttempts}/10)
               </p>
-            )}
+            )} */}
           </div>
         )}
       </div>

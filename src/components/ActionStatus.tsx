@@ -378,7 +378,7 @@ export default function ActionStatus({ isExpanded, onToggle }: ActionStatusProps
         onClick={onToggle}
       >
         <div className="flex items-center space-x-3">
-          <h3 className="text-lg font-semibold text-gray-800">Action Status</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Action Logs</h3>
           <span className="text-sm text-gray-500">({jobs.length} jobs)</span>
           {activeJobIds.size > 0 && (
             <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">

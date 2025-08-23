@@ -197,12 +197,13 @@ export default function StatusPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">System Status</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Status</h1>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>Last updated:</span>
               <span className="font-mono">{lastUpdated.toLocaleTimeString()}</span>
             </div>
           </div>
+          <p className="text-gray-600 text-lg">Overview of action logs</p>
         </div>
 
         {error && (
@@ -235,9 +236,8 @@ export default function StatusPage() {
                 
                 {/* Function Status Grid */}
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Actions status</h4>
                   <div className="grid grid-cols-2 gap-2">
-                                         {Object.entries(actions).map(([actionName, actionData]) => {
+                    {Object.entries(actions).map(([actionName, actionData]) => {
                        console.log('Action display:', { actionName, status: actionData.status, statusType: typeof actionData.status });
                        const actionConfig = statusConfig[actionData.status as keyof typeof statusConfig] || statusConfig.unknown;
                        console.log('Action config found:', !!actionConfig, 'Using fallback:', !statusConfig[actionData.status as keyof typeof statusConfig]);

@@ -298,7 +298,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
       <div className="flex flex-col md:flex-row gap-6">
         {/* Form Inputs */}
         <div className="flex-1 space-y-4">
-          <h3 className="text-lg font-semibold text-content-primary">Configuration</h3>
+          <h3 className="text-lg font-semibold text-content-primary">Inputs</h3>
           
           {currentInputFields.map(({ key, label, placeholder, required }) => (
             <div key={key}>
