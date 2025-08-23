@@ -243,6 +243,8 @@ async function resetAccountPassword(page, browser) {
     console.log(`New password: ${newPassword}`);
     
     // From here
+    await page.reload();
+    await page.waitForLoadState('networkidle');
 
     // Navigate through the menu
     await page.getByText('Game User').click();
@@ -267,8 +269,11 @@ async function resetAccountPassword(page, browser) {
     }
 
     if (!accountExists) {
-      console.log('No matching account. Aborting.');
-      return;
+      // console.log('No matching account. Aborting.');
+      return {
+          success: false,
+          message: 'No account found'
+      };
     }
 
     // 1. Click the Reset password button in the same frame that holds your table
@@ -293,9 +298,17 @@ async function resetAccountPassword(page, browser) {
     try {
       const submitBtn = popupFrame.getByRole('button', { name: 'Submit' });
       await submitBtn.waitFor({ state: 'detached', timeout: 5000 });
-      console.log('Reset successful');
+      // console.log('Reset successful');
+      return {
+          success: true,
+          message: 'Password reset successful'
+      };
     } catch {
-      console.error('Error: The password must contain uppercase and lowercase letters and special symbols, and must be between 6 and 12 characters long');
+      // console.error('Error: The password must contain uppercase and lowercase letters and special symbols, and must be between 6 and 12 characters long');
+      return {
+          success: false,
+          message: 'Error resetting password: Password requirements not met'
+      };
     }
 
   } catch (error) {

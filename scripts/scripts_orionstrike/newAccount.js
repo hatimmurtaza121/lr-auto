@@ -243,17 +243,19 @@ async function createNewAccount(page, browser) {
     const newAccountName = 'testing06';
     const newPassword    = 'Hatim121';
   
-    console.log('Starting account creation process...');
-    
+    // From here
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
     await page.locator('#frm_left_frm').contentFrame().locator('a').filter({ hasText: 'Admin Structure' }).click();
 
     // Fill search field and click Search
     await page.locator('iframe[name="frm_main_content"]').contentFrame().getByRole('textbox', { name: 'Account' }).fill(newAccountName);
     await page.locator('iframe[name="frm_main_content"]').contentFrame().getByRole('button', { name: 'Search' }).click();
-    
+
     // Access the main content iframe
     const mainFrame = await page.frame({ name: 'frm_main_content' });
-    
+
     // Wait for the first result row to appear
     const firstRow = mainFrame.locator('tbody > tr.list').first();
     try {
@@ -263,17 +265,20 @@ async function createNewAccount(page, browser) {
         const accountCell = firstRow.locator('td').nth(1);
         const cellText = (await accountCell.textContent()).trim();
         if (cellText == newAccountName) {
-            console.log(`Account found, user already created. Aborting.`);
-            return;
+            // console.log(`Account found, user already created. Aborting.`);
+            return {
+                success: false,
+                message: 'Account has already been created'
+            };
         }
     } catch (e) {
-        console.log(`No results found. Continuing with account creation...`);
+        // console.log(`No results found. Continuing with account creation...`);
     }
 
     await page.locator('iframe[name="frm_main_content"]').contentFrame().getByText('Create Account').click();
     await page.locator('#Container iframe').contentFrame().locator('#txtAccount').fill(newAccountName);
     await page.locator('#Container iframe').contentFrame().locator('#txtLogonPass').fill(newPassword);
-    await page.locator('#Container iframe').contentFrame().locator('#txtLogonPass2').fill(newPassword);
+    await page.locator('#txtLogonPass2').fill(newPassword);
     await page.locator('#Container iframe').contentFrame().getByRole('button', { name: 'Create' }).click();
 
     // Wait for the pop‑up div on the main page
@@ -282,15 +287,18 @@ async function createNewAccount(page, browser) {
 
     // branch on what it says
     if (popupText === 'Successfully Created Account') {
-      console.log(`Successfully created user "${newAccountName}".`);
+        // console.log(`Successfully created user "${newAccountName}".`);
+        return {
+            success: true,
+            message: 'Account created successfully'
+        };
     } else {
-      console.log(`Popup says: "${popupText}"`);
+        // console.log(`Popup says: "${popupText}"`);
+        return {
+            success: false,
+            message: `Error creating account: ${popupText}`
+        };
     }
-  
-    // keep the browser open for manual inspection
-    console.log('Browser will stay open for manual interaction.');
-    console.log('Press Ctrl+C in the terminal to close the browser.');
-    await new Promise(() => {}); // never resolves
 }
 
 // Run the main function

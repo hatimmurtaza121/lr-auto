@@ -245,6 +245,9 @@ async function redeem(page, browser) {
       console.log(`Redeem amount: ${redeemAmount}`);
 
       // From here
+      await page.reload();
+      await page.waitForLoadState('networkidle');
+
       // Navigate through the menu
       await page.getByText('Game User').click();
       await page.getByText('User Management').click();
@@ -268,8 +271,11 @@ async function redeem(page, browser) {
       }
 
       if (!accountExists) {
-        console.log('No matching account. Aborting.');
-        return;
+        // console.log('No matching account. Aborting.');
+        return {
+            success: false,
+            message: 'No account found'
+        };
       }
 
       // Manually showing errors
@@ -282,11 +288,17 @@ async function redeem(page, browser) {
       const redeemAmountNum = parseFloat(redeemAmount);
 
       if (redeemAmountNum > currentBalance) {
-        console.error('Error: Withdrawal amount is greater than customer balance. Please check and withdraw again');
-        return;
+        // console.error('Error: Withdrawal amount is greater than customer balance. Please check and withdraw again');
+        return {
+            success: false,
+            message: 'Withdrawal amount is greater than customer balance. Please check and withdraw again'
+        };
       } else if (redeemAmount == "0"){
-        console.error('Error: Amount must be greater than 0');
-        return;
+        // console.error('Error: Amount must be greater than 0');
+        return {
+            success: false,
+            message: 'Amount should be greater than 0'
+        };
       }
 
       // 1. Click button in the same frame that holds your table
@@ -301,9 +313,17 @@ async function redeem(page, browser) {
       
       try {
         await page.frameLocator('iframe:nth-of-type(2)').frameLocator('iframe[name="layui-layer-iframe2"]').getByRole('button', { name: 'Submit' }).waitFor({ state: 'detached', timeout: 5000 });
-        console.log('Redeem successful');
+        // console.log('Redeem successful');
+        return {
+            success: true,
+            message: 'Redeem successful'
+        };
       } catch {
-        console.error('Error: Remarks can only be letters and numbers, and cannot exceed 50 characters');
+        // console.error('Error: Remarks can only be letters and numbers, and cannot exceed 50 characters');
+        return {
+            success: false,
+            message: 'Remarks can only be letters and numbers, and cannot exceed 50 characters'
+        };
       }
 
   } catch (error) {

@@ -72,7 +72,7 @@ async function run(page, context, params = {}) {
           const successDialog = playerFrame.getByRole('dialog', { name: 'Successfully! You can Copy' });
           await successDialog.waitFor({ state: 'visible', timeout: 3000 });
           await successDialog.click();
-          console.log('Account created successfully');
+          // console.log('Account created successfully');
           return {
             success: true,
             message: 'Account created successfully'
@@ -83,22 +83,22 @@ async function run(page, context, params = {}) {
             const alreadyExistsError = playerFrame.getByText('The Accounts has already been');
             await alreadyExistsError.waitFor({ state: 'visible', timeout: 3000 });
             await alreadyExistsError.click();
-            console.log('Account has already been created');
+            // console.log('Account has already been created');
             return {
               success: false,
               message: 'Account has already been created'
             };
           } catch (errorError) {
             // If neither success nor specific error found, return generic error
-            console.log('Try again');
+            // console.log('Error creating account');
             return {
               success: false,
-              message: 'Try again'
+              message: 'Error creating account: Unable to determine outcome'
             };
           }
         }
     } catch (error) {
-        console.error('Error during account creation:', error);
+        // console.error('Error during account creation:', error);
         return {
           success: false,
           message: `Error creating account: ${error.message || error}`

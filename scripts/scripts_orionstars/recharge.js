@@ -244,6 +244,10 @@ async function recharge(page, browser) {
         console.log(`Account to recharge: ${accountName}`);
         console.log(`Recharge amount: ${rechargeAmount}`);
 
+        // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // Navigate to User Management
         await page.locator('#frm_left_frm').contentFrame().locator('a').filter({ hasText: 'User Management' }).click();
         
@@ -259,16 +263,22 @@ async function recharge(page, browser) {
         try {
             await firstRow.waitFor({ timeout: 5000 });
         } catch (e) {
-            console.log(`No results found. Aborting password reset.`);
-            return;
+            // console.log(`No results found. Aborting password reset.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         
         // Extract and verify the Account cell (3rd column) in the first row
         const accountCell = firstRow.locator('td').nth(2);
         const cellText = (await accountCell.textContent()).trim();
         if (cellText !== accountName) {
-            console.log(`Account mismatch: found "${cellText}" instead of "${accountName}". Aborting.`);
-            return;
+            // console.log(`Account mismatch: found "${cellText}" instead of "${accountName}". Aborting.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         
         // Rest work from update
@@ -286,14 +296,30 @@ async function recharge(page, browser) {
             const trimmed = msgText.trim();
 
             if (trimmed === 'Confirmed successful') {
-                console.log('Recharge successful.');
+                // console.log('Recharge successful.');
+                return {
+                    success: true,
+                    message: 'Recharge successful'
+                };
             } else if (trimmed === 'Sorry, the surplus money is insufficient!') {
-                console.log('Recharge failed: insufficient surplus money.');
+                // console.log('Recharge failed: insufficient surplus money.');
+                return {
+                    success: false,
+                    message: 'Amount is insufficient'
+                };
             } else {
-                console.log(`Unexpected message: ${trimmed}`);
+                // console.log(`Unexpected message: ${trimmed}`);
+                return {
+                    success: false,
+                    message: `Error during recharge: ${trimmed}`
+                };
             }
         } catch (e) {
-            console.log('Message element not found. Recharge outcome unknown.');
+            // console.log('Message element not found. Recharge outcome unknown.');
+            return {
+                success: false,
+                message: 'Error during recharge: No confirmation message found'
+            };
         }
 
     } catch (error) {

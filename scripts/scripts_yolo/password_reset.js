@@ -67,7 +67,7 @@ async function run(page, context, params = {}) {
 
         // 3.5. Wait for table to load and stabilize
         await page.waitForTimeout(1000);
-        console.log('Waiting for search results to load...');
+        // console.log('Waiting for search results to load...');
         
         // Wait for either data to appear OR "No data" message to appear
         try {
@@ -83,7 +83,7 @@ async function run(page, context, params = {}) {
                 .filter({ hasText: 'No data.' });
 
             if (await noData.count() > 0) {
-                console.log('No user exists. Aborting.');
+                // console.log('No user exists. Aborting.');
                 return {
                     success: false,
                     message: 'No account found'
@@ -96,26 +96,26 @@ async function run(page, context, params = {}) {
                 await firstRow.waitFor({ timeout: 5000 });             // wait for at least one data row
                 const accountCell = firstRow.locator('td').nth(2);     // 3rd <td> holds the account
                 const foundName = (await accountCell.textContent()).trim();
-                console.log(foundName, '---', target_username);
+                // console.log(foundName, '---', target_username);
                 if (foundName !== target_username) {
-                  console.log('Account in row does not match. Aborting.');
+                  // console.log('Account in row does not match. Aborting.');
                   return {
                     success: false,
                     message: 'No account found'
                   };
                 }
             } catch {
-              console.log('No rows found. Aborting.');
+              // console.log('No rows found. Aborting.');
               return {
                 success: false,
                 message: 'No account found'
               };
             }
         } catch (error) {
-            console.log('Table loading timeout. Aborting.');
+            // console.log('Table loading timeout. Aborting.');
             return {
                 success: false,
-                message: 'Table loading timeout'
+                message: 'Error resetting password: Table loading timeout'
             };
         }
 
@@ -137,7 +137,7 @@ async function run(page, context, params = {}) {
                 .nth(1);
             await successElement.waitFor({ state: 'visible', timeout: 3000 });
             await successElement.click();
-            console.log('Password reset successful');
+            // console.log('Password reset successful');
             return {
                 success: true,
                 message: 'Password reset successful'
@@ -151,17 +151,17 @@ async function run(page, context, params = {}) {
                     .nth(1);
                 await failedElement.waitFor({ state: 'visible', timeout: 3000 });
                 await failedElement.click();
-                console.log('Old password cannot be the new password');
+                // console.log('Old password cannot be the new password');
                 return {
                     success: false,
                     message: 'Old password cannot be the new password'
                 };
             } catch (errorError) {
                 // If neither success nor specific error found, return generic error
-                console.log('Try again');
+                // console.log('Error resetting password');
                 return {
                     success: false,
-                    message: 'Try again'
+                    message: 'Error resetting password: Unable to determine outcome'
                 };
             }
         }

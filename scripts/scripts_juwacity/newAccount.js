@@ -245,6 +245,10 @@ async function createNewAccount(page, browser) {
 
   console.log('Starting account creation process...');
 
+  // From here
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+
   // Navigate to User Management
   await page.getByText('Game User').click();
   await page.getByRole('menuitem', { name: 'User Management' }).click();
@@ -261,7 +265,7 @@ async function createNewAccount(page, browser) {
   const hasNoData = await noDataElement.isVisible();
   
   if (hasNoData) {
-    console.log(`No existing user found for "${newAccountName}". Proceeding with account creation...`);
+    // console.log(`No existing user found for "${newAccountName}". Proceeding with account creation...`);
   } else {
     // Check if there are actual table rows with data
     const tableRows = await page.locator('tr.el-table__row').count();
@@ -272,8 +276,11 @@ async function createNewAccount(page, browser) {
       const existingUsername = (await usernameCell.textContent())?.trim();
 
       if (existingUsername === newAccountName) {
-        console.log(`User "${newAccountName}" already exists.`);
-        return;
+        // console.log(`User "${newAccountName}" already exists.`);
+        return {
+            success: false,
+            message: 'Account has already been created'
+        };
       }
     }
   }
@@ -299,11 +306,14 @@ async function createNewAccount(page, browser) {
     
     if (isErrorVisible) {
       const errorText = await errorMessage.textContent();
-      console.log(`Error occurred: ${errorText}`);
+      // console.log(`Error occurred: ${errorText}`);
       
       if (errorText.includes('login name have used')) {
-        console.log(`User "${newAccountName}" already exists in the system.`);
-        return;
+        // console.log(`User "${newAccountName}" already exists in the system.`);
+        return {
+            success: false,
+            message: 'Account has already been created'
+        };
       }
     } else {
       // Check for success message
@@ -312,13 +322,25 @@ async function createNewAccount(page, browser) {
       
       if (isSuccessVisible) {
         const successText = await successMessage.textContent();
-        console.log(`Success: ${successText}`);
+        // console.log(`Success: ${successText}`);
+        return {
+            success: true,
+            message: 'Account created successfully'
+        };
       } else {
-        console.log('Account created successfully (no specific success message found).');
+        // console.log('Account created successfully (no specific success message found).');
+        return {
+            success: true,
+            message: 'Account created successfully'
+        };
       }
     }
   } catch (error) {
-    console.log('Account created successfully (no messages found).');
+    // console.log('Account created successfully (no messages found).');
+    return {
+        success: true,
+        message: 'Account created successfully'
+    };
   }
   
   console.log('Browser will stay open for manual interaction.');

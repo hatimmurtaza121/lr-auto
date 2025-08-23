@@ -242,6 +242,10 @@ async function resetAccountPassword(page, browser) {
         console.log(`Account to reset: ${accountName}`);
         console.log(`New password: ${newPassword}`);
         
+        // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // Navigate to User Management
         await page.locator('#frm_left_frm').contentFrame().locator('a').filter({ hasText: 'User Management' }).click();
         
@@ -257,16 +261,22 @@ async function resetAccountPassword(page, browser) {
         try {
             await firstRow.waitFor({ timeout: 5000 });
         } catch (e) {
-            console.log(`No results found. Aborting password reset.`);
-            return;
+            // console.log(`No results found. Aborting password reset.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         
         // Extract and verify the Account cell (3rd column) in the first row
         const accountCell = firstRow.locator('td').nth(2);
         const cellText = (await accountCell.textContent()).trim();
         if (cellText !== accountName) {
-            console.log(`Account mismatch: found "${cellText}" instead of "${accountName}". Aborting.`);
-            return;
+            // console.log(`Account mismatch: found "${cellText}" instead of "${accountName}". Aborting.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         
         // Rest work from update
@@ -281,12 +291,24 @@ async function resetAccountPassword(page, browser) {
         try {
             const successMsg = await page.locator('#mb_msg font').textContent();
             if (successMsg.trim() === 'Modified success!') {
-                console.log('Password reset successful.');
+                // console.log('Password reset successful.');
+                return {
+                    success: true,
+                    message: 'Password reset successful'
+                };
             } else {
-                console.log(`Unexpected success message: ${successMsg}`);
+                // console.log(`Unexpected success message: ${successMsg}`);
+                return {
+                    success: true,
+                    message: 'Password reset successful'
+                };
             }
         } catch (e) {
-            console.log('Success message not found. Password reset may have failed.');
+            // console.log('Success message not found. Password reset may have failed.');
+            return {
+                success: false,
+                message: 'Error resetting password: No confirmation message found'
+            };
         }
         
     } catch (error) {

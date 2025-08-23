@@ -244,16 +244,20 @@ async function redeem(page, browser) {
         console.log(`Account to redeem: ${accountName}`);
         console.log(`Redeem amount: ${redeemAmount}`);
 
+        // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // Wait for the Important Announcement to appear and click OK
         try {
             await page.waitForSelector('span:has-text("OK")', { timeout: 30000 });
-            console.log('Important Announcement detected!');
+            // console.log('Important Announcement detected!');
 
             await page.click('span:has-text("OK")');
-            console.log('OK button clicked in Important Announcement');
+            // console.log('OK button clicked in Important Announcement');
 
         } catch (error) {
-            console.log('Important Announcement not found or already dismissed');
+            // console.log('Important Announcement not found or already dismissed');
         }
 
         // Click on the User List menu item its the 3 in list
@@ -267,7 +271,7 @@ async function redeem(page, browser) {
         
         // Type the account name to search for
         await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[2]/form/div/div/div[2]/input', accountName);
-        console.log(`Searching for account: ${accountName}`);
+        // console.log(`Searching for account: ${accountName}`);
         
         // Click the search button
         await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[2]/form/div[2]/div/button');
@@ -288,7 +292,7 @@ async function redeem(page, browser) {
         }
         
         if (accountFound) {
-            console.log(`Account "${accountName}" found! Proceeding with password reset...`);
+            // console.log(`Account "${accountName}" found! Proceeding with password reset...`);
             
             // Click on editor option
             await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[4]/div[3]/table/tbody/tr/td/div/button/span');
@@ -304,15 +308,15 @@ async function redeem(page, browser) {
             
             // Fill in redeem amount
             await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[2]/div/div[2]/form/div[4]/div/div/input', redeemAmount);
-            console.log(`Redeem amount filled: ${redeemAmount}`);
+            // console.log(`Redeem amount filled: ${redeemAmount}`);
 
             // Fill in remarks
             await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[2]/div/div[2]/form/div[5]/div/div/textarea', remarks);
-            console.log(`Remarks filled: ${remarks}`);
+            // console.log(`Remarks filled: ${remarks}`);
             
             // Click confirm button
             await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[2]/div/div[3]/button[2]');
-            console.log('Confirm button clicked');
+            // console.log('Confirm button clicked');
             
             // Wait for response
             await page.waitForTimeout(2000);
@@ -321,32 +325,53 @@ async function redeem(page, browser) {
             // Check for "redeem amount can not be greater than the balance" error
             const balanceError = await page.locator('text=redeem amount can not be greater than the balance').first();
             if (await balanceError.count() > 0) {
-            console.log('Error: The redeem amount can not be greater than the balance!');
-            return;
+            // console.log('Error: The redeem amount can not be greater than the balance!');
+            return {
+                success: false,
+                message: 'Amount is insufficient'
+            };
             }
             
             // Check for "Players can only deposit again after selecting whether or not to participate in the Midnight Bonus program for the previous deposit" error
             const midnightBonusError = await page.locator('text=Players can only deposit again after selecting whether or not to participate in the Midnight Bonus program for the previous deposit').first();
             if (await midnightBonusError.count() > 0) {
-            console.log('Error: Players can only deposit again after selecting whether or not to participate in the Midnight Bonus program for the previous deposit!');
-            return;
+            // console.log('Error: Players can only deposit again after selecting whether or not to participate in the Midnight Bonus program for the previous deposit!');
+            return {
+                success: false,
+                message: 'Players can only deposit again after selecting whether or not to participate in the Midnight Bonus program for the previous deposit'
+            };
             }
             
             // Check for "withdrawal amount should be greater than 0" error
             const zeroAmountError = await page.locator('text=withdrawal amount should be greater than 0').first();
             if (await zeroAmountError.count() > 0) {
-            console.log('Error: The withdrawal amount should be greater than 0!');
-            return;
+            // console.log('Error: The withdrawal amount should be greater than 0!');
+            return {
+                success: false,
+                message: 'Amount should be greater than 0'
+            };
             }
             
             // If no errors found, assume success
-            console.log(`Redeem process completed successfully for account: ${accountName}`);
+            // console.log(`Redeem process completed successfully for account: ${accountName}`);
+            return {
+                success: true,
+                message: 'Redeem successful'
+            };
             
         } else {
-            console.log(`404 Error | Account "${accountName}" not found. Cannot redeem.`);
+            // console.log(`404 Error | Account "${accountName}" not found. Cannot redeem.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         } catch (error) {
-        console.log('Error checking for existing account or redeeming amount:', error);
+            // console.log('Error checking for existing account or redeeming amount:', error);
+            return {
+                success: false,
+                message: `Error during recharge: ${error}`
+            };
         }
 
     } catch (error) {

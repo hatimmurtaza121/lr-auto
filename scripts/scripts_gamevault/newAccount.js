@@ -239,7 +239,11 @@ async function createNewAccount(page, browser) {
     // & user is on home page
     try {
         const newAccountName = "testsaad";
-        const newPassword = "testsaad121"; 
+        const newPassword = "testsaad121";
+
+        // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
         
         // Wait for the Important Announcement to appear and click OK
         try {
@@ -256,7 +260,7 @@ async function createNewAccount(page, browser) {
         // Click on the User List menu item its the 3 in list
         const sidebarItems = await page.$$('li.el-menu-item');
         await sidebarItems[3].click();
-        console.log('User List menu item clicked');
+        // console.log('User List menu item clicked');
         // Wait for page to load
         await page.waitForTimeout(2000);
         
@@ -289,9 +293,13 @@ async function createNewAccount(page, browser) {
         }
         
         if (accountFound) {
-            console.log(`Account "${newAccountName}" already exists! Skipping account creation.`);
+            // console.log(`Account "${newAccountName}" already exists! Skipping account creation.`);
+            return {
+                success: false,
+                message: 'Account has already been created'
+            };
         } else {
-            console.log(`Account "${newAccountName}" not found. Proceeding with account creation...`);
+            // console.log(`Account "${newAccountName}" not found. Proceeding with account creation...`);
         }
         } catch (error) {
         console.log('Error checking for existing account, proceeding with creation...');
@@ -341,13 +349,25 @@ async function createNewAccount(page, browser) {
                 const errorText = await errorMessage.textContent();
             
                 if (errorText?.toLowerCase().includes('login name have used')) {
-                console.log('Error: Account name is already in use.');
+                  // console.log('Error: Account name is already in use.');
+                  return {
+                    success: false,
+                    message: 'Account has already been created'
+                  };
                 } else {
-                console.log('Other alert message:', errorText?.trim());
+                  // console.log('Other alert message:', errorText?.trim());
+                  return {
+                    success: false,
+                    message: `Error creating account: ${errorText?.trim()}`
+                  };
                 }
             } catch (error) {
                 // If no alert appeared in time, assume success
-                console.log('Account created successfully');
+                // console.log('Account created successfully');
+                return {
+                  success: true,
+                  message: 'Account created successfully'
+                };
             }
         }
 

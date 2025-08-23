@@ -243,8 +243,10 @@ async function createNewAccount(page, browser) {
     const newAccountName  = "testing07";
     const newPassword     = "Hatim121";
   
-    console.log('Starting account creation process...');
-  
+    // From here
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
     // Navigate through the menu
     await page.getByText('Game User').click();
     await page.getByText('User Management').click();
@@ -268,8 +270,11 @@ async function createNewAccount(page, browser) {
     }
 
     if (accountExists) {
-      console.log('Matching account found. Aborting.');
-      return;
+        // console.log('Matching account found. Aborting.');
+        return {
+            success: false,
+            message: 'Account has already been created'
+        };
     }
 
     await page.locator('iframe').nth(1).contentFrame().getByRole('button', { name: 'Add user' }).click();
@@ -284,15 +289,18 @@ async function createNewAccount(page, browser) {
     await page.locator('iframe').nth(1).contentFrame().locator('iframe[name="layui-layer-iframe1"]').contentFrame().locator('.layui-layer-content').waitFor({ state: 'visible' });
     const popupText = await page.locator('iframe').nth(1).contentFrame().locator('iframe[name="layui-layer-iframe1"]').contentFrame().locator('.layui-layer-content').textContent();
     if (popupText === 'Insert successful') {
-        console.log(`Successfully created user "${newAccountName}".`);
+        // console.log(`Successfully created user "${newAccountName}".`);
+        return {
+            success: true,
+            message: 'Account created successfully'
+        };
     } else {
-        console.log(`Popup says: "${popupText}"`);
+        // console.log(`Popup says: "${popupText}"`);
+        return {
+            success: false,
+            message: `Error creating account: ${popupText}`
+        };
     }
-
-    // always keep the browser open
-    console.log('Browser will stay open for manual interaction.');
-    console.log('Press Ctrl+C in the terminal to close the browser.');
-    await new Promise(() => {}); // never resolves
 }
 
 

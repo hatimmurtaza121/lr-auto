@@ -244,16 +244,20 @@ async function recharge(page, browser) {
         console.log(`Account to recharge: ${accountName}`);
         console.log(`Recharge amount: ${rechargeAmount}`);
 
+        // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // Wait for the Important Announcement to appear and click OK
         try {
             await page.waitForSelector('span:has-text("OK")', { timeout: 30000 });
-            console.log('Important Announcement detected!');
+            // console.log('Important Announcement detected!');
             
             await page.click('span:has-text("OK")');
-            console.log('OK button clicked in Important Announcement');
+            // console.log('OK button clicked in Important Announcement');
         
         } catch (error) {
-            console.log('Important Announcement not found or already dismissed');
+            // console.log('Important Announcement not found or already dismissed');
         }
 
         // Click on the User List menu item its the 3 in list
@@ -267,7 +271,7 @@ async function recharge(page, browser) {
         
         // Type the account name to search for
         await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[2]/form/div/div/div[2]/input', accountName);
-        console.log(`Searching for account: ${accountName}`);
+        // console.log(`Searching for account: ${accountName}`);
         
         // Click the search button
         await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[2]/form/div[2]/div/button');
@@ -288,7 +292,7 @@ async function recharge(page, browser) {
         }
         
         if (accountFound) {
-            console.log(`Account "${accountName}" found! Proceeding with recharge...`);
+            // console.log(`Account "${accountName}" found! Proceeding with recharge...`);
             
             // Click on editor option
             await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[4]/div[3]/table/tbody/tr/td/div/button/span');
@@ -304,15 +308,15 @@ async function recharge(page, browser) {
             
             // Fill in recharge amount
             await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[4]/div/div[2]/form/div[5]/div/div/input', rechargeAmount);
-            console.log(`Recharge amount filled: ${rechargeAmount}`);
+            // console.log(`Recharge amount filled: ${rechargeAmount}`);
             
             // Fill in remarks
             await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[4]/div/div[2]/form/div[6]/div/div/textarea', remarks);
-            console.log(`Remarks filled: ${remarks}`);
+            // console.log(`Remarks filled: ${remarks}`);
 
             // Click confirm button
             await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[4]/div/div[3]/button[2]/span');
-            console.log('Confirm button clicked');
+            // console.log('Confirm button clicked');
             
             // Wait for response
             await page.waitForTimeout(2000);
@@ -321,25 +325,43 @@ async function recharge(page, browser) {
             // Check for "The recharge amount should be greater than 0" error
             const zeroAmountError = await page.locator('text=The recharge amount should be greater than 0').first();
             if (await zeroAmountError.count() > 0) {
-            console.log('Error: The recharge amount should be greater than 0!');
-            return;
+            // console.log('Error: The recharge amount should be greater than 0!');
+            return {
+                success: false,
+                message: 'Amount should be greater than 0'
+            };
             }
             
             // Check for "not enougn balance" error
             const balanceError = await page.locator('text=not enougn balance').first();
             if (await balanceError.count() > 0) {
-            console.log('Error: Not enougn balance!');
-            return;
+            // console.log('Error: Not enougn balance!');
+            return {
+                success: false,
+                message: 'Amount is insufficient'
+            };
             }
             
             // If no errors found, assume success
-            console.log(`Recharge process completed successfully for account: ${accountName}`);
+            // console.log(`Recharge process completed successfully for account: ${accountName}`);
+            return {
+                success: true,
+                message: 'Recharge successful'
+            };
             
         } else {
-            console.log(`404 Error | Account "${accountName}" not found. Cannot recharge.`);
+            // console.log(`404 Error | Account "${accountName}" not found. Cannot recharge.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         } catch (error) {
-        console.log('Error checking for existing account or recharging amount:', error);
+            // console.log('Error checking for existing account or recharging amount:', error);
+            return {
+                success: false,
+                message: `Error during recharge: ${error}`
+            };
         }
 
     } catch (error) {

@@ -245,6 +245,10 @@ async function createNewAccount(page, browser) {
   
     console.log('Starting account creation process...');
     
+    // From here
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
     await page.locator('#frm_left_frm').contentFrame().locator('a').filter({ hasText: 'User Management' }).click();
 
     // Fill search field and click Search
@@ -263,11 +267,14 @@ async function createNewAccount(page, browser) {
         const accountCell = firstRow.locator('td').nth(2);
         const cellText = (await accountCell.textContent()).trim();
         if (cellText == newAccountName) {
-            console.log(`Account found, user already created. Aborting.`);
-            return;
+            // console.log(`Account found, user already created. Aborting.`);
+            return {
+                success: false,
+                message: 'Account has already been created'
+            };
         }
     } catch (e) {
-        console.log(`No results found. Continuing with account creation...`);
+        // console.log(`No results found. Continuing with account creation...`);
     }
 
     await page.locator('iframe[name="frm_main_content"]').contentFrame().getByText('Create Player').click();
@@ -283,9 +290,17 @@ async function createNewAccount(page, browser) {
 
     // branch on what it says
     if (popupText === 'Added successfully') {
-      console.log(`Successfully created user "${newAccountName}".`);
+        // console.log(`Successfully created user "${newAccountName}".`);
+        return {
+            success: true,
+            message: 'Account created successfully'
+        };
     } else {
-      console.log(`Popup says: "${popupText}"`);
+        // console.log(`Popup says: "${popupText}"`);
+        return {
+            success: false,
+            message: `Error creating account: ${popupText}`
+        };
     }
   
     // keep the browser open for manual inspection

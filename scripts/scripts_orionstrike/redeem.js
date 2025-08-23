@@ -244,6 +244,10 @@ async function redeem(page, browser) {
         console.log(`Account to redeem: ${accountName}`);
         console.log(`Redeem amount: ${redeemAmount}`);
 
+        // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // Navigate to Admin Structure
         await page.locator('#frm_left_frm').contentFrame().locator('a').filter({ hasText: 'Admin Structure' }).click();
         
@@ -259,16 +263,22 @@ async function redeem(page, browser) {
         try {
             await firstRow.waitFor({ timeout: 5000 });
         } catch (e) {
-            console.log(`No results found. Aborting.`);
-            return;
+            // console.log(`No results found. Aborting.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         
         // Extract and verify the Account cell (3rd column) in the first row
         const accountCell = firstRow.locator('td').nth(1);
         const cellText = (await accountCell.textContent()).trim();
         if (cellText !== accountName) {
-            console.log(`Account mismatch: found "${cellText}" instead of "${accountName}". Aborting.`);
-            return;
+            // console.log(`Account mismatch: found "${cellText}" instead of "${accountName}". Aborting.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         
         // Rest work from update
@@ -278,19 +288,31 @@ async function redeem(page, browser) {
         await page.locator('#Container iframe').contentFrame().locator('#txtAddGold').fill(redeemAmount);
         await page.locator('#Container iframe').contentFrame().getByRole('button', { name: 'Redeem' }).click();
 
-        // Confirm recharge outcome message
+        // Confirm redeem outcome message
         try {
             // grab the font text inside the #mb_msg div
             const msgText = await page.locator('#mb_msg font').textContent();
             const trimmed = msgText.trim();
 
             if (trimmed === 'Confirmed successful') {
-                console.log('Redeem successful.');
+                // console.log('Redeem successful.');
+                return {
+                    success: true,
+                    message: 'Redeem successful'
+                };
             } else {
-                console.log(`Error: ${trimmed}`);
+                // console.log(`Error: ${trimmed}`);
+                return {
+                    success: false,
+                    message: `Error during redeem: ${trimmed}`
+                };
             }
         } catch (e) {
-            console.log('Message element not found. Recharge outcome unknown.');
+            // console.log('Message element not found. Recharge outcome unknown.');
+            return {
+                success: false,
+                message: 'Error during redeem: No confirmation message found'
+            };
         }
 
     } catch (error) {

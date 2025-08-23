@@ -243,34 +243,38 @@ async function resetAccountPassword(page, browser) {
         console.log(`Account to reset: ${accountName}`);
         console.log(`New password: ${newPassword}`);
 
+        // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // Wait for the Important Announcement to appear and click OK
         try {
             await page.waitForSelector('span:has-text("OK")', { timeout: 30000 });
-            console.log('Important Announcement detected!');
+            // console.log('Important Announcement detected!');
             
             await page.click('span:has-text("OK")');
-            console.log('OK button clicked in Important Announcement');
+            // console.log('OK button clicked in Important Announcement');
             
         } catch (error) {
-            console.log('Important Announcement not found or already dismissed');
+            // console.log('Important Announcement not found or already dismissed');
         }
 
         // Click on the User List menu item its the 3 in list
         const sidebarItems = await page.$$('li.el-menu-item');
         await sidebarItems[3].click();
-        console.log('User List menu item clicked');
+        // console.log('User List menu item clicked');
         // Wait for page to load
         await page.waitForTimeout(2000);
         
         // Search for existing account
-        console.log('Searching for existing account...');
+        // console.log('Searching for existing account...');
         
         // Click on the search input field
         await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[2]/form/div/div/div[2]/input');
         
         // Type the account name to search for
         await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[2]/form/div/div/div[2]/input', accountName);
-        console.log(`Searching for account: ${accountName}`);
+        // console.log(`Searching for account: ${accountName}`);
         
         // Click the search button
         await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[2]/form/div[2]/div/button');
@@ -291,39 +295,52 @@ async function resetAccountPassword(page, browser) {
         }
         
         if (accountFound) {
-            console.log(`Account "${accountName}" found! Proceeding with password reset...`);
+            // console.log(`Account "${accountName}" found! Proceeding with password reset...`);
             
             // Click on editor option
             await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div[4]/div[3]/table/tbody/tr/td/div/button/span');
-            console.log('Editor option clicked');
+            // console.log('Editor option clicked');
             
             // Wait for dropdown to appear
             await page.waitForTimeout(1000);
             
             // Click on Reset Password
             await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div/div[2]/div/button[3]/span');
-            console.log('Reset Password option clicked');
+            // console.log('Reset Password option clicked');
             
             // Wait for the password reset form to load
             await page.waitForTimeout(2000);
             
             // Fill in New password
             await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[3]/div/div[2]/form/div/div/div/input', newPassword);
-            console.log(`New password filled: ${newPassword}`);
+            // console.log(`New password filled: ${newPassword}`);
             
             // Fill in Confirm password
             await page.fill('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[3]/div/div[2]/form/div[2]/div/div/input', newPassword);
-            console.log(`Confirm password filled: ${newPassword}`);
+            // console.log(`Confirm password filled: ${newPassword}`);
             
             // Click the Confirm button
             await page.click('xpath=//*[@id="app"]/div/div[4]/div[2]/div[2]/section/div/div[3]/div/div[3]/button[2]/span');
-            console.log('Confirm button clicked');
+            // console.log('Confirm button clicked');
+            // Return success
+            return {
+                success: true,
+                message: 'Password reset successful'
+            };
             
         } else {
-            console.log(`404 Error | Account "${accountName}" not found. Cannot reset password.`);
+            // console.log(`404 Error | Account "${accountName}" not found. Cannot reset password.`);
+            return {
+                success: false,
+                message: 'No account found'
+            };
         }
         } catch (error) {
-        console.log('Error checking for existing account or resetting password:', error);
+        // console.log('Error checking for existing account or resetting password:', error);
+        return {
+            success: false,
+            message: `Error resetting password: ${error}`
+        };
         }
 
     } catch (error) {

@@ -246,6 +246,9 @@ async function recharge(page, browser) {
         console.log(`Recharge amount: ${rechargeAmount}`);
 
         // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // Navigate through the menu
         await page.getByText('Game User').click();
         await page.getByText('User Management').click();
@@ -269,14 +272,20 @@ async function recharge(page, browser) {
         }
 
         if (!accountExists) {
-          console.log('No matching account. Aborting.');
-          return;
+          // console.log('No matching account. Aborting.');
+          return {
+              success: false,
+              message: 'No account found'
+          };
         }
 
         // Manually showing errors
         if (rechargeAmount == "0"){
-          console.error('Error: Amount must be greater than 0');
-          return;
+          // console.error('Error: Amount must be greater than 0');
+          return {
+              success: false,
+              message: 'Amount should be greater than 0'
+          };
         }
 
         // 1. Click the Reset password button in the same frame that holds your table
@@ -291,9 +300,17 @@ async function recharge(page, browser) {
 
         try {
           await page.locator('iframe').nth(1).contentFrame().locator('iframe[name="layui-layer-iframe2"]').contentFrame().getByRole('button', { name: 'Submit' }).waitFor({ state: 'detached', timeout: 5000 });
-          console.log('Recharge successful');
+          // console.log('Recharge successful');
+          return {
+              success: true,
+              message: 'Recharge successful'
+          };
         } catch {
-          console.error('Error: Recharge balance is greater than available balance, please check and recharge again OR Remarks can only be letters and numbers, and cannot exceed 50 characters');
+          // console.error('Error: Recharge balance is greater than available balance, please check and recharge again OR Remarks can only be letters and numbers, and cannot exceed 50 characters');
+          return {
+              success: false,
+              message: 'Recharge balance is greater than available balance, please check and recharge again OR Remarks can only be letters and numbers, and cannot exceed 50 characters'
+          };
         }
 
     } catch (error) {

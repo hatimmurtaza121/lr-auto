@@ -241,8 +241,10 @@ async function resetAccountPassword(page, browser) {
     
     console.log(`Account to reset: ${accountName}`);
     console.log(`New password: ${newPassword}`);
-    
+
     // From here
+    await page.reload();
+    await page.waitForLoadState('networkidle');
 
     // 1. Navigate to User Management
     await page.getByText('Game User').click();
@@ -257,8 +259,11 @@ async function resetAccountPassword(page, browser) {
     try {
       await resultRow.waitFor({ timeout: 5000 });
     } catch {
-      console.log('No matching account. Aborting.');
-      return;
+      // console.log('No matching account. Aborting.');
+      return {
+          success: false,
+          message: 'No account found'
+      };
     }
 
     // 4. Open the editor dropdown and click Reset Password
@@ -279,7 +284,19 @@ async function resetAccountPassword(page, browser) {
 
     // 7. Capture and log the result alert
     const alertMessage = await page.getByRole('alert').textContent();
-    console.log('Result:', alertMessage.trim());
+    // console.log('Result:', alertMessage.trim());
+    
+    if (alertMessage && alertMessage.trim().toLowerCase().includes('success')) {
+        return {
+            success: true,
+            message: 'Password reset successful'
+        };
+    } else {
+        return {
+            success: false,
+            message: `Error resetting password: ${alertMessage.trim()}`
+        };
+    }
 
   } catch (error) {
     console.error('Error during password reset:', error);

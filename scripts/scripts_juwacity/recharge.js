@@ -244,7 +244,11 @@ async function recharge(page, browser) {
         console.log(`Account to recharge: ${accountName}`);
         console.log(`Recharge amount: ${rechargeAmount}`);
 
+
         // From here
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+
         // 1. Navigate to User Management
         await page.getByText('Game User').click();
         await page.getByRole('menuitem', { name: 'User Management' }).click();
@@ -258,8 +262,11 @@ async function recharge(page, browser) {
         try {
           await resultRow.waitFor({ timeout: 5000 });
         } catch {
-          console.log('No matching account. Aborting.');
-          return;
+          // console.log('No matching account. Aborting.');
+          return {
+              success: false,
+              message: 'No account found'
+          };
         }
 
         // 4. Open the editor dropdown and click Reset Password
@@ -271,7 +278,19 @@ async function recharge(page, browser) {
 
         // 7. Capture and log the result alert
         const alertMessage = await page.getByRole('alert').textContent();
-        console.log('Result:', alertMessage.trim());
+        // console.log('Result:', alertMessage.trim());
+        
+        if (alertMessage && alertMessage.trim().toLowerCase().includes('success')) {
+            return {
+                success: true,
+                message: 'Recharge successful'
+            };
+        } else {
+            return {
+                success: false,
+                message: `Error during recharge: ${alertMessage.trim()}`
+            };
+        }
 
     } catch (error) {
         console.error('Error during recharging amount:', error);
