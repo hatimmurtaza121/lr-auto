@@ -2,12 +2,19 @@ const { chromium } = require('playwright');
 const path = require('path');
 
 // WebSocket screenshot capture function
-function createWebSocketScreenshotCapture(page, gameName, action, interval = 500) {
+function createWebSocketScreenshotCapture(page, gameName, action, interval = 500, teamId = 'unknown', sessionId = 'unknown', gameId = 0) {
     console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
     console.log('WebSocket server available:', !!global.screenshotWebSocketServer);
     
     const screenshotInterval = setInterval(async () => {
         try {
+            // Check if page is still valid before taking screenshot
+            if (!page || page.isClosed()) {
+                console.log(`Page closed for ${gameName} - ${action}, stopping screenshot capture`);
+                clearInterval(screenshotInterval);
+                return;
+            }
+            
             // Take screenshot as buffer
             const screenshotBuffer = await page.screenshot();
             
@@ -20,18 +27,31 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
             // Emit custom event that parent can listen to
             if (global.screenshotWebSocketServer) {
                 console.log('Broadcasting screenshot via WebSocket...');
-                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
+                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameId, gameName, action, teamId, sessionId);
             } else {
                 console.log('WebSocket server not available for screenshot broadcast');
             }
         } catch (error) {
-            console.log('WebSocket screenshot error:', error);
+            // Don't log cleanup errors as they're expected when page closes
+            const errorMessage = error.message || String(error);
+            if (!errorMessage.includes('Target page, context or browser has been closed') &&
+                !errorMessage.includes('cannot register cleanup after operation has finished')) {
+                console.log('WebSocket screenshot error:', error);
+            }
         }
     }, interval);
 
     return () => {
         console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action}`);
-        clearInterval(screenshotInterval);
+        try {
+            clearInterval(screenshotInterval);
+            // Additional safety: ensure interval is cleared
+            if (screenshotInterval) {
+                clearInterval(screenshotInterval);
+            }
+        } catch (cleanupError) {
+            console.log('Screenshot interval cleanup error (non-critical):', cleanupError);
+        }
     };
 }
 

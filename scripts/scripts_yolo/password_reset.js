@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 
 // WebSocket screenshot capture function
-function createWebSocketScreenshotCapture(page, gameName, action, interval = 500) {
+function createWebSocketScreenshotCapture(page, gameName, action, interval = 500, teamId = 'unknown', sessionId = 'unknown', gameId = 0) {
     console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
     console.log('WebSocket server available:', !!global.screenshotWebSocketServer);
     
@@ -22,7 +22,7 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
             // Emit custom event that parent can listen to
             if (global.screenshotWebSocketServer) {
                 console.log('Broadcasting screenshot via WebSocket...');
-                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
+                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameId, gameName, action, teamId, sessionId);
             } else {
                 console.log('WebSocket server not available for screenshot broadcast');
             }
