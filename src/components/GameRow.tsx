@@ -149,21 +149,18 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     };
   };
 
-  // Create WebSocket connection when component mounts and game is logged in
+  // Create WebSocket connection when component mounts - ALWAYS establish connection for live view
   useEffect(() => {
     console.log(`GameRow ${gameName}: useEffect triggered, isLoggedIn: ${isLoggedIn}`);
+    
+    // ALWAYS establish WebSocket connection for live view, regardless of login state
+    // This ensures screenshots are always displayed in real-time
+    console.log(`GameRow ${gameName}: Creating WebSocket connection for live view (logged in: ${isLoggedIn})`);
+    createWebSocketConnection();
+    
+    // Only fetch action logs if actually logged in (not just during login)
     if (isLoggedIn) {
-      console.log(`GameRow ${gameName}: Creating WebSocket connection`);
-      createWebSocketConnection();
-      // Fetch all action logs from database
       fetchAllActionLogs();
-    } else {
-      console.log(`GameRow ${gameName}: Not logged in, closing connection if exists`);
-      // Close connection if not logged in
-      if (wsConnection) {
-        wsConnection.close();
-        setWsConnection(null);
-      }
     }
 
     return () => {
@@ -180,7 +177,7 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
         URL.revokeObjectURL(blobUrlRef.current);
       }
     };
-  }, [isLoggedIn, gameName]);
+  }, [gameName]); // Always connect when component mounts
 
   // Set up heartbeat, ping, and log refresh intervals
   useEffect(() => {
@@ -213,6 +210,49 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       };
     }
   }, [wsConnection, connectionStatus, isLoggedIn]);
+
+  // CRITICAL FIX: Listen for job events and ensure WebSocket connection is maintained
+  // This ensures we can receive screenshots for all actions (login, new account, etc.)
+  useEffect(() => {
+    const handleNewJob = (event: CustomEvent) => {
+      const { gameName: jobGameName, action } = event.detail;
+      
+      // Only handle jobs for this specific game
+      if (jobGameName === gameName) {
+        console.log(`GameRow ${gameName}: ${action} job started, ensuring WebSocket connection is active`);
+        
+        // Ensure WebSocket connection is active for screenshots
+        if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+          console.log(`GameRow ${gameName}: Creating WebSocket connection for ${action} job`);
+          createWebSocketConnection();
+        }
+      }
+    };
+
+    const handleJobComplete = (event: CustomEvent) => {
+      const { gameName: jobGameName, action, success } = event.detail;
+      
+      // Only handle jobs for this specific game
+      if (jobGameName === gameName) {
+        if (success) {
+          console.log(`GameRow ${gameName}: ${action} job completed successfully, keeping WebSocket connection for live view`);
+          // Keep the connection for ongoing screenshot updates
+        } else {
+          console.log(`GameRow ${gameName}: ${action} job failed, keeping WebSocket connection for live view`);
+          // Keep connection even on failure - user might want to see what happened
+        }
+      }
+    };
+
+    // Listen for job events
+    window.addEventListener('new-job', handleNewJob as EventListener);
+    window.addEventListener('login-job-complete', handleJobComplete as EventListener);
+
+    return () => {
+      window.removeEventListener('new-job', handleNewJob as EventListener);
+      window.removeEventListener('login-job-complete', handleJobComplete as EventListener);
+    };
+  }, [gameName, wsConnection]);
 
   // Fetch all action logs from database using the same endpoint as Action Logs
   const fetchAllActionLogs = async () => {
@@ -290,7 +330,9 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       {/* Column 1-3: Live View - Spans 3 columns for more space */}
       <div className="lg:col-span-3">
         <div className="min-h-80 h-full bg-gray-100 rounded-2xl border-2 border-gray-200 overflow-hidden flex items-center justify-center relative">
-          {isLoggedIn && imageSrc ? (
+          {/* In order to hide screenshots */}
+          {/* {isLoggedIn && imageSrc ? ( */}
+          {imageSrc ? (
             <img 
               src={imageSrc} 
               alt="Live view" 
@@ -307,6 +349,9 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
             <div className="text-center text-gray-500">
               <div className="text-4xl mb-2">🖥️</div>
               <p className="text-sm font-medium">Live View</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {isLoggedIn ? 'Waiting for action...' : 'Waiting for login...'}
+              </p>
             </div>
           )}
         </div>

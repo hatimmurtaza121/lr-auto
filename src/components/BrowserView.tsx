@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 
 interface BrowserViewProps {
   isExecuting: boolean;
+  gameId?: number; // NEW: Add game ID prop
+  gameName?: string; // NEW: Add game name prop
 }
 
-export default function BrowserView({ isExecuting }: BrowserViewProps) {
+export default function BrowserView({ isExecuting, gameId, gameName }: BrowserViewProps) {
   const [imageSrc, setImageSrc] = useState<string>('');
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
@@ -36,11 +38,13 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
       setConnectionStatus('connected');
       setReconnectAttempts(0); // Reset reconnect attempts on successful connection
       
-      // Send authentication message
+      // Send authentication message with game info if available
       const authMessage = {
         type: 'auth',
         userId: 'current-user',
-        teamId: 'current-team'
+        teamId: 'current-team',
+        ...(gameId && { gameId }), // Include game ID if available
+        ...(gameName && { gameName }) // Include game name if available
       };
       ws.send(JSON.stringify(authMessage));
     };
