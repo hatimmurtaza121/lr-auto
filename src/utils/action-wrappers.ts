@@ -415,7 +415,9 @@ export async function executeDynamicActionWithSession(
   userId: string,
   gameCredentialId: number,
   actionName: string,
-  params: Record<string, any>
+  params: Record<string, any>,
+  teamId?: number,
+  sessionId?: string
 ): Promise<{ success: boolean; message: string; needsLogin?: boolean; gameInfo?: any }> {
   const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
     // console.log(`Starting dynamic action: ${actionName} with params:`, params);
@@ -456,13 +458,20 @@ export async function executeDynamicActionWithSession(
       
       // Use the unified script execution system
       const { executeActionScript } = await import('@/utils/script-executor');
+      
+      // Use the passed session ID or generate a new one if not provided
+      const finalSessionId = sessionId || `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const result = await executeActionScript(
         page, 
         context, 
         actionName, 
         gameInfo.name.toLowerCase().replace(/\s+/g, ''),
+        gameInfo.game.id, // NEW: Pass game ID
         params,
-        databaseScript
+        databaseScript,
+        (teamId || gameInfo.team_id).toString(), // Use passed team ID or fall back to game info
+        finalSessionId // Use final session ID
       );
       
       return result;

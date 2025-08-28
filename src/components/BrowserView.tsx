@@ -11,6 +11,7 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [sessionId, setSessionId] = useState<string>(''); // NEW: Store session ID
   const blobUrlRef = useRef<string>('');
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -48,7 +49,14 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
       try {
         const data = JSON.parse(event.data);
         
-        if (data.type === 'screenshot') {
+        if (data.type === 'connection' && data.sessionId) {
+          // NEW: Store the session ID when connection is established
+          setSessionId(data.sessionId);
+          console.log(`BrowserView: Session established with ID: ${data.sessionId}`);
+        } else if (data.type === 'screenshot') {
+          // Accept ALL screenshots (session ID matching removed)
+          console.log(`BrowserView: Received screenshot (${data.data.length} chars)`);
+          
           // Convert base64 to blob URL
           const byteCharacters = atob(data.data);
           const byteNumbers = new Array(byteCharacters.length);
@@ -68,6 +76,7 @@ export default function BrowserView({ isExecuting }: BrowserViewProps) {
           blobUrlRef.current = url;
           setImageSrc(url);
           
+          console.log(`BrowserView: Screenshot displayed successfully`);
         } else if (data.type === 'connection') {
         } else if (data.type === 'heartbeat') {
         } else if (data.type === 'worker_status') {

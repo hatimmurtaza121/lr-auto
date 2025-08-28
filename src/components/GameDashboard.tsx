@@ -295,9 +295,32 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-6">
+      <div className="flex flex-col gap-6">
+        {/* Actions Section */}
+        <div>
+          <h3 className="text-lg font-semibold text-content-primary mb-4">Actions</h3>
+          
+          <div className="grid grid-cols-2 gap-3">
+            {actions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => setSelectedAction(action.id)}
+                className={`w-full py-3 px-4 rounded-2xl font-bold border-4 transition-all duration-150 active:animate-tap ${
+                  selectedAction === action.id
+                    ? 'bg-surface-primary hover:bg-surface-secondary text-primary-500 border-primary-500'
+                    : 'bg-surface-primary hover:bg-surface-secondary text-content-primary border-border-primary'
+                }`}
+              >
+                {(action.display_name && action.display_name.trim().length > 0)
+                  ? action.display_name
+                  : action.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Form Inputs */}
-        <div className="flex-1 space-y-4">
+        <div className="space-y-4">
           <h3 className="text-lg font-semibold text-content-primary">Inputs</h3>
           
           {currentInputFields.map(({ key, label, placeholder, required }) => (
@@ -314,27 +337,6 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
                 required={required}
               />
             </div>
-          ))}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="md:w-48 space-y-3">
-          <h3 className="text-lg font-semibold text-content-primary">Actions</h3>
-          
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              onClick={() => setSelectedAction(action.id)}
-              className={`w-full py-3 px-4 rounded-2xl font-bold border-4 transition-all duration-150 active:animate-tap ${
-                selectedAction === action.id
-                  ? 'bg-surface-primary hover:bg-surface-secondary text-primary-500 border-primary-500'
-                  : 'bg-surface-primary hover:bg-surface-secondary text-content-primary border-border-primary'
-              }`}
-            >
-              {(action.display_name && action.display_name.trim().length > 0)
-                ? action.display_name
-                : action.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </button>
           ))}
         </div>
       </div>

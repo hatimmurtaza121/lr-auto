@@ -9,6 +9,7 @@ import {
   Alert,
   Box,
 } from "@mui/material";
+import GameRow from './GameRow';
 
 const supabase = createClient();
 
@@ -81,35 +82,39 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
     const handleSessionExpired = (event: CustomEvent) => {
       const { gameName: expiredGameName } = event.detail;
       
-      // Only trigger login screen if this event is for this specific game widget
+      // Only trigger login state if this event is for this specific game widget
       if (expiredGameName === gameName) {
-        // console.log(`Session expired for ${gameName}, triggering login screen`);
+        // console.log(`Session expired for ${gameName}, updating state but not expanding`);
         setIsLoggedIn(false);
         setNeedsLogin(true);
-        setIsExpanded(true);
+        // Don't automatically expand - let user click to expand
+        // setIsExpanded(true);
       }
     };
 
     // Listen for login job completion
     const handleLoginJobComplete = (event: CustomEvent) => {
-      // console.log(`Login job completion event received for ${gameName}:`, event.detail);
       const { gameName: completedGameName, action, success, sessionToken, message } = event.detail;
       
       if (completedGameName === gameName && action === 'login') {
-        // console.log(`Login job completed for ${gameName}:`, { success, message });
         if (success) {
-          // console.log(`Login succeeded for ${gameName}, setting logged in state`);
           setSessionToken(sessionToken || 'session-token');
           setIsLoggedIn(true);
           setNeedsLogin(false);
           setErrorMessage('');
+          setIsExpanded(true); // Auto-expand after successful login to show dashboard
+          
+          // Also check the session to ensure the UI updates properly
+          setTimeout(() => {
+            checkExistingSession();
+          }, 1000);
         } else {
           // Fix: Reset login state when login fails
-          // console.log(`Login failed for ${gameName}, resetting state...`);
           setSessionToken(null);
           setIsLoggedIn(false);
           setNeedsLogin(true);
-          setIsExpanded(true);
+          // Don't automatically expand on login failure
+          // setIsExpanded(true);
           setErrorMessage(message || 'Login failed');
         }
       }
@@ -119,6 +124,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
     window.addEventListener('login-job-complete', handleLoginJobComplete as EventListener);
 
     return () => {
+      console.log(`Removing event listeners for ${gameName}`);
       window.removeEventListener('session-expired', handleSessionExpired as EventListener);
       window.removeEventListener('login-job-complete', handleLoginJobComplete as EventListener);
     };
@@ -153,12 +159,14 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         if (data.hasSession) {
           setSessionToken(data.sessionToken);
           setIsLoggedIn(true);
-          // console.log('Found existing session:', data);
+          // Don't auto-expand - keep collapsed until user chooses to interact
+          console.log('Found existing session:', data);
         } else if (data.hasCredentials) {
           // No session but credentials exist - pre-fill the form but don't show login screen
           setUsername(data.username || '');
           setPassword(data.password || '');
-          // console.log('No session but credentials found, pre-filled form');
+          // Don't auto-expand - keep collapsed until user chooses to interact
+          console.log('No session but credentials found, pre-filled form');
         } else {
           // No credentials found - don't show login screen
           // console.log('No credentials found');
@@ -214,7 +222,6 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       
       if (data.jobId) {
         // Login job was added to queue successfully
-        // console.log('Login job added to queue:', data.jobId);
         
         // Dispatch event for ActionStatus component to track this job
         const newJobEvent = new CustomEvent('new-job', {
@@ -228,8 +235,17 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         
         // Show success message for job submission
         setErrorMessage('');
-        // Note: We don't set isLoggedIn here because we need to wait for the job to complete
-        // The ActionStatus component will handle showing the progress
+        
+        // Since the backend login was successful, manually check session after a delay
+        // This ensures the UI updates even if the event system doesn't work
+        setTimeout(() => {
+          checkExistingSession();
+        }, 2000);
+        
+        // Also try an immediate session check
+        setTimeout(() => {
+          checkExistingSession();
+        }, 500);
       } else {
         throw new Error('No job ID returned from login request');
       }
@@ -259,7 +275,8 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       setSessionToken(null);
       setIsLoggedIn(false);
       setNeedsLogin(true);
-      setIsExpanded(true);
+      // Don't automatically expand on login failure
+      // setIsExpanded(true);
       setErrorMessage(userFriendlyMessage);
     } finally {
       setIsLoading(false);
@@ -302,57 +319,93 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       setIsLoggedIn(false);
       setUsername('');
       setPassword('');
+      // Don't auto-expand - let user choose when to expand
+      // setIsExpanded(true);
     }
   };
 
-  return (
-    <div 
-              className="bg-white rounded-2xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 cursor-pointer mb-6 break-inside-avoid"
-      onClick={() => !isLoggedIn && !isCheckingSession && setIsExpanded(!isExpanded)}
-    >
-      {isCheckingSession ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-            <span className="text-lg text-gray-600">Checking session...</span>
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  // If not expanded, show only the game name
+  if (!isExpanded) {
+    return (
+      <div className="bg-white rounded-2xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 mb-6 cursor-pointer group min-h-[120px] flex items-center justify-center" onClick={toggleExpanded}>
+        {/* Game Header - Clickable */}
+        <div className="relative w-full">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900">{displayName}</h2>
+            {isLoggedIn && (
+              <p className="text-base text-green-600 mt-1">Logged in • Click to open</p>
+            )}
+            {!isLoggedIn && hasCredentials && (
+              <p className="text-base text-gray-500 mt-1">Credentials saved • Click to login</p>
+            )}
+            {!isLoggedIn && !hasCredentials && (
+              <p className="text-base text-gray-500 mt-1">Click to login</p>
+            )}
+          </div>
+          <div className="absolute top-0 right-0 flex items-center space-x-2">
+            {isLoggedIn ? (
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            ) : (
+              <div className="w-3 h-3 rounded-full bg-gray-300"></div>
+            )}
+            <svg 
+              className="w-6 h-6 text-gray-400 transform transition-all duration-200 group-hover:text-blue-600 group-hover:scale-110" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </div>
         </div>
-             ) : (!isExpanded && !isLoggedIn) ? (
-         <div className="flex items-center justify-center h-32">
-           <div className="text-center">
-             <span className="text-3xl font-bold text-gray-900">{displayName}</span>
-             {(hasCredentials || (username && password)) && (
-               <div className="mt-2 text-sm text-gray-500">
-                 Credentials saved • Click to login
-               </div>
-             )}
-           </div>
-         </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">{displayName}</h2>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${isLoggedIn ? 'bg-green-500' : 'bg-gray-300'}`} />
-              {isLoggedIn ? (
-                <div></div> // Hidden logout button for now
-              ) : (
-                <svg 
-                  className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 mb-6">
+      {/* Game Header - Clickable to collapse */}
+      <div className="flex items-center justify-between mb-6 cursor-pointer group" onClick={toggleExpanded}>
+                <div>
+          <h2 className="text-2xl font-bold text-gray-900">{displayName}</h2>
+        </div>
+        <div className="flex items-center space-x-2">
+          {/* Circle indicator for login status */}
+          {isLoggedIn ? (
+            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+          ) : (
+            <div className="w-3 h-3 rounded-full bg-gray-300"></div>
+          )}
+          <svg 
+            className="w-6 h-6 text-gray-400 transform rotate-180 transition-all duration-200 group-hover:text-blue-600 group-hover:scale-110" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Fat Row Layout - Three Columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        {/* Column 1: Inputs - Narrower */}
+        <div className="lg:col-span-1">
+          {/* Login form or GameDashboard content */}
+          {isCheckingSession ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="text-lg text-gray-600">Checking session...</span>
+              </div>
             </div>
-          </div>
-          {!isLoggedIn && isExpanded ? (
-            <div 
-              className="space-y-6 animate-in slide-in-from-top-2 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
+          ) : !isLoggedIn ? (
+            <div className="space-y-4">
               <TextField
                 label="Username"
                 variant="outlined"
@@ -360,14 +413,14 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 value={username}
                 onChange={e => {
                   setUsername(e.target.value);
-                  setErrorMessage(''); // Clear error when user types
+                  setErrorMessage('');
                 }}
                 disabled={isLoading}
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     backgroundColor: "rgba(255,255,255,0.9)",
                     borderRadius: "12px",
-                    height: "48px", // Match the py-3 height (24px) + some padding
+                    height: "48px",
                     "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
                     "&.Mui-focused": { 
                       backgroundColor: "rgba(255,255,255,1)",
@@ -394,14 +447,14 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 value={password}
                 onChange={e => {
                   setPassword(e.target.value);
-                  setErrorMessage(''); // Clear error when user types
+                  setErrorMessage('');
                 }}
                 disabled={isLoading}
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     backgroundColor: "rgba(255,255,255,0.9)",
                     borderRadius: "12px",
-                    height: "48px", // Match the py-3 height (24px) + some padding
+                    height: "48px",
                     "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
                     "&.Mui-focused": { 
                       backgroundColor: "rgba(255,255,255,1)",
@@ -420,36 +473,35 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                   },
                 }}
               />
-              {/* Error Message - Positioned between password and login button */}
               {errorMessage && (
-                <Alert severity="error" className="w-full mb-6">
+                <Alert severity="error" className="w-full">
                   {errorMessage}
                 </Alert>
               )}
-                             <Button
-                 variant="contained"
-                 onClick={handleLogin}
-                 disabled={isLoading || !username || !password}
-                 fullWidth
-                 sx={{
-                   backgroundColor: "#1976d2",
-                   color: "#fff",
-                   height: 40,
-                   fontWeight: 600,
-                   fontSize: "1rem",
-                   textTransform: "none",
-                   borderRadius: "16px",
-                   boxShadow: "0 8px 20px -5px rgba(25,118,210,0.3)",
-                   "&:hover": {
-                     backgroundColor: "#1565c0",
-                     boxShadow: "0 12px 28px -5px rgba(25,118,210,0.4)",
-                   },
-                   "&:disabled": {
-                     backgroundColor: "#90caf9",
-                     color: "#fff",
-                   },
-                 }}
-               >
+              <Button
+                variant="contained"
+                onClick={handleLogin}
+                disabled={isLoading || !username || !password}
+                fullWidth
+                sx={{
+                  backgroundColor: "#1976d2",
+                  color: "#fff",
+                  height: 40,
+                  fontWeight: 600,
+                  fontSize: "1rem",
+                  textTransform: "none",
+                  borderRadius: "16px",
+                  boxShadow: "0 8px 20px -5px rgba(25,118,210,0.3)",
+                  "&:hover": {
+                    backgroundColor: "#1565c0",
+                    boxShadow: "0 12px 28px -5px rgba(25,118,210,0.4)",
+                  },
+                  "&:disabled": {
+                    backgroundColor: "#90caf9",
+                    color: "#fff",
+                  },
+                }}
+              >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -460,7 +512,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 )}
               </Button>
             </div>
-          ) : isLoggedIn ? (
+          ) : (
             <Suspense fallback={
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -471,134 +523,26 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
                 onNeedsLogin={() => {
                   setIsLoggedIn(false);
                   setNeedsLogin(true);
-                  setIsExpanded(true);
                 }}
                 onExecutionStart={onExecutionStart}
                 onExecutionEnd={onExecutionEnd}
                 onLogUpdate={onLogUpdate}
               />
             </Suspense>
-          ) : needsLogin ? (
-            <div 
-              className="space-y-6 animate-in slide-in-from-top-2 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Alert severity="warning" className="w-full mb-6">
-                Session expired. Please login again to continue.
-              </Alert>
-                                             <TextField
-                  label="Username"
-                  variant="outlined"
-                  fullWidth
-                  value={username}
-                  onChange={e => {
-                    setUsername(e.target.value);
-                    setErrorMessage('');
-                  }}
-                  error={!!errorMessage}
-                  helperText={errorMessage}
-                  disabled={isLoading}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      backgroundColor: "rgba(255,255,255,0.9)",
-                      borderRadius: "12px",
-                      height: "48px", // Match the py-3 height (24px) + some padding
-                      "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
-                      "&.Mui-focused": { 
-                        backgroundColor: "rgba(255,255,255,1)",
-                        "& .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#1976d2",
-                          borderWidth: "2px",
-                        },
-                      },
-                    },
-                    "& .MuiInputLabel-root": {
-                      color: "rgba(0,0,0,0.7)",
-                      fontWeight: 500,
-                      "&.Mui-focused": {
-                        color: "#1976d2",
-                      },
-                    },
-                  }}
-                />
-                               <TextField
-                  label="Password"
-                  variant="outlined"
-                  fullWidth
-                  type="password"
-                  value={password}
-                  onChange={e => {
-                    setPassword(e.target.value);
-                    setErrorMessage('');
-                  }}
-                  error={!!errorMessage}
-                  helperText={errorMessage}
-                  disabled={isLoading}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      backgroundColor: "rgba(255,255,255,0.9)",
-                      borderRadius: "12px",
-                      height: "48px", // Match the py-3 height (24px) + some padding
-                      "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
-                      "&.Mui-focused": { 
-                        backgroundColor: "rgba(255,255,255,1)",
-                        "& .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#1976d2",
-                          borderWidth: "2px",
-                        },
-                      },
-                    },
-                    "& .MuiInputLabel-root": {
-                      color: "rgba(0,0,0,0.7)",
-                      fontWeight: 500,
-                      "&.Mui-focused": {
-                        color: "#1976d2",
-                      },
-                    },
-                  }}
-                />
-              {errorMessage && (
-                <Alert severity="error" className="w-full mb-6">
-                  {errorMessage}
-                </Alert>
-              )}
-                             <Button
-                 variant="contained"
-                 onClick={handleLogin}
-                 disabled={isLoading || !username || !password}
-                 fullWidth
-                 sx={{
-                   backgroundColor: "#1976d2",
-                   color: "#fff",
-                   height: 40,
-                   fontWeight: 600,
-                   fontSize: "1rem",
-                   textTransform: "none",
-                   borderRadius: "16px",
-                   boxShadow: "0 8px 20px -5px rgba(25,118,210,0.3)",
-                   "&:hover": {
-                     backgroundColor: "#1565c0",
-                     boxShadow: "0 12px 28px -5px rgba(25,118,210,0.4)",
-                   },
-                   "&:disabled": {
-                     backgroundColor: "#90caf9",
-                     color: "#fff",
-                   },
-                 }}
-               >
-                {isLoading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    <span className="ml-2">Reconnecting...</span>
-                  </div>
-                ) : (
-                  'Reconnect'
-                )}
-              </Button>
-            </div>
-          ) : null}
-        </>
-      )}
+          )}
+        </div>
+
+        {/* Column 2 & 3: Live View and Logs - Use GameRow component */}
+        <div className="lg:col-span-4 h-full">
+          <GameRow
+            gameId={credential?.game_id || 0}
+            gameName={gameName}
+            displayName={displayName}
+            isLoggedIn={isLoggedIn}
+            onLogUpdate={onLogUpdate}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -47,6 +47,34 @@ export class GlobalWorker {
     }
   }
 
+  private async broadcastGameLogUpdate(gameName: string, currentLog?: string, allLogs?: string[], gameCredentialId?: number) {
+    if (screenshotWebSocketServer.isServerInitialized()) {
+      let gameId = 0; // Default fallback
+      
+      // Try to get game ID from game credential if available
+      if (gameCredentialId) {
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          
+          const { data: gameCredential, error } = await supabase
+            .from('game_credential')
+            .select('game_id')
+            .eq('id', gameCredentialId)
+            .single();
+            
+          if (!error && gameCredential) {
+            gameId = gameCredential.game_id;
+          }
+        } catch (error) {
+          console.log('Could not get game ID for broadcast, using fallback:', error);
+        }
+      }
+      
+      screenshotWebSocketServer.broadcastLogUpdate(gameId, gameName, currentLog, allLogs);
+    }
+  }
+
   private dispatchScriptResult(jobId: string, result: any) {
     // Log the script result for debugging
     // The result will be passed through the existing job status polling system
@@ -59,6 +87,7 @@ export class GlobalWorker {
 
     // Broadcast that worker is starting execution
     this.broadcastWorkerStatus(true, `Starting ${data.action}...`, [`Starting ${data.action}...`]);
+    await this.broadcastGameLogUpdate(data.gameName, `Starting ${data.action}...`, [`Starting ${data.action}...`], data.gameCredentialId);
 
     try {
       await job.updateProgress(10);
@@ -66,6 +95,7 @@ export class GlobalWorker {
       // Handle all actions dynamically
       await job.updateProgress(20);
       this.broadcastWorkerStatus(true, `Processing ${data.action}...`, [`Processing ${data.action}...`]);
+      await this.broadcastGameLogUpdate(data.gameName, `Processing ${data.action}...`, [`Processing ${data.action}...`], data.gameCredentialId);
       
       // Create timeout for job execution (60 seconds)
       const timeoutMs = 60000;
@@ -159,6 +189,7 @@ export class GlobalWorker {
       // Broadcast completion
       const completionMessage = result?.message || 'Job completed successfully';
       this.broadcastWorkerStatus(false, completionMessage, [completionMessage]);
+      await this.broadcastGameLogUpdate(data.gameName, completionMessage, [completionMessage], data.gameCredentialId);
 
       // Ensure the result is properly returned and stored
       
@@ -219,6 +250,7 @@ export class GlobalWorker {
       
       // Broadcast error
       this.broadcastWorkerStatus(false, finalErrorMessage, [finalErrorMessage]);
+      await this.broadcastGameLogUpdate(data.gameName, finalErrorMessage, [finalErrorMessage], data.gameCredentialId);
       
       // For unexpected errors, we don't want to retry, so we throw the error
       // For expected errors, we also don't retry as per requirements

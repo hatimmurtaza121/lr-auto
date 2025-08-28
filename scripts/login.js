@@ -9,7 +9,7 @@ const fs = require('fs');
 const config = require('./config');
 
 // WebSocket screenshot capture function
-function createWebSocketScreenshotCapture(page, gameName, action, interval = 500) {
+function createWebSocketScreenshotCapture(page, gameName, action, interval = 500, teamId = 'unknown', sessionId = 'unknown', gameId = 0) {
     console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
     let screenshotCount = 0;
     
@@ -30,12 +30,12 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
             
             // Emit custom event that parent can listen to
             if (global.screenshotWebSocketServer) {
-                // console.log(`Broadcasting screenshot #${screenshotCount} via WebSocket server...`);
-                // console.log('WebSocket server connection count:', global.screenshotWebSocketServer.getConnectionCount());
-                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
-                // console.log(`Screenshot #${screenshotCount} broadcasted successfully`);
+                console.log(`Broadcasting screenshot #${screenshotCount} via WebSocket server...`);
+                console.log('WebSocket server connection count:', global.screenshotWebSocketServer.getConnectionCount());
+                global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameId, gameName, action, teamId, sessionId);
+                console.log(`Screenshot #${screenshotCount} broadcasted successfully`);
             } else {
-                // console.log('WebSocket server not available for screenshot broadcasting');
+                console.log('WebSocket server not available for screenshot broadcasting');
             }
         } catch (error) {
             console.log(`WebSocket screenshot #${screenshotCount} error:`, error);
@@ -917,7 +917,15 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
         isInitialized: global.screenshotWebSocketServer.isServerInitialized(),
         connectionCount: global.screenshotWebSocketServer.getConnectionCount()
       } : 'NOT AVAILABLE');
-      stopScreenshotCapture = createWebSocketScreenshotCapture(page, 'yolo', 'login', 500);
+      
+      // Get game info to determine the correct game name and ID for screenshots
+      const gameInfo = await getGameInfo(loginGameCredentialId);
+      const gameName = gameInfo?.game?.name || 'unknown';
+      const gameId = gameInfo?.game?.id || 0;
+      
+      console.log(`Using game name: ${gameName}, game ID: ${gameId} for screenshot capture`);
+      
+      stopScreenshotCapture = createWebSocketScreenshotCapture(page, gameName, 'login', 500, loginTeamId?.toString() || 'unknown', 'unknown', gameId);
       console.log('Screenshot capture started successfully');
     } catch (error) {
       console.log('Failed to start screenshot capture:', error);

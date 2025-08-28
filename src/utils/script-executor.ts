@@ -1,12 +1,28 @@
 import { BrowserContext, Page } from 'playwright';
 
 // WebSocket screenshot capture function - unified for all actions
-export function createWebSocketScreenshotCapture(page: Page, gameName: string, action: string, interval: number = 500) {
-    console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
-    console.log('WebSocket server available:', !!(global as any).screenshotWebSocketServer);
+export function createWebSocketScreenshotCapture(
+    page: Page, 
+    gameName: string, 
+    action: string, 
+    interval: number = 500,
+    teamId: string = 'unknown',
+    sessionId: string = 'unknown',
+    gameId: number // NEW: Add game ID parameter
+) {
+    console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action} (Team: ${teamId}, Session: ${sessionId})`);
+    console.log(`WebSocket server available: ${!!(global as any).screenshotWebSocketServer}`);
+    console.log(`Screenshot interval: ${interval}ms`);
     
     const screenshotInterval = setInterval(async () => {
         try {
+            // Check if page is still valid before taking screenshot
+            if (!page || page.isClosed()) {
+                console.log(`Page closed for ${gameName} - ${action}, stopping screenshot capture`);
+                clearInterval(screenshotInterval);
+                return;
+            }
+            
             // console.log(`Taking screenshot for ${gameName} - ${action}...`);
             // Take screenshot as buffer
             const screenshotBuffer = await page.screenshot();
@@ -20,19 +36,45 @@ export function createWebSocketScreenshotCapture(page: Page, gameName: string, a
             
             // Emit custom event that parent can listen to
             if ((global as any).screenshotWebSocketServer) {
-                // console.log('Broadcasting screenshot via WebSocket...');
-                (global as any).screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameName, action);
+                console.log(`Screenshot captured for ${gameName} - ${action} (${screenshotBuffer.length} bytes)`);
+                console.log(`Broadcasting to WebSocket server (Team: ${teamId}, Session: ${sessionId})`);
+                
+                // NEW: Use session-based broadcasting with game ID
+                (global as any).screenshotWebSocketServer.broadcastScreenshot(
+                    screenshotBuffer, 
+                    gameId, // NEW: Pass game ID
+                    gameName, 
+                    action, 
+                    teamId, 
+                    sessionId
+                );
+                
+                console.log(`Screenshot sent successfully`);
             } else {
-                // console.log('WebSocket server not available for screenshot broadcast');
+                console.log(`WebSocket server not available for screenshot broadcast`);
             }
         } catch (error) {
-            console.log('WebSocket screenshot error:', error);
+            // Don't log cleanup errors as they're expected when page closes
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (!errorMessage.includes('Target page, context or browser has been closed') &&
+                !errorMessage.includes('cannot register cleanup after operation has finished')) {
+                console.log('WebSocket screenshot error:', error);
+            }
         }
     }, interval);
 
     return () => {
         console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action}`);
-        clearInterval(screenshotInterval);
+        try {
+            clearInterval(screenshotInterval);
+            // Additional safety: ensure interval is cleared
+            if (screenshotInterval) {
+                clearInterval(screenshotInterval);
+            }
+            console.log(`Screenshot capture stopped successfully for ${gameName} - ${action}`);
+        } catch (cleanupError) {
+            console.log(`Screenshot interval cleanup error (non-critical): ${cleanupError}`);
+        }
     };
 }
 
@@ -49,8 +91,11 @@ export async function executeActionScript(
     context: BrowserContext, 
     actionName: string, 
     gameName: string,
+    gameId: number, // NEW: Add game ID parameter
     params: any = {},
-    databaseScript?: string | null
+    databaseScript?: string | null,
+    teamId: string = 'unknown',
+    sessionId: string = 'unknown'
 ): Promise<ScriptResult> {
     
     let scriptCode: string;
@@ -63,7 +108,7 @@ export async function executeActionScript(
         console.log(`Executing ${actionName} script from database`);
     } else {
         // Fallback to hardcoded script
-        scriptCode = await getFallbackScript(actionName, gameName);
+        scriptCode = await getFallbackScript(actionName, gameName, gameId);
         scriptSource = 'fallback';
         console.log(`Executing ${actionName} script from fallback (hardcoded)`);
     }
@@ -76,8 +121,8 @@ export async function executeActionScript(
     }
     
     try {
-        // Start WebSocket screenshot capture
-        const stopScreenshotCapture = createWebSocketScreenshotCapture(page, gameName, actionName, 500);
+        // Screenshot capture is now handled inside the script wrapper
+        // No need to start it here to avoid duplication
         
         try {
             // Execute the script using a more robust approach that properly handles async/await
@@ -90,7 +135,19 @@ export async function executeActionScript(
                 `
                 // Define an async function that will execute the script
                 const runScript = async function() {
-                    ${scriptCode}
+                    console.log('Database script wrapper starting for ' + '${actionName}');
+                    
+                    // Start WebSocket screenshot capture for database scripts
+                    const stopScreenshotCapture = createWebSocketScreenshotCapture(page, '${gameName}', '${actionName}', 500, '${teamId}', '${sessionId}', ${gameId});
+                    
+                    try {
+                        console.log('Executing database script: ' + '${actionName}');
+                        ${scriptCode}
+                    } finally {
+                        console.log('Database script finished, stopping screenshot capture');
+                        // Always stop screenshot capture
+                        stopScreenshotCapture();
+                    }
                 };
                 
                 // Execute the async function and return its promise
@@ -115,9 +172,13 @@ export async function executeActionScript(
                 };
             }
             
+        } catch (scriptError) {
+            // Re-throw the error after stopping screenshot capture
+            throw scriptError;
         } finally {
-            // Always stop screenshot capture
-            stopScreenshotCapture();
+            // Screenshot cleanup is handled inside the script wrapper
+            // Small delay to ensure everything is properly cleaned up
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
         
     } catch (error) {
@@ -131,7 +192,7 @@ export async function executeActionScript(
 }
 
 // Fallback script loader - loads hardcoded scripts
-async function getFallbackScript(actionName: string, gameName: string): Promise<string> {
+async function getFallbackScript(actionName: string, gameName: string, gameId: number): Promise<string> {
     try {
         // Map game names to script directories
         const gameScriptMap: { [key: string]: string } = {
@@ -172,11 +233,19 @@ async function getFallbackScript(actionName: string, gameName: string): Promise<
                         // Fallback script for ${actionName} in ${gameName}
                         // Loading from hardcoded script file
                         
-                        // Create the original function
-                        const originalFunction = ${functionString};
+                        // Start WebSocket screenshot capture for fallback scripts
+                        const stopScreenshotCapture = createWebSocketScreenshotCapture(page, '${gameName}', '${actionName}', 500, 'unknown', 'unknown', ${gameId});
                         
-                        // Execute it with the provided parameters
-                        return await originalFunction(page, context, params);
+                        try {
+                            // Create the original function
+                            const originalFunction = ${functionString};
+                            
+                            // Execute it with the provided parameters
+                            return await originalFunction(page, context, params);
+                        } finally {
+                            // Always stop screenshot capture
+                            stopScreenshotCapture();
+                        }
                     `;
                 }
             }

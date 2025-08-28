@@ -1,16 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import GameWidget from '@/components/GameWidget';
-import BrowserView from '@/components/BrowserView';
-import ActionStatus from '@/components/ActionStatus';
-import Loader from '@/components/Loader';
-import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from '@mui/material';
+import GameWidget from '@/components/GameWidget';
 import Navbar from '@/components/Navbar';
+import { useRouter } from 'next/navigation';
 import { getSelectedTeamId } from '@/utils/team';
 import { getAllGames, getTeamGameCredentials } from '@/utils/game-mapping';
+import ActionStatus from '@/components/ActionStatus';
 
 interface Game {
   id: number;
@@ -152,7 +149,14 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <Loader message="Loading dashboard..." />;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
@@ -180,53 +184,41 @@ export default function Dashboard() {
       .replace(/_/g, ' ') // Replace underscores with spaces
       .replace(/\b\w/g, l => l.toUpperCase()); // Capitalize first letter of each word
 
-            return (
-                      <GameWidget
-              key={game.id}
-              gameName={game.name} // Use database name directly for API calls
-              displayName={displayName} // Use formatted name for display
-              hasCredentials={!!credential}
-              credential={credential}
-              onExecutionStart={() => {
-                console.log('Dashboard: Execution started');
-                setIsExecuting(true);
-                setCurrentLog('');
-                setAllLogs([]);
-              }}
-              onExecutionEnd={() => {
-                console.log('Dashboard: Execution ended');
-                setIsExecuting(false);
-              }}
-              onLogUpdate={handleLogUpdate}
-            />
-        );
+    return (
+      <GameWidget
+        key={game.id}
+        gameName={game.name} // Use database name directly for API calls
+        displayName={displayName} // Use formatted name for display
+        hasCredentials={!!credential}
+        credential={credential}
+        onExecutionStart={() => {
+          console.log('Dashboard: Execution started');
+          setIsExecuting(true);
+          setCurrentLog('');
+          setAllLogs([]);
+        }}
+        onExecutionEnd={() => {
+          console.log('Dashboard: Execution ended');
+          setIsExecuting(false);
+        }}
+        onLogUpdate={handleLogUpdate}
+      />
+    );
   });
 
   return (
     <div className="min-h-screen bg-gray-300 font-system">
       <Navbar />
-      <div className="w-full px-2 sm:px-4 pt-20 h-[100vh] lg:h-[calc(100vh)]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 h-full">
-          {/* Left Column - Game Widgets */}
-          <div className="overflow-y-auto px-2 sm:px-4 lg:pr-4 scrollbar-hide">
-            <div className="space-y-4 lg:space-y-6 max-w-4xl mx-auto">
-              {/* Action Status Widget */}
-              <ActionStatus 
-                isExpanded={isActionStatusExpanded}
-                onToggle={() => setIsActionStatusExpanded(!isActionStatusExpanded)}
-              />
-              
-              {/* Game Widgets */}
-              {gameWidgets}
-            </div>
-          </div>
+      <div className="w-full px-2 sm:px-4 pt-20 pb-8">
+        <div className="w-full space-y-6">
+          {/* Action Status - Job tracking and monitoring */}
+          <ActionStatus 
+            isExpanded={isActionStatusExpanded} 
+            onToggle={() => setIsActionStatusExpanded(!isActionStatusExpanded)} 
+          />
           
-          {/* Right Column - Browser View (Always visible on large screens, visible on all screens during execution) */}
-          <div className={`${workerExecuting || isExecuting ? 'block' : 'hidden lg:block'} h-[calc(100vh-100px)]`}>
-            <BrowserView 
-              isExecuting={workerExecuting || isExecuting} 
-            />
-          </div>
+          {/* Game Widgets - Each in its own fat row */}
+          {gameWidgets}
         </div>
       </div>
     </div>

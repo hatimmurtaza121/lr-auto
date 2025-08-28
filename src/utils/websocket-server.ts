@@ -4,14 +4,32 @@ interface ScreenshotMessage {
   type: 'screenshot';
   data: string; // base64 encoded image
   timestamp: string;
+  gameId: number; // NEW: Game ID for reliable matching
   gameName: string;
   action: string;
+  teamId: string;
+  sessionId: string; // NEW: Session that initiated the action
+}
+
+interface LogUpdateMessage {
+  type: 'log_update';
+  gameId: number; // NEW: Game ID for reliable matching
+  gameName: string;
+  currentLog?: string;
+  allLogs?: string[];
+  timestamp: string;
+  teamId: string; // NEW: Team context for filtering
 }
 
 interface ConnectionInfo {
   ws: WebSocket;
   userId?: string;
   teamId?: string;
+  gameId?: number; // NEW: Game ID for reliable matching
+  gameName?: string;
+  sessionId: string; // NEW: Unique session identifier
+  subscribedGameIds: number[]; // NEW: Game IDs this session is watching
+  subscribedGames: string[]; // Legacy: Game names for backward compatibility
   lastHeartbeat?: number;
   connectionTime: number;
   reconnectAttempts: number;
@@ -25,6 +43,11 @@ class ScreenshotWebSocketServer {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private isInitialized = false;
   private port: number = 8080;
+
+  // NEW: Generate unique session ID
+  private generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
 
   initialize(port: number = 8080) {
     if (this.isInitialized && this.wss) {
@@ -73,22 +96,27 @@ class ScreenshotWebSocketServer {
 
   private handleNewConnection(ws: WebSocket) {
     const connectionId = `conn_${++this.connectionCounter}`;
+    const sessionId = this.generateSessionId();
     
-    // console.log(`WebSocket client connected: ${connectionId}`);
+    // console.log(`WebSocket client connected: ${connectionId}, session: ${sessionId}`);
     
     this.connections.set(connectionId, { 
       ws,
+      sessionId,
+      subscribedGameIds: [],
+      subscribedGames: [],
       lastHeartbeat: Date.now(),
       connectionTime: Date.now(),
       reconnectAttempts: 0
     });
     
-    // Send welcome message
+    // Send welcome message with session ID
     try {
       ws.send(JSON.stringify({
         type: 'connection',
         message: 'Connected to screenshot stream',
         connectionId,
+        sessionId,
         timestamp: Date.now()
       }));
     } catch (error) {
@@ -106,9 +134,26 @@ class ScreenshotWebSocketServer {
           if (connection) {
             connection.userId = data.userId;
             connection.teamId = data.teamId;
+            connection.gameId = data.gameId;
+            connection.gameName = data.gameName;
             connection.lastHeartbeat = Date.now();
+            
+            // NEW: Subscribe to the specified game using both ID and name
+            if (data.gameId && !connection.subscribedGameIds.includes(data.gameId)) {
+              connection.subscribedGameIds.push(data.gameId);
+              console.log(`WebSocket Server: Connection ${connectionId} subscribed to game ID: ${data.gameId}`);
+            }
+            if (data.gameName && !connection.subscribedGames.includes(data.gameName)) {
+              connection.subscribedGames.push(data.gameName);
+              console.log(`WebSocket Server: Connection ${connectionId} subscribed to game: "${data.gameName}"`);
+            }
+            console.log(`WebSocket Server: All subscribed game IDs for ${connectionId}: [${connection.subscribedGameIds.join(', ')}]`);
+            console.log(`WebSocket Server: All subscribed games for ${connectionId}: [${connection.subscribedGames.join(', ')}]`);
           }
-          // console.log(`Authenticated connection ${connectionId} for user ${data.userId}, team ${data.teamId}`);
+          // console.log(`Authenticated connection ${connectionId} for user ${data.userId}, team ${data.teamId}, game ${data.gameName}`);
+        } else if (data.type === 'subscribe') {
+          // Handle game subscriptions (gameId is already handled above)
+          // Legacy subscribedGames is kept for backward compatibility but not used for matching
         } else if (data.type === 'heartbeat') {
           // Update heartbeat timestamp
           const connection = this.connections.get(connectionId);
@@ -216,13 +261,14 @@ class ScreenshotWebSocketServer {
     }, 60000);
   }
 
-  broadcastScreenshot(screenshotBuffer: Buffer, gameName: string, action: string) {
+  // NEW: Enhanced screenshot broadcasting with session filtering and game ID
+  broadcastScreenshot(screenshotBuffer: Buffer, gameId: number, gameName: string, action: string, teamId: string, initiatedBySessionId: string) {
     if (!this.wss) {
       // console.log('WebSocket server not initialized');
       return;
     }
 
-    // console.log(`WebSocket Server: Broadcasting screenshot for ${gameName} - ${action} to ${this.connections.size} clients`);
+    // console.log(`WebSocket Server: Broadcasting screenshot for ${gameName} - ${action} to session ${initiatedBySessionId}`);
     // console.log(`WebSocket Server: Screenshot buffer size: ${screenshotBuffer.length} bytes`);
     
     const base64Image = screenshotBuffer.toString('base64');
@@ -230,8 +276,11 @@ class ScreenshotWebSocketServer {
       type: 'screenshot',
       data: base64Image,
       timestamp: new Date().toISOString(),
+      gameId,
       gameName,
-      action
+      action,
+      teamId,
+      sessionId: initiatedBySessionId
     };
 
     const messageStr = JSON.stringify(message);
@@ -240,31 +289,103 @@ class ScreenshotWebSocketServer {
     let sentCount = 0;
     let failedCount = 0;
 
+    // Send to ALL connections subscribed to this game (not just the initiating session)
     this.connections.forEach((connection, connectionId) => {
-      // console.log(`WebSocket Server: Checking connection ${connectionId}, readyState: ${connection.ws.readyState}`);
-      if (connection.ws.readyState === WebSocket.OPEN) {
+      // Game ID matching (more reliable than game name)
+      const connectionHasGame = connection.subscribedGameIds.includes(gameId);
+      
+      console.log(`WebSocket Server: Checking connection ${connectionId} for game ID ${gameId} (name: "${gameName}")`);
+      console.log(`  → Subscribed game IDs: [${connection.subscribedGameIds.join(', ')}]`);
+      console.log(`  → Has game ID ${gameId}: ${connectionHasGame}`);
+      
+      if (connection.ws.readyState === WebSocket.OPEN && connectionHasGame) {
+        
         try {
           connection.ws.send(messageStr);
           sentCount++;
-          // console.log(`WebSocket Server: Successfully sent to ${connectionId}`);
+          console.log(`WebSocket Server: Screenshot sent to connection ${connectionId} (Team: ${connection.teamId}, Session: ${connection.sessionId})`);
         } catch (error) {
-          console.error(`WebSocket Server: Failed to send to ${connectionId}:`, error);
+          console.error(`WebSocket Server: Failed to send to connection ${connectionId}:`, error);
           this.connections.delete(connectionId);
           failedCount++;
         }
-      } else {
-        // console.log(`WebSocket Server: Removing dead connection ${connectionId}, readyState: ${connection.ws.readyState}`);
-        // Remove dead connections
-        this.connections.delete(connectionId);
-        failedCount++;
       }
     });
 
     if (sentCount === 0) {
-      // console.log(`WebSocket Server: Screenshot captured but no clients connected (${gameName} - ${action})`);
+      console.log(`WebSocket Server: Screenshot captured but no connections found for game ID ${gameId} (${gameName}) - ${action}`);
+      console.log(`Looking for game ID: ${gameId}`);
+      console.log(`Available connections: ${this.connections.size}`);
+      this.connections.forEach((conn, id) => {
+        console.log(`  - Connection ${id}: Team ${conn.teamId}, Game IDs: [${conn.subscribedGameIds.join(', ')}]`);
+        const hasGame = conn.subscribedGameIds.includes(gameId);
+        console.log(`    → Has game ID ${gameId}: ${hasGame}`);
+      });
     } else {
-      // console.log(`WebSocket Server: Screenshot broadcasted to ${sentCount} clients, ${failedCount} failed`);
+      console.log(`WebSocket Server: Screenshot sent to ${sentCount} connections for game ID ${gameId} (${gameName}) - ${action}`);
     }
+  }
+
+  // NEW: Legacy method for backward compatibility (will be deprecated)
+  broadcastScreenshotLegacy(screenshotBuffer: Buffer, gameName: string, action: string) {
+    // For legacy calls, we need to get game ID from game name
+    // This is a temporary solution until all callers are updated
+    this.broadcastScreenshot(screenshotBuffer, 0, gameName, action, 'all', 'all'); // gameId = 0 for legacy
+  }
+
+  // NEW: Enhanced log update broadcasting with team filtering and game ID
+  broadcastLogUpdate(gameId: number, gameName: string, currentLog?: string, allLogs?: string[], teamId?: string) {
+    if (!this.wss) return;
+
+    const message: LogUpdateMessage = {
+      type: 'log_update',
+      gameId,
+      gameName,
+      currentLog,
+      allLogs,
+      timestamp: new Date().toISOString(),
+      teamId: teamId || 'all'
+    };
+
+    const messageStr = JSON.stringify(message);
+    let sentCount = 0;
+    let failedCount = 0;
+
+    this.connections.forEach((connection, connectionId) => {
+      // Game ID matching (more reliable than game name)
+      const connectionHasGame = connection.subscribedGameIds.includes(gameId);
+      
+      // Only send to connections that are interested in this specific game and team
+      if (connection.ws.readyState === WebSocket.OPEN && 
+          connectionHasGame &&
+          (!teamId || connection.teamId === teamId)) {
+        try {
+          connection.ws.send(messageStr);
+          sentCount++;
+        } catch (error) {
+          console.error(`Failed to send log update to ${connectionId}:`, error);
+          this.connections.delete(connectionId);
+          failedCount++;
+        }
+      }
+    });
+
+    console.log(`WebSocket Server: Log update broadcasted for game ID ${gameId} (${gameName}) (team: ${teamId}) to ${sentCount} clients, ${failedCount} failed`);
+    if (sentCount === 0) {
+      console.log(`WebSocket Server: No connections received log update for game ID ${gameId} (${gameName})`);
+      console.log(`Available connections: ${this.connections.size}`);
+      this.connections.forEach((conn, id) => {
+        const hasGame = conn.subscribedGameIds.includes(gameId);
+        console.log(`  - Connection ${id}: Team ${conn.teamId}, Game IDs: [${conn.subscribedGameIds.join(', ')}], Has game ID ${gameId}: ${hasGame}`);
+      });
+    }
+  }
+
+  // NEW: Legacy method for backward compatibility
+  broadcastLogUpdateLegacy(gameName: string, currentLog?: string, allLogs?: string[]) {
+    // For legacy calls, we need to get game ID from game name
+    // This is a temporary solution until all callers are updated
+    this.broadcastLogUpdate(0, gameName, currentLog, allLogs); // gameId = 0 for legacy
   }
 
   broadcastWorkerStatus(isExecuting: boolean, currentLog?: string, allLogs?: string[]) {

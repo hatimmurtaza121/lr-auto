@@ -5,6 +5,7 @@ export interface JobData {
   params: any;
   teamId: number;
   gameName: string;
+  sessionId: string; // NEW: Session ID that initiated this job
   result?: JobResult; // Store the job result in the job data
   cancelled?: boolean; // Flag to mark job as cancelled
   cancelledAt?: number; // Timestamp when job was cancelled

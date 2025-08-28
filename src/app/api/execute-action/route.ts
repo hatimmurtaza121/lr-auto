@@ -112,6 +112,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Generate unique session ID for this action execution
+    const sessionId = `api_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     // Create job data
     const jobData: JobData = {
       userId: user.id,
@@ -120,6 +123,7 @@ export async function POST(request: NextRequest) {
       params: snakeCaseParams,
       teamId: parseInt(teamId),
       gameName: request.headers.get('x-game-name') || '',
+      sessionId: sessionId, // NEW: Include session ID
     };
 
     // Add job to queue

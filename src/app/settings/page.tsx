@@ -193,7 +193,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => { e.stopPropagation(); }}>
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[72vh] overflow-y-auto" onClick={(e) => { e.stopPropagation(); }}>
         <h2 className="text-xl font-semibold mb-4">
           {editData ? 'Edit' : 'Add New'} {type === 'team' ? 'Team' : type === 'game' ? 'Game' : 'Action'}
         </h2>
