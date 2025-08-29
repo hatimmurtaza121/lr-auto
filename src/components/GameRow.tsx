@@ -369,45 +369,35 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
               {/* Display all action logs with reasonable max height and scroll */}
               <div className="overflow-y-auto space-y-2 max-h-[32.5rem]  ">
                 {allActionLogs.map((log, index) => (
-                  <div key={index} className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-xs">
-                    <div className="flex items-center justify-between mb-1">
+                  <div key={index} className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-xs relative">
+                    <div className="mb-1">
                       <div className="text-xs text-gray-600 font-medium truncate">
                         {log.action}
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        {/* Status indicator */}
-                        <div className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                          log.status === 'success' ? 'text-green-600 bg-green-50' :
-                          log.status === 'fail' ? 'text-red-600 bg-red-50' :
-                          'text-gray-600 bg-gray-50'
-                        }`}>
-                          {log.status === 'success' ? '✓' :
-                           log.status === 'fail' ? '✗' : '?'}
-                        </div>
-                        {/* Duration */}
-                        <div className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                          log.status === 'success' ? 'text-green-600 bg-green-50' :
-                          log.status === 'fail' ? 'text-red-600 bg-red-50' :
-                          'text-blue-600 bg-blue-50'
-                        }`}>
-                          {log.execution_time_secs ? `${log.execution_time_secs.toFixed(1)}s` : '?'}
-                        </div>
                       </div>
                     </div>
                     
                     {/* Show inputs if available */}
                     {log.inputs && Object.keys(log.inputs).length > 0 && (
                       <div className="text-xs text-gray-500 mb-1 p-1.5 bg-gray-50 rounded border border-gray-100">
-                        <span className="font-medium">Inputs:</span> {Object.keys(log.inputs).join(' | ')}
+                        <span className="font-medium">Inputs:</span> {Object.values(log.inputs).join(' | ')}
                       </div>
                     )}
                     
                     {/* Show message if available */}
                     {log.message && (
-                      <div className="text-xs text-gray-700 leading-relaxed line-clamp-2">
+                      <div className={`text-xs leading-relaxed line-clamp-2 ${
+                        log.status === 'success' ? 'text-green-600' :
+                        log.status === 'fail' ? 'text-red-600' :
+                        'text-gray-500'
+                      }`}>
                         {log.message}
                       </div>
                     )}
+                    
+                    {/* Duration at bottom right */}
+                    <div className="absolute bottom-2 right-2 text-xs text-gray-500">
+                      {log.execution_time_secs ? `${log.execution_time_secs.toFixed(1)}s` : ''}
+                    </div>
                   </div>
                 ))}
               </div>

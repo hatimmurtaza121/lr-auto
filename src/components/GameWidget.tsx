@@ -334,7 +334,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       <div className="bg-white rounded-2xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 mb-6 cursor-pointer group min-h-[120px] flex items-center justify-center" onClick={toggleExpanded}>
         {/* Game Header - Clickable */}
         <div className="relative w-full">
-          <div className="text-center">
+          <div className="text-center w-full">
             <h2 className="text-2xl font-bold text-gray-900">{displayName}</h2>
             {isLoggedIn && (
               <p className="text-base text-green-600 mt-1">Logged in • Click to open</p>
@@ -348,9 +348,13 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
           </div>
           <div className="absolute top-0 right-0 flex items-center space-x-2">
             {isLoggedIn ? (
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <div className="px-2 py-1 bg-green-100 text-green-600 text-xs font-medium rounded-full">
+                Logged in
+              </div>
             ) : (
-              <div className="w-3 h-3 rounded-full bg-gray-300"></div>
+              <div className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                Logged out
+              </div>
             )}
             <svg 
               className="w-6 h-6 text-gray-400 transform transition-all duration-200 group-hover:text-blue-600 group-hover:scale-110" 
@@ -369,16 +373,20 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
   return (
     <div className="bg-white rounded-2xl shadow-xl hover:shadow-3xl hover:shadow-blue-600/60 transition-all duration-200 p-6 mb-6">
       {/* Game Header - Clickable to collapse */}
-      <div className="flex items-center justify-between mb-6 cursor-pointer group" onClick={toggleExpanded}>
-                <div>
+      <div className="relative mb-6 cursor-pointer group" onClick={toggleExpanded}>
+        <div className="text-center w-full">
           <h2 className="text-2xl font-bold text-gray-900">{displayName}</h2>
         </div>
-        <div className="flex items-center space-x-2">
-          {/* Circle indicator for login status */}
+        <div className="absolute top-0 right-0 flex items-center space-x-2">
+          {/* Text indicator for login status */}
           {isLoggedIn ? (
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            <div className="px-2 py-1 bg-green-100 text-green-600 text-xs font-medium rounded-full">
+              Logged in
+            </div>
           ) : (
-            <div className="w-3 h-3 rounded-full bg-gray-300"></div>
+            <div className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+              Logged out
+            </div>
           )}
           <svg 
             className="w-6 h-6 text-gray-400 transform rotate-180 transition-all duration-200 group-hover:text-blue-600 group-hover:scale-110" 

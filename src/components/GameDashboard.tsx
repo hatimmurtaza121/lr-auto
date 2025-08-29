@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getSelectedTeamId } from '@/utils/team';
 import { createClient } from '@/lib/supabase/client';
 
@@ -43,9 +43,25 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
   const [output, setOutput] = useState<string>('');
   const [isExecuting, setIsExecuting] = useState(false);
   const [loadingActions, setLoadingActions] = useState(true);
+  const [actionsDropdownOpen, setActionsDropdownOpen] = useState(false);
 
   const [currentLog, setCurrentLog] = useState<string>('');
   const [allLogs, setAllLogs] = useState<string[]>([]);
+  const actionsDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
+        setActionsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Fetch actions from database
   const fetchActions = async () => {
@@ -300,22 +316,49 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
         <div>
           <h3 className="text-lg font-semibold text-content-primary mb-4">Actions</h3>
           
-          <div className="grid grid-cols-2 gap-3">
-            {actions.map((action) => (
-              <button
-                key={action.id}
-                onClick={() => setSelectedAction(action.id)}
-                className={`w-full py-3 px-4 rounded-2xl font-bold border-4 transition-all duration-150 active:animate-tap ${
-                  selectedAction === action.id
-                    ? 'bg-surface-primary hover:bg-surface-secondary text-primary-500 border-primary-500'
-                    : 'bg-surface-primary hover:bg-surface-secondary text-content-primary border-border-primary'
-                }`}
-              >
-                {(action.display_name && action.display_name.trim().length > 0)
-                  ? action.display_name
-                  : action.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </button>
-            ))}
+          <div className="relative" ref={actionsDropdownRef}>
+            <button
+              onClick={() => setActionsDropdownOpen(!actionsDropdownOpen)}
+              className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group border border-gray-300 hover:border-gray-400 w-full justify-between"
+            >
+              <span className="whitespace-nowrap">
+                {selectedAction 
+                  ? actions.find(a => a.id === selectedAction)?.display_name || 
+                    actions.find(a => a.id === selectedAction)?.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                  : 'Select an action'}
+              </span>
+              <svg className={`w-4 h-4 transition-transform ${actionsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {actionsDropdownOpen && (
+              <div className="absolute top-full left-0 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-xl py-2 animate-in fade-in z-50 max-h-60 overflow-y-auto scrollbar-hide [&::-webkit-scrollbar]:hidden">
+                {actions.map((action) => (
+                  <button
+                    key={action.id}
+                    onClick={() => {
+                      setSelectedAction(action.id);
+                      setActionsDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                      selectedAction === action.id ? 'bg-blue-50 text-blue-700 font-medium' : ''
+                    }`}
+                  >
+                    <span className="truncate">
+                      {action.display_name && action.display_name.trim().length > 0
+                        ? action.display_name
+                        : action.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </span>
+                    {selectedAction === action.id && (
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -323,21 +366,25 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-content-primary">Inputs</h3>
           
-          {currentInputFields.map(({ key, label, placeholder, required }) => (
-            <div key={key}>
-              <label className="block text-sm font-medium text-content-secondary mb-1">
-                {label} {required && <span className="text-red-500">*</span>}
-              </label>
-              <input
-                type="text"
-                value={formInputs[key] || ''}
-                onChange={(e) => handleInputChange(key, e.target.value)}
-                className="w-full px-4 py-3 bg-surface-secondary border border-border-primary rounded-2xl focus:outline-none focus:ring-2 focus:ring-border-focus focus:border-transparent transition-all duration-200 text-content-primary placeholder-content-tertiary"
-                placeholder={placeholder}
-                required={required}
-              />
-            </div>
-          ))}
+          {currentInputFields.length > 0 ? (
+            currentInputFields.map(({ key, label, placeholder, required }) => (
+              <div key={key}>
+                <label className="block text-sm font-medium text-content-secondary mb-1">
+                  {label} {required && <span className="text-red-500">*</span>}
+                </label>
+                <input
+                  type="text"
+                  value={formInputs[key] || ''}
+                  onChange={(e) => handleInputChange(key, e.target.value)}
+                  className="w-full px-4 py-3 bg-surface-secondary border border-border-primary rounded-2xl focus:outline-none focus:ring-2 focus:ring-border-focus focus:border-transparent transition-all duration-200 text-content-primary placeholder-content-tertiary"
+                  placeholder={placeholder}
+                  required={required}
+                />
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-500">No inputs required</p>
+          )}
         </div>
       </div>
 

@@ -66,6 +66,8 @@ export default function StatusPage() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [gameStatuses, setGameStatuses] = useState<GameStatus[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [teamName, setTeamName] = useState<string>('');
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -78,11 +80,24 @@ export default function StatusPage() {
           router.replace('/choose-team');
         } else {
           setLoading(false);
+          fetchTeamName(selectedTeamId);
           fetchGameStatus(selectedTeamId);
         }
       }
     });
   }, [router, supabase.auth]);
+
+  const fetchTeamName = async (teamId: number) => {
+    try {
+      const response = await fetch(`/api/team?teamId=${teamId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTeamName(data.team.name);
+      }
+    } catch (error) {
+      console.error('Error fetching team name:', error);
+    }
+  };
 
   const fetchGameStatus = async (teamId: number) => {
     try {
@@ -203,6 +218,9 @@ export default function StatusPage() {
               <span className="font-mono">{lastUpdated.toLocaleTimeString()}</span>
             </div>
           </div>
+          {teamName && (
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">{teamName}</h2>
+          )}
           <p className="text-gray-600 text-lg">Overview of action logs</p>
         </div>
 
@@ -228,11 +246,20 @@ export default function StatusPage() {
                  key={index}
                  className={`card-elevated p-6 hover:shadow-ios-xl transition-all duration-200`}
                >
-                                 <div className="mb-4">
-                   <h3 className="text-lg font-semibold text-gray-900">
-                     {gameStatus.game_name}
-                   </h3>
-                 </div>
+                                                 <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {gameStatus.game_name}
+                  </h3>
+                  <button
+                    onClick={() => setShowModal(true)}
+                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Edit"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                </div>
                 
                 {/* Function Status Grid */}
                 <div className="mt-4">
@@ -262,6 +289,23 @@ export default function StatusPage() {
           })}
         </div>
 
+        {/* Coming Soon Modal */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-12 max-w-2xl mx-4 text-center relative">
+              <button
+                onClick={() => setShowModal(false)}
+                className="absolute top-4 right-4 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <h3 className="text-xl font-semibold text-gray-900">Coming soon, stay tuned</h3>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
