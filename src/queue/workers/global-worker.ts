@@ -81,6 +81,22 @@ export class GlobalWorker {
     // The ActionStatus component will receive it via the job status API
   }
 
+  private dispatchLoginJobComplete(gameName: string, result: any) {
+    // Broadcast login completion via WebSocket so frontend can handle it
+    if (screenshotWebSocketServer.isServerInitialized()) {
+      // Use the existing broadcastScriptResult method
+      screenshotWebSocketServer.broadcastScriptResult('login-job', {
+        type: 'login-job-complete',
+        gameName: gameName,
+        action: 'login',
+        success: result?.success || false,
+        sessionToken: result?.sessionToken || null,
+        message: result?.message || 'Login completed'
+      });
+      console.log(`Login job completed for ${gameName}:`, result);
+    }
+  }
+
   async processJob(job: Job) {
     const data = job.data;
     let result: any;
@@ -116,12 +132,13 @@ export class GlobalWorker {
       const executionPromise = (async () => {
         try {
           if (data.action === 'login') {
-            // Special handling for login (needs teamId)
+            // Special handling for login (needs teamId and sessionId)
             return await loginWithSession(
               data.userId,
               data.gameCredentialId,
               data.params || {},
-              data.teamId
+              data.teamId,
+              data.sessionId      // Pass sessionId for screenshot tagging
             );
           } else {
             // Use dynamic executor for all other actions
@@ -129,7 +146,9 @@ export class GlobalWorker {
               data.userId,
               data.gameCredentialId,
               data.action,
-              data.params || {}
+              data.params || {},
+              data.teamId,        // Pass teamId for screenshot tagging
+              data.sessionId      // Pass sessionId for screenshot tagging
             );
           }
         } catch (error) {
@@ -171,6 +190,7 @@ export class GlobalWorker {
           await updateGameStatus({
             teamId: data.teamId,
             gameId: game.id,
+            userId: data.userId, // Add userId to track which user executed the action
             action: actionName,
             status: result?.success ? 'success' : 'fail',
             inputs: inputs,
@@ -185,6 +205,11 @@ export class GlobalWorker {
       
       // Dispatch the script result
       this.dispatchScriptResult(job.id || 'unknown', result);
+      
+      // Dispatch login completion event if this is a login job
+      if (data.action === 'login') {
+        this.dispatchLoginJobComplete(data.gameName, result);
+      }
       
       // Broadcast completion
       const completionMessage = result?.message || 'Job completed successfully';
@@ -228,6 +253,7 @@ export class GlobalWorker {
            await updateGameStatus({
              teamId: data.teamId,
              gameId: game.id,
+             userId: data.userId, // Add userId to track which user executed the action
              action: data.action, // Already in snake_case from API
              status: 'fail',
              inputs: inputs,

@@ -10,7 +10,7 @@ const config = require('./config');
 
 // WebSocket screenshot capture function
 function createWebSocketScreenshotCapture(page, gameName, action, interval = 500, teamId = 'unknown', sessionId = 'unknown', gameId = 0) {
-    console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
+    // console.log(`Starting WebSocket screenshot capture for ${gameName} - ${action}`);
     let screenshotCount = 0;
     
     const screenshotInterval = setInterval(async () => {
@@ -30,10 +30,10 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
             
             // Emit custom event that parent can listen to
             if (global.screenshotWebSocketServer) {
-                console.log(`Broadcasting screenshot #${screenshotCount} via WebSocket server...`);
-                console.log('WebSocket server connection count:', global.screenshotWebSocketServer.getConnectionCount());
+                // console.log(`Broadcasting screenshot #${screenshotCount} via WebSocket server...`);
+                // console.log('WebSocket server connection count:', global.screenshotWebSocketServer.getConnectionCount());
                 global.screenshotWebSocketServer.broadcastScreenshot(screenshotBuffer, gameId, gameName, action, teamId, sessionId);
-                console.log(`Screenshot #${screenshotCount} broadcasted successfully`);
+                // console.log(`Screenshot #${screenshotCount} broadcasted successfully`);
             } else {
                 console.log('WebSocket server not available for screenshot broadcasting');
             }
@@ -43,7 +43,7 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
     }, interval);
 
     return () => {
-        console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action} (took ${screenshotCount} screenshots)`);
+        // console.log(`Stopping WebSocket screenshot capture for ${gameName} - ${action} (took ${screenshotCount} screenshots)`);
         clearInterval(screenshotInterval);
     };
 }
@@ -872,6 +872,7 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
   const loginUserId = providedUserId || userId;
   const loginGameCredentialId = providedGameCredentialId || 0; // Default to 0 if not provided
   const loginTeamId = providedParams?.teamId || teamId; // Get team ID from params or fall back to global
+  const loginSessionId = providedParams?.sessionId || 'unknown'; // Get session ID from params
   if (!loginTeamId) {
     console.error('No team ID provided - cannot proceed with login');
     return {
@@ -886,7 +887,8 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
     loginGameUrl,
     loginUserId,
     loginGameCredentialId,
-    loginTeamId
+    loginTeamId,
+    loginSessionId
   });
   console.log('Team ID parameter received:', teamId);
   
@@ -911,22 +913,22 @@ async function loginAndSaveState(providedUsername, providedPassword, providedGam
     // Start WebSocket screenshot capture
     let stopScreenshotCapture;
     try {
-      console.log('Starting WebSocket screenshot capture for login...');
-      console.log('WebSocket server available:', !!global.screenshotWebSocketServer);
-      console.log('WebSocket server details:', global.screenshotWebSocketServer ? {
-        isInitialized: global.screenshotWebSocketServer.isServerInitialized(),
-        connectionCount: global.screenshotWebSocketServer.getConnectionCount()
-      } : 'NOT AVAILABLE');
+      // console.log('Starting WebSocket screenshot capture for login...');
+      // console.log('WebSocket server available:', !!global.screenshotWebSocketServer);
+      // console.log('WebSocket server details:', global.screenshotWebSocketServer ? {
+      //   isInitialized: global.screenshotWebSocketServer.isServerInitialized(),
+      //   connectionCount: global.screenshotWebSocketServer.getConnectionCount()
+      // } : 'NOT AVAILABLE');
       
       // Get game info to determine the correct game name and ID for screenshots
       const gameInfo = await getGameInfo(loginGameCredentialId);
       const gameName = gameInfo?.game?.name || 'unknown';
       const gameId = gameInfo?.game?.id || 0;
       
-      console.log(`Using game name: ${gameName}, game ID: ${gameId} for screenshot capture`);
+      // console.log(`Using game name: ${gameName}, game ID: ${gameId} for screenshot capture`);
       
-      stopScreenshotCapture = createWebSocketScreenshotCapture(page, gameName, 'login', 500, loginTeamId?.toString() || 'unknown', 'unknown', gameId);
-      console.log('Screenshot capture started successfully');
+      stopScreenshotCapture = createWebSocketScreenshotCapture(page, gameName, 'login', 500, loginTeamId?.toString() || 'unknown', loginSessionId, gameId);
+      // console.log('Screenshot capture started successfully');
     } catch (error) {
       console.log('Failed to start screenshot capture:', error);
       stopScreenshotCapture = () => {}; // No-op function

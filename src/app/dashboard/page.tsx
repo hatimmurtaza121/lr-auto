@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
 import { getSelectedTeamId } from '@/utils/team';
 import { getAllGames, getTeamGameCredentials } from '@/utils/game-mapping';
-import ActionStatus from '@/components/ActionStatus';
+
 
 interface Game {
   id: number;
@@ -44,8 +44,7 @@ export default function Dashboard() {
   const [currentLog, setCurrentLog] = useState('');
   const [allLogs, setAllLogs] = useState<string[]>([]);
   
-  // Action Status widget state
-  const [isActionStatusExpanded, setIsActionStatusExpanded] = useState(false);
+
 
   // WebSocket connection for worker status
   useEffect(() => {
@@ -54,11 +53,14 @@ export default function Dashboard() {
     
     ws.onopen = () => {
       console.log('Dashboard WebSocket connected');
+      // Get the current team ID for WebSocket authentication
+      const currentTeamId = getSelectedTeamId();
+      
       // Send authentication
       ws.send(JSON.stringify({
         type: 'auth',
         userId: 'dashboard',
-        teamId: 'dashboard'
+        teamId: currentTeamId?.toString() || 'unknown'
       }));
     };
 
@@ -211,12 +213,6 @@ export default function Dashboard() {
       <Navbar />
       <div className="w-full px-2 sm:px-4 pt-20 pb-8">
         <div className="w-full space-y-6">
-          {/* Action Status - Job tracking and monitoring */}
-          <ActionStatus 
-            isExpanded={isActionStatusExpanded} 
-            onToggle={() => setIsActionStatusExpanded(!isActionStatusExpanded)} 
-          />
-          
           {/* Game Widgets - Each in its own fat row */}
           {gameWidgets}
         </div>

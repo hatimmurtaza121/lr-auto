@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { getSelectedTeamId } from '@/utils/team';
+import { getGameId } from '@/utils/game-mapping';
 
 interface GameRowProps {
   gameId: number;
@@ -20,7 +22,8 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
   const [currentLog, setCurrentLog] = useState<string>('');
   const [allLogs, setAllLogs] = useState<Array<{message: string, actionName?: string, duration?: string, inputs?: string}>>([]);
   const [sessionId, setSessionId] = useState<string>(''); // NEW: Store session ID
-  const [allActionLogs, setAllActionLogs] = useState<any[]>([]);
+  const [gameJobs, setGameJobs] = useState<any[]>([]);
+  const [jobStats, setJobStats] = useState<any>({});
   const blobUrlRef = useRef<string>('');
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,11 +49,15 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       setReconnectAttempts(0);
       console.log(`GameRow ${gameName}: WebSocket connected, sending auth message`);
       
+      // Get the current team ID for WebSocket authentication
+      const currentTeamId = getSelectedTeamId();
+      console.log(`GameRow ${gameName}: Current team ID:`, currentTeamId);
+      
       // Send authentication message
       const authMessage = {
         type: 'auth',
         userId: 'current-user',
-        teamId: 'current-team',
+        teamId: currentTeamId?.toString() || 'unknown',
         gameId: gameId,
         gameName: gameName
       };
@@ -109,11 +116,30 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
           // Handle log updates - now just refresh database data
           console.log(`GameRow ${gameName}: Received log update, refreshing database data`);
           
-          // Refresh all action logs from database
-          fetchAllActionLogs();
+          // Refresh game jobs from database
+          fetchGameJobs();
           
           // Notify parent component
           onLogUpdate?.(data.currentLog || '', []);
+        } else if (data.type === 'script-result' && data.result?.type === 'login-job-complete') {
+          // Handle login completion from global worker
+          const { gameName: completedGameName, action, success, sessionToken, message } = data.result;
+          
+          if (completedGameName === gameName && action === 'login') {
+            console.log(`GameRow ${gameName}: Received login completion via WebSocket:`, data.result);
+            
+            // Dispatch custom event for GameWidget to handle
+            const loginEvent = new CustomEvent('login-job-complete', {
+              detail: {
+                gameName: completedGameName,
+                action: action,
+                success: success,
+                sessionToken: sessionToken,
+                message: message
+              }
+            });
+            window.dispatchEvent(loginEvent);
+          }
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -145,7 +171,8 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error(`GameRow ${gameName}: WebSocket error:`, error);
+      setConnectionStatus('disconnected');
     };
   };
 
@@ -158,9 +185,9 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     console.log(`GameRow ${gameName}: Creating WebSocket connection for live view (logged in: ${isLoggedIn})`);
     createWebSocketConnection();
     
-    // Only fetch action logs if actually logged in (not just during login)
+    // Only fetch game jobs if actually logged in (not just during login)
     if (isLoggedIn) {
-      fetchAllActionLogs();
+      fetchGameJobs();
     }
 
     return () => {
@@ -211,6 +238,38 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     }
   }, [wsConnection, connectionStatus, isLoggedIn]);
 
+  // Smart polling for Live Action widget - only poll when there are active jobs
+  useEffect(() => {
+    if (isLoggedIn) {
+      // Initial fetch when logged in
+      fetchGameJobs();
+      
+      // Listen for immediate refresh when actions are executed
+      const handleActionExecuted = () => {
+        // Immediate refresh when action is executed
+        fetchGameJobs();
+      };
+      
+      window.addEventListener('action-executed', handleActionExecuted);
+      
+      return () => {
+        window.removeEventListener('action-executed', handleActionExecuted);
+      };
+    }
+  }, [isLoggedIn]);
+
+  // Smart polling: only poll when there are active/waiting jobs
+  useEffect(() => {
+    if (isLoggedIn && (jobStats.active > 0 || jobStats.waiting > 0)) {
+      // Poll every 2 seconds when there are active jobs
+      const interval = setInterval(() => {
+        fetchGameJobs();
+      }, 2000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn, jobStats.active, jobStats.waiting]);
+
   // CRITICAL FIX: Listen for job events and ensure WebSocket connection is maintained
   // This ensures we can receive screenshots for all actions (login, new account, etc.)
   useEffect(() => {
@@ -226,6 +285,9 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
           console.log(`GameRow ${gameName}: Creating WebSocket connection for ${action} job`);
           createWebSocketConnection();
         }
+        
+        // Immediately refresh game jobs to show the new job
+        fetchGameJobs();
       }
     };
 
@@ -254,64 +316,99 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     };
   }, [gameName, wsConnection]);
 
-  // Fetch all action logs from database using the same endpoint as Action Logs
-  const fetchAllActionLogs = async () => {
+
+
+  // Cancel a specific job
+  const cancelJob = async (jobId: string) => {
     try {
-      console.log(`GameRow ${gameName}: Fetching all action logs from database...`);
+      console.log(`GameRow ${gameName}: Cancelling job ${jobId}...`);
       
-      // Get the current session token
+      // Find the job to get the action type
+      const job = gameJobs.find(j => j.jobId === jobId);
+      if (!job) {
+        console.error(`GameRow ${gameName}: Job ${jobId} not found in gameJobs`);
+        return;
+      }
+      
+      // Get user session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        console.log(`GameRow ${gameName}: No session token, skipping fetch`);
+        console.error('User not authenticated');
         return;
       }
 
-      const response = await fetch(`/api/logs?teamId=1`, {
+      // Cancel the job
+      const response = await fetch('/api/queue/cancel-job', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ 
+          jobId,
+          action: job.action
+        })
+      });
+
+      if (response.ok) {
+        console.log(`GameRow ${gameName}: Job ${jobId} cancelled successfully`);
+        // Refresh the game jobs to show updated status
+        fetchGameJobs();
+      } else {
+        console.error(`GameRow ${gameName}: Failed to cancel job ${jobId}`);
+      }
+    } catch (error) {
+      console.error(`GameRow ${gameName}: Error cancelling job:`, error);
+    }
+  };
+
+  // Fetch game-specific jobs from queue
+  const fetchGameJobs = async () => {
+    try {
+      console.log(`GameRow ${gameName}: Fetching game jobs from queue...`);
+      
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error('User not authenticated');
+        return;
+      }
+
+      // Get team ID
+      const teamId = getSelectedTeamId();
+      if (!teamId) {
+        console.error('No team selected');
+        return;
+      }
+
+      // Get game ID from game mapping
+      const gameId = await getGameId(gameName);
+      if (!gameId) {
+        console.error('Game not found:', gameName);
+        return;
+      }
+
+      // Fetch game-specific jobs
+      const response = await fetch(`/api/queue/game-jobs?teamId=${teamId}&gameId=${gameId}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
       });
-      
-      console.log(`GameRow ${gameName}: API response status:`, response.status);
-      
+
       if (response.ok) {
         const result = await response.json();
-        console.log(`GameRow ${gameName}: API response result:`, result);
-        
-        if (result.success && result.logs) {
-          // Find all logs for this specific game
-          const gameLogs = result.logs.filter((log: any) => 
-            log.game_id === gameId
-          );
-          
-          if (gameLogs.length > 0) {
-            // Transform logs to the format we need
-            const transformedLogs = gameLogs.map((log: any) => ({
-              action: log.action_display_name || log.action,
-              status: log.status,
-              execution_time_secs: log.execution_time_secs,
-              inputs: log.inputs,
-              message: log.message || `${log.action} ${log.status === 'success' ? 'completed' : 'failed'}`,
-              updated_at: log.updated_at
-            }));
-            
-            console.log(`GameRow ${gameName}: Setting ${transformedLogs.length} action logs:`, transformedLogs);
-            setAllActionLogs(transformedLogs);
-          } else {
-            console.log(`GameRow ${gameName}: No logs found for this game`);
-            setAllActionLogs([]);
-          }
-        } else {
-          console.log(`GameRow ${gameName}: API response not successful:`, result);
-          setAllActionLogs([]);
-        }
+        console.log(`GameRow ${gameName}: Received ${result.jobs?.length || 0} game jobs`);
+        setGameJobs(result.jobs || []);
+        setJobStats(result.stats || {});
       } else {
-        console.error(`GameRow ${gameName}: API response not ok:`, response.status, response.statusText);
-        setAllActionLogs([]);
+        console.error(`GameRow ${gameName}: Failed to fetch game jobs:`, response.statusText);
+        setGameJobs([]);
+        setJobStats({});
       }
     } catch (error) {
-      console.error(`GameRow ${gameName}: Failed to fetch action logs:`, error);
-      setAllActionLogs([]);
+      console.error(`GameRow ${gameName}: Error fetching game jobs:`, error);
+      setGameJobs([]);
+      setJobStats({});
     }
   };
 
@@ -360,44 +457,86 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       {/* Column 4: Logs - Takes 1 column on the right */}
       <div className="lg:col-span-1">
         <div className="h-full bg-gray-100 rounded-2xl border-2 border-gray-200 overflow-hidden p-4 ">
-          {isLoggedIn && allActionLogs.length > 0 ? (
+          {isLoggedIn ? (
             <div className="h-full flex flex-col ">
-              <div className="text-sm font-semibold text-gray-700 mb-2 border-b border-gray-300 pb-1  ">
+              <div className="text-sm font-semibold text-gray-700 mb-2 border-b border-gray-300 pb-1">
                 Live Action
               </div>
               
-              {/* Display all action logs with reasonable max height and scroll */}
-              <div className="overflow-y-auto space-y-2 max-h-[32.5rem]  ">
-                {allActionLogs.map((log, index) => (
-                  <div key={index} className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-xs relative">
-                    <div className="mb-1">
-                      <div className="text-xs text-gray-600 font-medium truncate">
-                        {log.action}
+              {/* Job Stats */}
+              {(jobStats.active > 0 || jobStats.waiting > 0) && (
+                <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-xs text-blue-700 font-medium mb-1">Current Status</div>
+                  <div className="flex gap-3 text-xs text-blue-600">
+                    {jobStats.active > 0 && <span>{jobStats.active} running</span>}
+                    {jobStats.waiting > 0 && <span>{jobStats.waiting} queued</span>}
+                  </div>
+                </div>
+              )}
+              
+              {/* Display action logs in compact format */}
+              <div className="overflow-y-auto overflow-x-hidden space-y-2 max-h-[32.5rem]">
+                {gameJobs.map((job, index) => (
+                  <div key={job.jobId} className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-xs overflow-hidden">
+                    {/* Header row with action name and status */}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-xs font-medium text-gray-700 truncate flex-1 pr-2">
+                        {job.actionDisplayName || job.action}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {/* Cancel button for queued jobs - positioned to the left */}
+                        {job.status === 'waiting' && (
+                          <button
+                            onClick={() => cancelJob(job.jobId)}
+                            className="px-2 py-0.5 text-xs text-red-700 rounded border border-red-200 hover:bg-red-100 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        
+                        {/* Status indicator */}
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                          job.status === 'active' ? 'bg-blue-100 text-blue-700 animate-pulse' :
+                          job.status === 'waiting' ? 'bg-yellow-100 text-yellow-700' :
+                          job.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          job.status === 'failed' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {job.status === 'active' ? 'Running' :
+                           job.status === 'waiting' ? 'Queued' :
+                           job.status === 'completed' ? '✓' :
+                           job.status === 'failed' ? '✗' :
+                           job.status}
+                        </span>
                       </div>
                     </div>
                     
-                    {/* Show inputs if available */}
-                    {log.inputs && Object.keys(log.inputs).length > 0 && (
-                      <div className="text-xs text-gray-500 mb-1 p-1.5 bg-gray-50 rounded border border-gray-100">
-                        <span className="font-medium">Inputs:</span> {Object.values(log.inputs).join(' | ')}
+                    {/* Inputs row - always show if params exist */}
+                    {job.params && Object.keys(job.params).length > 0 && (
+                      <div className="text-xs text-gray-600 mb-1 break-words">
+                        <span className="font-medium">Inputs:</span> {Object.values(job.params).join(' | ')}
                       </div>
                     )}
                     
-                    {/* Show message if available */}
-                    {log.message && (
-                      <div className={`text-xs leading-relaxed line-clamp-2 ${
-                        log.status === 'success' ? 'text-green-600' :
-                        log.status === 'fail' ? 'text-red-600' :
-                        'text-gray-500'
+                    {/* Message row */}
+                    {job.message && (
+                      <div className={`text-xs leading-relaxed break-words ${
+                        job.status === 'completed' ? 'text-green-600' :
+                        job.status === 'failed' ? 'text-red-600' :
+                        'text-gray-600'
                       }`}>
-                        {log.message}
+                        {job.message}
                       </div>
                     )}
                     
-                    {/* Duration at bottom right */}
-                    <div className="absolute bottom-2 right-2 text-xs text-gray-500">
-                      {log.execution_time_secs ? `${log.execution_time_secs.toFixed(1)}s` : ''}
-                    </div>
+
+                    
+                    {/* Execution time at bottom right */}
+                    {job.executionTime && (
+                      <div className="text-xs text-gray-500 text-right mt-1">
+                        {job.executionTime.toFixed(1)}s
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { getSelectedTeamId } from '@/utils/team';
 
 interface BrowserViewProps {
   isExecuting: boolean;
@@ -38,11 +39,14 @@ export default function BrowserView({ isExecuting, gameId, gameName }: BrowserVi
       setConnectionStatus('connected');
       setReconnectAttempts(0); // Reset reconnect attempts on successful connection
       
+      // Get the current team ID for WebSocket authentication
+      const currentTeamId = getSelectedTeamId();
+      
       // Send authentication message with game info if available
       const authMessage = {
         type: 'auth',
         userId: 'current-user',
-        teamId: 'current-team',
+        teamId: currentTeamId?.toString() || 'unknown',
         ...(gameId && { gameId }), // Include game ID if available
         ...(gameName && { gameName }) // Include game name if available
       };

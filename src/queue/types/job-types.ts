@@ -4,6 +4,7 @@ export interface JobData {
   action: string;
   params: any;
   teamId: number;
+  gameId: number; // Add gameId for direct filtering
   gameName: string;
   sessionId: string; // NEW: Session ID that initiated this job
   result?: JobResult; // Store the job result in the job data

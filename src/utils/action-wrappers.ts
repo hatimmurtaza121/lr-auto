@@ -341,7 +341,8 @@ export async function loginWithSession(
   userId: string,
   gameCredentialId: number,
   params: ActionParams,
-  teamId?: number
+  teamId?: number,
+  sessionId?: string
 ): Promise<{ success: boolean; message: string; sessionToken?: string; gameCredentialId?: number; needsLogin?: boolean; gameInfo?: any; logs?: string[] }> {
   const logs: string[] = [];
   
@@ -372,7 +373,7 @@ export async function loginWithSession(
       gameInfo.game.login_url,
       userId,
       gameCredentialId,
-      { ...params, teamId } // Pass the params and teamId to the login script
+      { ...params, teamId, sessionId } // Pass the params, teamId, and sessionId to the login script
     );
     
     // Restore original console.log

@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         .insert({
           team_id: parseInt(teamId),
           game_id: game.id,
+          user_id: user.id,
           username: username || '',
           password: password || '',
           created_at: new Date().toISOString()
@@ -94,7 +95,9 @@ export async function POST(request: NextRequest) {
       action: 'login',
       params: { username, password }, // Pass credentials to the job
       teamId: parseInt(teamId),
-      gameName: gameName
+      gameId: game.id,
+      gameName: gameName,
+      sessionId: `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
 
     // Add job to queue

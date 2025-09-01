@@ -34,6 +34,8 @@ CREATE TABLE game_credential (
   game_id     INTEGER      NOT NULL
                REFERENCES game(id)
                ON DELETE CASCADE,
+  user_id     UUID         NOT NULL
+               REFERENCES auth.users(id),
   username    TEXT         NOT NULL,
   password    TEXT         NOT NULL,
   created_at  TIMESTAMPTZ  DEFAULT now()
@@ -59,6 +61,7 @@ CREATE TABLE game_action_status (
   id                  SERIAL PRIMARY KEY,
   team_id             INTEGER NOT NULL REFERENCES team(id) ON DELETE CASCADE,
   game_id             INTEGER NOT NULL REFERENCES game(id) ON DELETE CASCADE,
+  user_id             UUID NOT NULL REFERENCES auth.users(id),
   action              TEXT NOT NULL,
   status              TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('success', 'fail', 'unknown')),
   inputs              JSONB,
@@ -165,3 +168,45 @@ INSERT INTO public.game (name, login_url) VALUES
   ('Orion Strike', 'https://www.orionstrike777.com/admin/login'),
   ('Mr All In One', 'https://agentserver.mrallinone777.com/'),
   ('Juwa City', 'https://ht.juwa777.com/login');
+
+
+-- Insert actions for all games
+INSERT INTO actions (game_id, name, inputs_json) 
+SELECT 
+  g.id as game_id,
+  'new_account' as name,
+  '{"fields": [{"key": "account_name", "label": "Account Name"}, {"key": "new_password", "label": "New Password"}]}'::jsonb as inputs_json
+FROM game g
+WHERE NOT EXISTS (
+  SELECT 1 FROM actions a WHERE a.game_id = g.id AND a.name = 'new_account'
+);
+
+INSERT INTO actions (game_id, name, inputs_json) 
+SELECT 
+  g.id as game_id,
+  'password_reset' as name,
+  '{"fields": [{"key": "account_name", "label": "Account Name"}, {"key": "new_password", "label": "New Password"}]}'::jsonb as inputs_json
+FROM game g
+WHERE NOT EXISTS (
+  SELECT 1 FROM actions a WHERE a.game_id = g.id AND a.name = 'password_reset'
+);
+
+INSERT INTO actions (game_id, name, inputs_json) 
+SELECT 
+  g.id as game_id,
+  'recharge' as name,
+  '{"fields": [{"key": "account_name", "label": "Account Name"}, {"key": "amount", "label": "Amount"}, {"key": "remark", "label": "Remark"}]}'::jsonb as inputs_json
+FROM game g
+WHERE NOT EXISTS (
+  SELECT 1 FROM actions a WHERE a.game_id = g.id AND a.name = 'recharge'
+);
+
+INSERT INTO actions (game_id, name, inputs_json) 
+SELECT 
+  g.id as game_id,
+  'redeem' as name,
+  '{"fields": [{"key": "account_name", "label": "Account Name"}, {"key": "amount", "label": "Amount"}, {"key": "remark", "label": "Remark"}]}'::jsonb as inputs_json
+FROM game g
+WHERE NOT EXISTS (
+  SELECT 1 FROM actions a WHERE a.game_id = g.id AND a.name = 'redeem'
+);

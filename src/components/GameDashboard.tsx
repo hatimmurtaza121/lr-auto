@@ -227,7 +227,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
       
       // Check if this is a queued job response
       if (result.jobId) {
-        // Dispatch event for ActionStatus component to track this job
+        // Dispatch event for job tracking
         const newJobEvent = new CustomEvent('new-job', {
           detail: {
             jobId: result.jobId,
@@ -238,7 +238,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
         window.dispatchEvent(newJobEvent);
         
         // Re-enable the execute button immediately after job is queued
-        // The ActionStatus component will handle job monitoring
+        // Job monitoring is handled by the Live Action widget
         setIsExecuting(false);
         
         return;

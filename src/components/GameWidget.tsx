@@ -77,7 +77,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
     // });
   }, [isLoggedIn, needsLogin, isExpanded, sessionToken, errorMessage, gameName]);
 
-  // Listen for session expired events from ActionStatus
+  // Listen for session expired events and WebSocket messages
   useEffect(() => {
     const handleSessionExpired = (event: CustomEvent) => {
       const { gameName: expiredGameName } = event.detail;
@@ -92,7 +92,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       }
     };
 
-    // Listen for login job completion
+    // Listen for login job completion (DOM events)
     const handleLoginJobComplete = (event: CustomEvent) => {
       const { gameName: completedGameName, action, success, sessionToken, message } = event.detail;
       
@@ -120,6 +120,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       }
     };
 
+    // Add event listeners
     window.addEventListener('session-expired', handleSessionExpired as EventListener);
     window.addEventListener('login-job-complete', handleLoginJobComplete as EventListener);
 
@@ -223,7 +224,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       if (data.jobId) {
         // Login job was added to queue successfully
         
-        // Dispatch event for ActionStatus component to track this job
+        // Dispatch event for job tracking
         const newJobEvent = new CustomEvent('new-job', {
           detail: {
             jobId: data.jobId,

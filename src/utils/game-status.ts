@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 export interface GameStatusUpdate {
   teamId: number;
   gameId: number;
+  userId: string; // Add userId field to track which user executed the action
   action: string;
   status: 'success' | 'fail' | 'unknown';
   inputs?: any; // Add inputs field to store action parameters
@@ -34,6 +35,7 @@ export async function updateGameStatus(update: GameStatusUpdate): Promise<void> 
       .insert({
         team_id: update.teamId,
         game_id: update.gameId,
+        user_id: update.userId, // Save user_id field
         action: update.action,
         status: update.status,
         inputs: update.inputs || null, // Save inputs field

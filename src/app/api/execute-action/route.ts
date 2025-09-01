@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
       action: actionNameForDb, // Use snake_case action name
       params: snakeCaseParams,
       teamId: parseInt(teamId),
+      gameId: game.id, // Add gameId for direct filtering
       gameName: request.headers.get('x-game-name') || '',
       sessionId: sessionId, // NEW: Include session ID
     };
