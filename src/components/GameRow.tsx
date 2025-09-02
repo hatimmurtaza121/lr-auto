@@ -40,7 +40,7 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       reconnectTimeoutRef.current = null;
     }
 
-    const ws = new WebSocket('ws://localhost:8080');
+    const ws = new WebSocket(process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:8080');
     setWsConnection(ws);
     setConnectionStatus('connecting');
 

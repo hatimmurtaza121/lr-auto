@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserSession } from '@/utils/api-helpers';
-import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Game ID is required' }, { status: 400 });
     }
 
-    const supabase = createClient(cookies());
+    const supabase = createAdminClient();
     
     const { data: actions, error } = await supabase
       .from('actions')
@@ -85,7 +84,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const supabase = createClient(cookies());
+    const supabase = createAdminClient();
     
     // Check if action already exists for this game
     const { data: existingAction } = await supabase

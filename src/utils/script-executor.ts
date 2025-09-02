@@ -266,8 +266,11 @@ async function getFallbackScript(actionName: string, gameName: string, gameId: n
 // Helper function to validate script code
 export function validateScriptCode(scriptCode: string): { isValid: boolean; error?: string } {
     try {
+        // Wrap the script code in an async function to handle await statements
+        const wrappedCode = `(async function(page, context, params, createWebSocketScreenshotCapture) {\n${scriptCode}\n})`;
+        
         // Basic validation - check if it's valid JavaScript
-        new Function('page', 'context', 'params', 'createWebSocketScreenshotCapture', scriptCode);
+        new Function('page', 'context', 'params', 'createWebSocketScreenshotCapture', wrappedCode);
         return { isValid: true };
     } catch (error) {
         return { 

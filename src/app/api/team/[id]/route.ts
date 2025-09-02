@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getUserSession } from '@/utils/api-helpers';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // Get user session
+    const user = await getUserSession(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const teamId = parseInt(params.id);
     if (isNaN(teamId)) {
       return NextResponse.json({ error: 'Invalid team ID' }, { status: 400 });
@@ -28,6 +30,7 @@ export async function PUT(
     }
 
     // Check if team exists
+    const supabase = createAdminClient();
     const { data: existingTeam, error: checkError } = await supabase
       .from('team')
       .select('id')
@@ -84,12 +87,19 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Get user session
+    const user = await getUserSession(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const teamId = parseInt(params.id);
     if (isNaN(teamId)) {
       return NextResponse.json({ error: 'Invalid team ID' }, { status: 400 });
     }
 
     // Check if team exists
+    const supabase = createAdminClient();
     const { data: existingTeam, error: checkError } = await supabase
       .from('team')
       .select('id')

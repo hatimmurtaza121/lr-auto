@@ -49,7 +49,7 @@ export default function Dashboard() {
   // WebSocket connection for worker status
   useEffect(() => {
     console.log('Dashboard: Setting up WebSocket connection...');
-    const ws = new WebSocket('ws://localhost:8080');
+    const ws = new WebSocket(process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:8080');
     
     ws.onopen = () => {
       console.log('Dashboard WebSocket connected');

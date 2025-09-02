@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserSession } from '@/utils/api-helpers';
-import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export async function PUT(
   request: NextRequest,
@@ -54,7 +53,7 @@ export async function PUT(
       }
     }
 
-    const supabase = createClient(cookies());
+    const supabase = createAdminClient();
     
     // Check if action exists
     const { data: existingAction, error: fetchError } = await supabase
@@ -131,7 +130,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid action ID' }, { status: 400 });
     }
 
-    const supabase = createClient(cookies());
+    const supabase = createAdminClient();
     
     // Check if action exists
     const { data: existingAction, error: fetchError } = await supabase

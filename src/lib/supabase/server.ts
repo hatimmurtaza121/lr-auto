@@ -1,13 +1,16 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Create client with user session (for authenticated operations)
 export const createClient = (cookieStore: ReturnType<typeof cookies>) => {
   return createServerClient(
     supabaseUrl!,
-    supabaseKey!,
+    supabaseAnonKey!,
     {
       cookies: {
         getAll() {
@@ -25,4 +28,13 @@ export const createClient = (cookieStore: ReturnType<typeof cookies>) => {
       },
     },
   );
+};
+
+// Create admin client with service role key (for admin operations)
+export const createAdminClient = () => {
+  if (!supabaseServiceKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+  }
+  
+  return createSupabaseClient(supabaseUrl!, supabaseServiceKey);
 }; 

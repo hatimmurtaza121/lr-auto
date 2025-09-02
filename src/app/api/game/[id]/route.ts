@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { getUserSession } from '@/utils/api-helpers';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // Get user session
+    const user = await getUserSession(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const gameId = parseInt(params.id);
     if (isNaN(gameId)) {
       return NextResponse.json({ error: 'Invalid game ID' }, { status: 400 });
@@ -49,6 +51,7 @@ export async function PUT(
     }
 
     // Check if game exists
+    const supabase = createAdminClient();
     const { data: existingGame, error: checkError } = await supabase
       .from('game')
       .select('id')
@@ -60,25 +63,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    // Check if new name conflicts with other games
-    const { data: conflictingGame, error: conflictError } = await supabase
-      .from('game')
-      .select('id')
-      .eq('name', name)
-      .neq('id', gameId)
-      .single();
 
-    if (conflictError && conflictError.code !== 'PGRST116') {
-      console.error('Error checking name conflict:', conflictError);
-      return NextResponse.json({ error: 'Failed to check name conflict' }, { status: 500 });
-    }
-
-    if (conflictingGame) {
-      return NextResponse.json(
-        { error: 'Game name already exists' },
-        { status: 409 }
-      );
-    }
 
     // Update game
     const gameData = {
@@ -111,12 +96,19 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Get user session
+    const user = await getUserSession(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const gameId = parseInt(params.id);
     if (isNaN(gameId)) {
       return NextResponse.json({ error: 'Invalid game ID' }, { status: 400 });
     }
 
     // Check if game exists
+    const supabase = createAdminClient();
     const { data: existingGame, error: checkError } = await supabase
       .from('game')
       .select('id')
@@ -128,7 +120,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    // Delete game (this will cascade to related records due to CASCADE constraint)
+    // Delete game (this will cascade to related records due to 'CASCADE constraint)
     const { error } = await supabase
       .from('game')
       .delete()

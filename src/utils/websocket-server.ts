@@ -30,6 +30,7 @@ interface ConnectionInfo {
   sessionId: string; // NEW: Unique session identifier
   subscribedGameIds: number[]; // NEW: Game IDs this session is watching
   subscribedGames: string[]; // Legacy: Game names for backward compatibility
+  subscribedTeams: string[]; // NEW: Teams this session is subscribed to
   lastHeartbeat?: number;
   connectionTime: number;
   reconnectAttempts: number;
@@ -60,6 +61,7 @@ class ScreenshotWebSocketServer {
     try {
       this.wss = new WebSocketServer({ 
         port,
+        host: '0.0.0.0', // Bind to all network interfaces
         // Add better error handling
         clientTracking: true,
         // Handle connection errors
@@ -105,6 +107,7 @@ class ScreenshotWebSocketServer {
       sessionId,
       subscribedGameIds: [],
       subscribedGames: [],
+      subscribedTeams: ['all'], // Default to all teams
       lastHeartbeat: Date.now(),
       connectionTime: Date.now(),
       reconnectAttempts: 0
@@ -147,8 +150,24 @@ class ScreenshotWebSocketServer {
               connection.subscribedGames.push(data.gameName);
               // console.log(`WebSocket Server: Connection ${connectionId} subscribed to game: "${data.gameName}"`);
             }
+            
+            // NEW: Handle team subscriptions
+            if (data.subscribeToTeams) {
+              if (Array.isArray(data.subscribeToTeams)) {
+                connection.subscribedTeams = data.subscribeToTeams;
+              } else if (data.subscribeToTeams === 'all') {
+                connection.subscribedTeams = ['all'];
+              } else if (data.subscribeToTeams === 'own') {
+                connection.subscribedTeams = [data.teamId?.toString() || 'all'];
+              }
+                         } else {
+               // Default: subscribe to own team only for security
+               connection.subscribedTeams = [data.teamId?.toString() || 'all'];
+             }
+            
             // console.log(`WebSocket Server: All subscribed game IDs for ${connectionId}: [${connection.subscribedGameIds.join(', ')}]`);
             // console.log(`WebSocket Server: All subscribed games for ${connectionId}: [${connection.subscribedGames.join(', ')}]`);
+            console.log(`WebSocket Server: Connection ${connectionId} subscribed to teams: [${connection.subscribedTeams.join(', ')}]`);
           }
           console.log(`Authenticated connection ${connectionId} for user ${data.userId}, team ${data.teamId}, game ${data.gameName}`);
         } else if (data.type === 'subscribe') {
@@ -294,14 +313,14 @@ class ScreenshotWebSocketServer {
       // Game ID matching (more reliable than game name)
       const connectionHasGame = connection.subscribedGameIds.includes(gameId);
       
-      // Team filtering - only send to connections from the same team
-      // Convert both to strings for comparison to handle number/string mismatches
-      const connectionHasTeam = connection.teamId?.toString() === teamId?.toString();
+             // Team filtering - only send to connections from the same team
+       // Convert both to strings for comparison to handle number/string mismatches
+       const connectionHasTeam = connection.subscribedTeams.includes(teamId);
       
       console.log(`WebSocket Server: Checking connection ${connectionId} for game ID ${gameId} (name: "${gameName}")`);
       console.log(`  → Subscribed game IDs: [${connection.subscribedGameIds.join(', ')}]`);
       console.log(`  → Has game ID ${gameId}: ${connectionHasGame}`);
-      console.log(`  → Connection team: ${connection.teamId}, Screenshot team: ${teamId}, Match: ${connectionHasTeam}`);
+      console.log(`  → Connection subscribed to teams: [${connection.subscribedTeams.join(', ')}], Screenshot team: ${teamId}, Match: ${connectionHasTeam}`);
       
       if (connection.ws.readyState === WebSocket.OPEN && connectionHasGame && connectionHasTeam) {
         
@@ -322,7 +341,7 @@ class ScreenshotWebSocketServer {
       console.log(`Looking for game ID: ${gameId}`);
       console.log(`Available connections: ${this.connections.size}`);
       this.connections.forEach((conn, id) => {
-        console.log(`  - Connection ${id}: Team ${conn.teamId}, Game IDs: [${conn.subscribedGameIds.join(', ')}]`);
+        console.log(`  - Connection ${id}: Team ${conn.teamId}, Game IDs: [${conn.subscribedGameIds.join(', ')}], Subscribed Teams: [${conn.subscribedTeams.join(', ')}]`);
         const hasGame = conn.subscribedGameIds.includes(gameId);
         console.log(`    → Has game ID ${gameId}: ${hasGame}`);
       });
@@ -362,9 +381,9 @@ class ScreenshotWebSocketServer {
       
       // Only send to connections that are interested in this specific game and team
       // Convert both to strings for comparison to handle number/string mismatches
-      if (connection.ws.readyState === WebSocket.OPEN && 
-          connectionHasGame &&
-          (!teamId || connection.teamId?.toString() === teamId?.toString())) {
+             if (connection.ws.readyState === WebSocket.OPEN && 
+           connectionHasGame &&
+           (!teamId || connection.subscribedTeams.includes(teamId))) {
         try {
           connection.ws.send(messageStr);
           sentCount++;

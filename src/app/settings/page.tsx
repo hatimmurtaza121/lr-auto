@@ -579,21 +579,33 @@ export default function Settings() {
   const handleAddTeam = async (data: { name: string; code: string }) => {
     try {
       setModalLoading(true);
-      const { error } = await supabase
-        .from('team')
-        .insert(data);
-
-      if (error) {
-        console.error('Error adding team:', error);
-        alert('Failed to add team');
+      
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert('Error: User not authenticated');
         return;
+      }
+
+      const response = await fetch('/api/team', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add team');
       }
 
       fetchData();
       setModalOpen(false);
     } catch (error) {
       console.error('Error adding team:', error);
-      alert('Failed to add team');
+      alert(error instanceof Error ? error.message : 'Failed to add team');
     } finally {
       setModalLoading(false);
     }
@@ -603,22 +615,33 @@ export default function Settings() {
     try {
       setModalLoading(true);
       const team = editData as Team;
-      const { error } = await supabase
-        .from('team')
-        .update(data)
-        .eq('id', team.id);
-
-      if (error) {
-        console.error('Error updating team:', error);
-        alert('Failed to update team');
+      
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert('Error: User not authenticated');
         return;
+      }
+
+      const response = await fetch(`/api/team/${team.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update team');
       }
 
       fetchData();
       setModalOpen(false);
     } catch (error) {
       console.error('Error updating team:', error);
-      alert('Failed to update team');
+      alert(error instanceof Error ? error.message : 'Failed to update team');
     } finally {
       setModalLoading(false);
     }
@@ -628,22 +651,31 @@ export default function Settings() {
     openConfirm('Are you sure you want to delete this team?', async () => {
       try {
         setConfirmLoading(true);
-        const { error } = await supabase
-          .from('team')
-          .delete()
-          .eq('id', teamId);
-
-        if (error) {
-          console.error('Error deleting team:', error);
-          alert('Failed to delete team');
+        
+        // Get user session token
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          alert('Error: User not authenticated');
           return;
+        }
+
+        const response = await fetch(`/api/team/${teamId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete team');
         }
 
         setConfirmOpen(false);
         fetchData();
       } catch (error) {
         console.error('Error deleting team:', error);
-        alert('Failed to delete team');
+        alert(error instanceof Error ? error.message : 'Failed to delete team');
       } finally {
         setConfirmLoading(false);
       }
@@ -653,21 +685,33 @@ export default function Settings() {
   const handleAddGame = async (data: { name: string; login_url: string; dashboard_url: string }) => {
     try {
       setModalLoading(true);
-      const { error } = await supabase
-        .from('game')
-        .insert(data);
-
-      if (error) {
-        console.error('Error adding game:', error);
-        alert('Failed to add game');
+      
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert('Error: User not authenticated');
         return;
+      }
+
+      const response = await fetch('/api/game', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add game');
       }
 
       fetchData();
       setModalOpen(false);
     } catch (error) {
       console.error('Error adding game:', error);
-      alert('Failed to add game');
+      alert(error instanceof Error ? error.message : 'Failed to add game');
     } finally {
       setModalLoading(false);
     }
@@ -677,22 +721,33 @@ export default function Settings() {
     try {
       setModalLoading(true);
       const game = editData as Game;
-      const { error } = await supabase
-        .from('game')
-        .update(data)
-        .eq('id', game.id);
-
-      if (error) {
-        console.error('Error updating game:', error);
-        alert('Failed to update game');
+      
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert('Error: User not authenticated');
         return;
+      }
+
+      const response = await fetch(`/api/game/${game.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update game');
       }
 
       fetchData();
       setModalOpen(false);
     } catch (error) {
       console.error('Error updating game:', error);
-      alert('Failed to update game');
+      alert(error instanceof Error ? error.message : 'Failed to update game');
     } finally {
       setModalLoading(false);
     }
@@ -702,22 +757,31 @@ export default function Settings() {
     openConfirm('Are you sure you want to delete this game?', async () => {
       try {
         setConfirmLoading(true);
-        const { error } = await supabase
-          .from('game')
-          .delete()
-          .eq('id', gameId);
-
-        if (error) {
-          console.error('Error deleting game:', error);
-          alert('Failed to delete game');
+        
+        // Get user session token
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          alert('Error: User not authenticated');
           return;
+        }
+
+        const response = await fetch(`/api/game/${gameId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete game');
         }
 
         setConfirmOpen(false);
         fetchData();
       } catch (error) {
         console.error('Error deleting game:', error);
-        alert('Failed to delete game');
+        alert(error instanceof Error ? error.message : 'Failed to delete game');
       } finally {
         setConfirmLoading(false);
       }
@@ -727,21 +791,39 @@ export default function Settings() {
   const handleAddAction = async (data: { name: string; display_name?: string; game_id: number; inputs_json: any; script_code?: string }) => {
     try {
       setModalLoading(true);
-      const { error } = await supabase
-        .from('actions')
-        .insert(data);
-
-      if (error) {
-        console.error('Error adding action:', error);
-        alert('Failed to add action');
+      
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert('Error: User not authenticated');
         return;
+      }
+
+      const response = await fetch('/api/actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          gameId: data.game_id,
+          name: data.name,
+          display_name: data.display_name,
+          inputsJson: data.inputs_json,
+          script_code: data.script_code
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add action');
       }
 
       fetchData();
       setModalOpen(false);
     } catch (error) {
       console.error('Error adding action:', error);
-      alert('Failed to add action');
+      alert(error instanceof Error ? error.message : 'Failed to add action');
     } finally {
       setModalLoading(false);
     }
@@ -751,22 +833,38 @@ export default function Settings() {
     try {
       setModalLoading(true);
       const action = editData as Action;
-      const { error } = await supabase
-        .from('actions')
-        .update(data)
-        .eq('id', action.id);
-
-      if (error) {
-        console.error('Error updating action:', error);
-        alert('Failed to update action');
+      
+      // Get user session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert('Error: User not authenticated');
         return;
+      }
+
+      const response = await fetch(`/api/actions/${action.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          name: data.name,
+          display_name: data.display_name,
+          inputsJson: data.inputs_json,
+          script_code: data.script_code
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update action');
       }
 
       fetchData();
       setModalOpen(false);
     } catch (error) {
       console.error('Error updating action:', error);
-      alert('Failed to update action');
+      alert(error instanceof Error ? error.message : 'Failed to update action');
     } finally {
       setModalLoading(false);
     }
@@ -776,22 +874,31 @@ export default function Settings() {
     openConfirm('Are you sure you want to delete this action?', async () => {
       try {
         setConfirmLoading(true);
-        const { error } = await supabase
-          .from('actions')
-          .delete()
-          .eq('id', actionId);
-
-        if (error) {
-          console.error('Error deleting action:', error);
-          alert('Failed to delete action');
+        
+        // Get user session token
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
+          alert('Error: User not authenticated');
           return;
+        }
+
+        const response = await fetch(`/api/actions/${actionId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete action');
         }
 
         setConfirmOpen(false);
         fetchData();
       } catch (error) {
         console.error('Error deleting action:', error);
-        alert('Failed to delete action');
+        alert(error instanceof Error ? error.message : 'Failed to delete action');
       } finally {
         setConfirmLoading(false);
       }
