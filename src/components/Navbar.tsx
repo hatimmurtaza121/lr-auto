@@ -132,37 +132,37 @@ export default function Navbar() {
         {/* Center - Navigation (Desktop Only) */}
         <div className="hidden lg:flex flex-1 justify-center items-center space-x-8">
           {/* Dashboard Link */}
-          <button
-            onClick={() => router.push('/dashboard')}
+          <a
+            href="/dashboard"
             className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
           >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
             Dashboard
-          </button>
+          </a>
 
           {/* Status Link */}
-          <button
-            onClick={() => router.push('/status')}
+          <a
+            href="/status"
             className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
           >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Status
-          </button>
+          </a>
 
           {/* Logs Link */}
-          <button
-            onClick={() => router.push('/logs')}
+          <a
+            href="/logs"
             className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
           >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             Logs
-          </button>
+          </a>
 
           {/* Team Dropdown */}
           {selectedTeamName && (
@@ -229,16 +229,16 @@ export default function Navbar() {
           </button>
           {dropdownOpen && (
             <div className="absolute top-full right-0 mt-3 w-48 bg-white border border-gray-200 rounded-xl shadow-xl py-2 animate-in fade-in z-50">
-              <button
+              <a
+                href="/settings"
                 className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                onClick={() => handleNavigation('/settings')}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Settings
-              </button>
+              </a>
               <button
                 className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
                 disabled
@@ -269,7 +269,7 @@ export default function Navbar() {
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden">
           <div 
             ref={sidebarRef}
-            className="fixed left-0 top-1/2 transform -translate-y-1/2 h-[80vh] w-3/5 bg-white shadow-xl rounded-tr-3xl rounded-br-3xl transform transition-transform duration-300 ease-in-out"
+            className="fixed left-0 top-1/2 -translate-y-1/2 h-[80vh] w-3/5 bg-white shadow-xl rounded-tr-3xl rounded-br-3xl transition-transform duration-300 ease-in-out"
           >
             {/* Sidebar Header */}
             <div className="flex items-center justify-between p-6 border-b-2 border-gray-200">
@@ -288,37 +288,37 @@ export default function Navbar() {
             {/* Navigation Items */}
             <div className="p-4 space-y-2">
               {/* Dashboard */}
-              <button
-                onClick={() => handleNavigation('/dashboard')}
+              <a
+                href="/dashboard"
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
                 Dashboard
-              </button>
+              </a>
 
               {/* Status */}
-              <button
-                onClick={() => handleNavigation('/status')}
+              <a
+                href="/status"
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Status
-              </button>
+              </a>
 
               {/* Logs */}
-              <button
-                onClick={() => handleNavigation('/logs')}
+              <a
+                href="/logs"
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Logs
-              </button>
+              </a>
 
               {/* Team - Mobile version with dropdown */}
               {selectedTeamName && (
@@ -381,8 +381,8 @@ export default function Navbar() {
 
             {/* Settings, Support */}
             <div className="p-4 space-y-2">
-              <button
-                onClick={() => handleNavigation('/settings')}
+              <a
+                href="/settings"
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,7 +390,7 @@ export default function Navbar() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Settings
-              </button>
+              </a>
 
               <button
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"

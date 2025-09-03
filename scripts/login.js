@@ -49,14 +49,7 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
     };
 }
 
-const username = process.argv[2] || '';
-const password = process.argv[3] || '';
-const gameurl = process.argv[4] || '';
-const saveToSupabase = process.argv[5] !== 'false'; // Default to true, but can be disabled
-// Get team ID from command line args, no default - will be handled in loginAndSaveState
-const teamId = process.argv[6] ? parseInt(process.argv[6]) : null;
-const userId = process.argv[7] || 'default-user-id'; // User ID parameter
-const storageFile = path.join(__dirname, '../auth-state.json');
+// Removed command line argument parsing - no longer used with new architecture
 
 // Initialize Supabase client with service role key for automation
 console.log('Initializing Supabase client...');
@@ -886,329 +879,9 @@ function getGameIdFromUrl(loginUrl) {
   }
 }
 
-async function loginAndSaveState(providedUsername, providedPassword, providedGameUrl, providedUserId, providedGameCredentialId, providedParams) {
-  console.log('loginAndSaveState called with parameters:', {
-    providedUsername,
-    providedPassword,
-    providedGameUrl,
-    providedUserId,
-    providedGameCredentialId,
-    providedParams
-  });
-  
-  // Always use manually entered credentials from params, never fall back to saved ones
-  const loginUsername = providedParams?.username || '';
-  const loginPassword = providedParams?.password || '';
-  const loginGameUrl = providedGameUrl || gameurl;
-  const loginUserId = providedUserId || userId;
-  const loginGameCredentialId = providedGameCredentialId || 0; // Default to 0 if not provided
-  const loginTeamId = providedParams?.teamId || teamId; // Get team ID from params or fall back to global
-  const loginSessionId = providedParams?.sessionId || 'unknown'; // Get session ID from params
-  if (!loginTeamId) {
-    console.error('No team ID provided - cannot proceed with login');
-    return {
-      success: false,
-      message: 'Team ID is required for login'
-    };
-  }
-  
-  console.log('Using parameters:', {
-    loginUsername,
-    loginPassword: '***', // Don't log password
-    loginGameUrl,
-    loginUserId,
-    loginGameCredentialId,
-    loginTeamId,
-    loginSessionId
-  });
-  console.log('Team ID parameter received:', teamId);
-  
-  const maxRetries = 10; // Allow up to 10 attempts for captcha
-  let attempt = 1;
-  
-  while (attempt <= maxRetries) {
-    console.log(`\n=== Login Attempt ${attempt}/${maxRetries} ===`);
-    
-    // Launch browser in non-headless mode so you can see it
-    const browser = await chromium.launch({
-      headless: config.BROWSER_HEADLESS,
-      slowMo: config.BROWSER_SLOW_MO // Add a small delay between actions for better visibility
-    });
-   
-    // Create a new browser context
-    const context = await browser.newContext();
-   
-    // Create a new page
-    const page = await context.newPage();
-   
-    // Start WebSocket screenshot capture
-    let stopScreenshotCapture;
-    try {
-      // console.log('Starting WebSocket screenshot capture for login...');
-      // console.log('WebSocket server available:', !!global.screenshotWebSocketServer);
-      // console.log('WebSocket server details:', global.screenshotWebSocketServer ? {
-      //   isInitialized: global.screenshotWebSocketServer.isServerInitialized(),
-      //   connectionCount: global.screenshotWebSocketServer.getConnectionCount()
-      // } : 'NOT AVAILABLE');
-      
-      // Get game info to determine the correct game name and ID for screenshots
-      const gameInfo = await getGameInfo(loginGameCredentialId);
-      const gameName = gameInfo?.game?.name || 'unknown';
-      const gameId = gameInfo?.game?.id || 0;
-      
-      // console.log(`Using game name: ${gameName}, game ID: ${gameId} for screenshot capture`);
-      
-      stopScreenshotCapture = createWebSocketScreenshotCapture(page, gameName, 'login', 500, loginTeamId?.toString() || 'unknown', loginSessionId, gameId);
-      // console.log('Screenshot capture started successfully');
-    } catch (error) {
-      console.log('Failed to start screenshot capture:', error);
-      stopScreenshotCapture = () => {}; // No-op function
-    }
-   
-    try {
-      console.log('Opening login page...');
-     
-      // Navigate to the login page
-      await page.goto(loginGameUrl);
-     
-      console.log('Login page opened successfully!');
-     
-      // Wait for the page to load completely
-      await page.waitForLoadState('networkidle');
-      
-      // Perform the login attempt
-      const loginResult = await performLoginAttempt(page, loginUsername, loginPassword, loginGameCredentialId);
-      
-      if (loginResult.result === 'success') {
-        console.log(`\nLogin successful on attempt ${attempt}!`);
-        
-        // Log successful captcha if we have captcha data
-        if (loginResult.captchaData) {
-          console.log('Login successful - logging captcha as SUCCESS');
-          loginResult.captchaData.apiStatus = 'success';
-          await logCaptchaToSupabase(
-            loginResult.captchaData.imagePath,
-            loginResult.captchaData.apiResponse,
-            loginResult.captchaData.apiStatus
-          );
-        } else {
-          console.log('No captcha data found for successful login');
-        }
-        
-        // Additional wait to ensure dashboard is fully loaded
-        await page.waitForTimeout(2000);
-        
-        // Save the authentication state
-        await context.storageState({ path: storageFile });
-        console.log(`Authentication state saved to: ${storageFile}`);
-        
-        // Also save credentials for future use
-        const credentialsFile = path.join(__dirname, 'stored-credentials.json');
-        const credentials = { username: loginUsername, password: loginPassword };
-        fs.writeFileSync(credentialsFile, JSON.stringify(credentials, null, 2));
-        console.log(`Credentials saved to: ${credentialsFile}`);
-        
-        // Capture session data for Supabase
-        const storageState = await context.storageState();
-        
-        // Capture cookies and calculate expiration like the original implementation
-        let cookies = await context.cookies();
-        console.log(`Cookies captured from logged-in session: ${cookies.length}`);
-        
-        // If no cookies with expiration found, wait a bit more and try again
-        const cookiesWithExpiration = cookies.filter(cookie => 
-          cookie.expires !== -1 && cookie.expires !== undefined
-        );
-        
-        if (cookiesWithExpiration.length === 0) {
-          console.log('No cookies with expiration found initially, waiting longer...');
-          await page.waitForTimeout(5000); // Wait 5 more seconds
-          cookies = await context.cookies();
-          console.log(`Cookies after additional wait: ${cookies.length}`);
-        }
-        
-        // Extract cookie expiration information from the actual cookie structure
-        const cookieExpirations = cookies
-          .filter(cookie => {
-            // Filter out session cookies (no expiration) and cookies without expiration
-            return cookie.expires !== -1 && cookie.expires !== undefined;
-          })
-          .map(cookie => {
-            // Convert Unix timestamp to ISO date
-            const expiresDate = cookie.expires ? new Date(cookie.expires * 1000).toISOString() : null;
-            return {
-              name: cookie.name,
-              domain: cookie.domain,
-              expires: cookie.expires,
-              expiresDate: expiresDate,
-              rawCookie: cookie // Include full cookie for debugging
-            };
-          });
-
-        // Find the earliest expiration time
-        const validExpirations = cookieExpirations.filter(c => c.expires && c.expires !== -1);
-        const earliestExpiration = validExpirations.length > 0 
-          ? Math.min(...validExpirations.map(c => c.expires))
-          : null;
-
-        // NEW: Capture session storage data
-        console.log('Capturing session storage data...');
-        const sessionStorageData = await captureSessionStorageData(page);
-        console.log(`Session storage captured: ${Object.keys(sessionStorageData).length} items`);
-        Object.entries(sessionStorageData).forEach(([key, value]) => {
-          console.log(`  - ${key}: ${value}`);
-        });
-
-        const sessionData = { 
-          ...storageState,
-          cookies,
-          cookieExpirations,
-          earliestExpiration,
-          earliestExpirationDate: earliestExpiration ? new Date(earliestExpiration * 1000).toISOString() : null,
-          sessionStorage: sessionStorageData // NEW: Include session storage data
-        };
-
-        console.log(`Captured ${cookies.length} cookies from logged-in session`);
-        console.log(`Cookies with expiration:`, cookieExpirations.length);
-        cookieExpirations.forEach(cookie => {
-          console.log(`  - ${cookie.name}: expires ${cookie.expiresDate}`);
-        });
-        console.log(`Earliest expiration: ${sessionData.earliestExpirationDate}`);
-        console.log('Session data captured for Supabase');
-        
-                                    // Save or update credentials in Supabase upon successful login FIRST
-         let savedCredentialId = null;
-         try {
-           console.log('Saving credentials after successful login...');
-           
-           // Determine game ID from URL
-           const gameId = getGameIdFromUrl(loginGameUrl);
-           
-           if (!gameId) {
-             console.error('Could not determine game ID for credential saving');
-             console.log('Login successful but could not save credentials - game ID unknown');
-           } else {
-                        console.log(`Using game ID: ${gameId} for credential saving`);
-           console.log(`Using team ID: ${loginTeamId} for credential saving`);
-           
-            
-             const savedCredential = await saveOrUpdateCredentials(
-               loginUsername, 
-               loginPassword, 
-               loginTeamId, 
-               gameId
-             );
-             console.log('Credentials saved/updated successfully:', savedCredential.id);
-             savedCredentialId = savedCredential.id; // Store the credential ID for session creation
-           }
-         } catch (error) {
-           console.error('Failed to save credentials after successful login:', error);
-           // Don't fail the entire login process if credential saving fails
-         }
-         
-         // Save session to Supabase (only if enabled) - use the saved credential ID
-         if (saveToSupabase) {
-           try {
-             // Use the saved credential ID if available, otherwise use the provided one
-             const sessionCredentialId = savedCredentialId || loginGameCredentialId;
-             console.log(`Using team ID: ${loginTeamId} for session saving`);
-             await saveSessionToSupabase(loginUsername, loginPassword, loginGameUrl, sessionData, loginUserId, sessionCredentialId, loginTeamId);
-             console.log('Session saved to Supabase successfully!');
-           } catch (error) {
-             console.error('Failed to save session to Supabase:', error);
-           }
-         } else {
-           console.log('Skipping Supabase save (disabled via parameter)');
-         }
-        
-         console.log('You can now run account creation without logging in again!');
-         
-         // Stop screenshot capture
-         stopScreenshotCapture();
-         
-         // Close the browser after successful login and state saving
-         await browser.close();
-         console.log('Browser closed successfully.');
-         
-                   // Return success result for queue processing
-          return {
-            success: true,
-            message: 'Login successful',
-            sessionToken: 'session-token', // This will be generated by the session manager
-            gameCredentialId: savedCredentialId || loginGameCredentialId
-          };
-        
-      } else if (loginResult.result === 'captcha_error') {
-        console.log(`Captcha error on attempt ${attempt} - will retry with fresh page`);
-        
-        // Log captcha as FAIL if we have captcha data
-        if (loginResult.captchaData) {
-          console.log('Captcha error detected - logging captcha as FAIL');
-          loginResult.captchaData.apiStatus = 'fail';
-          await logCaptchaToSupabase(
-            loginResult.captchaData.imagePath,
-            loginResult.captchaData.apiResponse,
-            loginResult.captchaData.apiStatus
-          );
-        }
-        
-        // Stop screenshot capture
-        stopScreenshotCapture();
-        
-        console.log('Closing browser due to captcha error...');
-        await browser.close();
-        console.log('Browser closed successfully after captcha error');
-        
-        if (attempt < maxRetries) {
-          console.log(`Retrying in 3 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          attempt++;
-        } else {
-          console.log(`Max retries (${maxRetries}) reached. Closing browser.`);
-          // Stop screenshot capture
-          stopScreenshotCapture();
-          await browser.close();
-          return {
-            success: false,
-            message: 'Login failed after max retries due to captcha errors'
-          };
-        }
-        
-      } else {
-        // Login failed for other reasons (e.g., credentials)
-        // Log captcha as SUCCESS if we have captcha data (since it's not a captcha error)
-        if (loginResult.captchaData) {
-          console.log('Login failed for non-captcha reasons - logging captcha as SUCCESS');
-          loginResult.captchaData.apiStatus = 'success';
-          await logCaptchaToSupabase(
-            loginResult.captchaData.imagePath,
-            loginResult.captchaData.apiResponse,
-            loginResult.captchaData.apiStatus
-          );
-        }
-        
-        // Stop screenshot capture
-        stopScreenshotCapture();
-        
-        await browser.close();
-        return {
-          success: false,
-          message: 'Login failed due to invalid credentials or other errors'
-        };
-      }
-      
-    } catch (error) {
-      console.error('Error during login process:', error);
-      // Stop screenshot capture
-      stopScreenshotCapture();
-      await browser.close();
-      return {
-        success: false,
-        message: `Login error: ${error.message}`
-      };
-    }
-  }
-}
+// REMOVED: loginAndSaveState function - no longer used with new team-isolated browser architecture
+// This function created its own browser instances and used file-based storage
+// The new architecture uses loginWithPersistentPage with shared browser instances
 
 // NEW: Login function that works with persistent page
 async function loginWithPersistentPage(page, context, providedUsername, providedPassword, providedGameUrl, providedUserId, providedGameCredentialId, providedParams) {
@@ -1224,10 +897,10 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
   // Always use manually entered credentials from params, never fall back to saved ones
   const loginUsername = providedParams?.username || '';
   const loginPassword = providedParams?.password || '';
-  const loginGameUrl = providedGameUrl || gameurl;
-  const loginUserId = providedUserId || userId;
+  const loginGameUrl = providedGameUrl || '';
+  const loginUserId = providedUserId || 'default-user-id';
   const loginGameCredentialId = providedGameCredentialId || 0;
-  const loginTeamId = providedParams?.teamId || teamId;
+  const loginTeamId = providedParams?.teamId;
   const loginSessionId = providedParams?.sessionId || 'unknown';
   
   if (!loginTeamId) {
@@ -1398,19 +1071,15 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
           // Don't fail the entire login process if credential saving fails
         }
         
-        // Save session to Supabase (only if enabled) - use the saved credential ID
-        if (saveToSupabase) {
-          try {
-            // Use the saved credential ID if available, otherwise use the provided one
-            const sessionCredentialId = savedCredentialId || loginGameCredentialId;
-            console.log(`Using team ID: ${loginTeamId} for session saving`);
-            await saveSessionToSupabase(loginUsername, loginPassword, loginGameUrl, sessionData, loginUserId, sessionCredentialId, loginTeamId);
-            console.log('Session saved to Supabase successfully!');
-          } catch (error) {
-            console.error('Failed to save session to Supabase:', error);
-          }
-        } else {
-          console.log('Skipping Supabase save (disabled via parameter)');
+        // Save session to Supabase - use the saved credential ID
+        try {
+          // Use the saved credential ID if available, otherwise use the provided one
+          const sessionCredentialId = savedCredentialId || loginGameCredentialId;
+          console.log(`Using team ID: ${loginTeamId} for session saving`);
+          await saveSessionToSupabase(loginUsername, loginPassword, loginGameUrl, sessionData, loginUserId, sessionCredentialId, loginTeamId);
+          console.log('Session saved to Supabase successfully!');
+        } catch (error) {
+          console.error('Failed to save session to Supabase:', error);
         }
         
         console.log('You can now run account creation without logging in again!');
@@ -1491,13 +1160,10 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
   }
 }
 
-// Export the functions for use in the queue system
+// Export the function for use in the queue system
 module.exports = {
-  loginAndSaveState,
   loginWithPersistentPage
 };
 
-// Run the function if this script is executed directly
-if (require.main === module) {
-  loginAndSaveState().catch(console.error);
-}
+// REMOVED: Direct script execution - no longer used with new architecture
+// The script is now called programmatically through action wrappers

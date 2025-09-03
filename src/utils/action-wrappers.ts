@@ -1,4 +1,4 @@
-import { executeWithSession, executeWithPersistentPage, SessionManager } from './session-manager';
+import { executeWithPersistentPage, SessionManager } from './session-manager';
 import { Page, BrowserContext } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import { screenshotWebSocketServer } from './websocket-server';
