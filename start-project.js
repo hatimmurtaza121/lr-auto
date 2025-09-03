@@ -24,7 +24,53 @@ function isPortAvailable(port) {
   });
 }
 
-// Check all required ports
+// Start Redis with Docker
+async function startRedis() {
+  return new Promise((resolve, reject) => {
+    console.log('Starting Redis with Docker...');
+    
+    // Try to start existing container first
+    const startExisting = spawn('docker', ['start', 'redis'], { stdio: 'pipe' });
+    
+    startExisting.on('close', (code) => {
+      if (code === 0) {
+        console.log('Redis container started successfully!');
+        setTimeout(() => resolve(), 2000);
+      } else {
+        // If start failed, create a new container
+        console.log('Creating new Redis container...');
+        const createNew = spawn('docker', [
+          'run', '-d',
+          '--name', 'redis',
+          '-p', '6379:6379',
+          'redis:alpine'
+        ], { stdio: 'inherit' });
+
+        createNew.on('close', (runCode) => {
+          if (runCode === 0) {
+            console.log('Redis container created and started successfully!');
+            setTimeout(() => resolve(), 2000);
+          } else {
+            console.error('Failed to create Redis container');
+            reject(new Error('Failed to create Redis container'));
+          }
+        });
+
+        createNew.on('error', (error) => {
+          console.error('Error creating Redis container:', error.message);
+          reject(error);
+        });
+      }
+    });
+
+    startExisting.on('error', (error) => {
+      console.error('Error starting Redis container:', error.message);
+      reject(error);
+    });
+  });
+}
+
+// Check all required ports and start Redis if needed
 async function checkPorts() {
   console.log('Checking required ports...');
   
@@ -40,10 +86,19 @@ async function checkPorts() {
   console.log(`WebSocket server (port ${PORTS.WEBSOCKET}): ${websocketAvailable ? 'Available' : 'In use'}`);
   console.log(`Redis server (port ${PORTS.REDIS}): ${redisAvailable ? 'Not running' : 'Running'}`);
   
+  // If Redis is not running, start it automatically
   if (redisAvailable) {
-    console.error('\nRedis is not running on port 6379!');
-    console.log('Please start Redis before running this project.');
-    process.exit(1);
+    console.log('\nRedis is not running. Starting Redis automatically...');
+    try {
+      await startRedis();
+      console.log('Redis is now running and ready!');
+    } catch (error) {
+      console.error('\nFailed to start Redis automatically.');
+      console.log('Please make sure Docker is installed and running.');
+      console.log('You can also start Redis manually with:');
+      console.log('docker run -d -p 6379:6379 --name redis redis:alpine');
+      process.exit(1);
+    }
   }
   
   if (!nextDevAvailable) {

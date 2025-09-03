@@ -4,12 +4,13 @@
 
 ### Prerequisites
 
-1. **Redis Server** - Required for job queue management
-   - Install Redis on your system
-   - On Windows, you can use:
-     - Windows Subsystem for Linux (WSL)
-     - Redis for Windows: https://github.com/microsoftarchive/redis/releases
-     - Docker: `docker run -d -p 6379:6379 redis:alpine`
+1. **Docker** - Required for Redis server (starts automatically)
+   - Docker Desktop must be installed and running
+   - Redis will be started automatically when you run `npm start`
+   - **Alternative: Manual Redis start**
+     ```bash
+     docker run -d -p 6379:6379 --name redis redis:alpine
+     ```
 
 2. **Node.js** - Version 18 or higher
 3. **npm** - Package manager

@@ -5,13 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node start-project.js",
     "lint": "next lint",
     "test:gemini": "node scripts/test-gemini.js",
     "login": "node scripts/login.js",
     "global-worker": "tsx src/queue/start-global-worker.ts",
-    "start-all": "concurrently \"npm run dev\" \"npm run global-worker\"",
-    "start": "node start-project.js"
+    "start-all": "concurrently \"npm run dev\" \"npm run global-worker\""
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
