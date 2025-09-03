@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Navbar from '@/components/Navbar';
 import Loader from '@/components/Loader';
+import ScriptEditor from '@/components/ScriptEditor';
 
 interface Team {
   id: number;
@@ -66,6 +67,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
   const [actionFields, setActionFields] = useState<Array<{ label: string }>>([]);
   const [showScriptEditor, setShowScriptEditor] = useState(false);
   const [gameDropdownOpen, setGameDropdownOpen] = useState(false);
+  const [scriptEditorOpen, setScriptEditorOpen] = useState(false);
 
   // Update form data when editData changes or when modal opens
   useEffect(() => {
@@ -383,26 +385,14 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                   </label>
                   <button
                     type="button"
-                    onClick={() => setShowScriptEditor(!showScriptEditor)}
+                    onClick={() => setScriptEditorOpen(true)}
                     className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
                   >
-                    {showScriptEditor ? 'Hide Editor' : 'Edit Script'}
+                    Edit Script
                   </button>
                 </div>
                 
-                {showScriptEditor && (
-                  <div className="space-y-2">
-                    <textarea
-                      value={formData.script_code}
-                      onChange={(e) => setFormData({...formData, script_code: e.target.value})}
-                      placeholder="// Enter your Playwright automation script here..."
-                      className="w-full h-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
-                      rows={12}
-                    />
-                  </div>
-                )}
-                
-                {!showScriptEditor && formData.script_code && (
+                {formData.script_code && (
                   <div className="p-3 bg-gray-50 rounded-md border">
                     <p className="text-sm text-gray-600 mb-2">Script code is set (click "Edit Script" to view/edit)</p>
                     <div className="text-xs text-gray-500 font-mono bg-white p-2 rounded border overflow-hidden">
@@ -410,6 +400,12 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                         ? `${formData.script_code.substring(0, 100)}...` 
                         : formData.script_code}
                     </div>
+                  </div>
+                )}
+                
+                {!formData.script_code && (
+                  <div className="p-3 bg-gray-50 rounded-md border">
+                    <p className="text-sm text-gray-600 mb-2">No script code set (click "Edit Script" to add)</p>
                   </div>
                 )}
               </div>
@@ -434,6 +430,18 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
           </div>
         </form>
       </div>
+      
+      {/* Script Editor Modal */}
+      <ScriptEditor
+        isOpen={scriptEditorOpen}
+        onClose={() => setScriptEditorOpen(false)}
+        onSave={(script) => {
+          setFormData({...formData, script_code: script});
+          setScriptEditorOpen(false);
+        }}
+        initialScript={formData.script_code}
+        title={`Edit Script - ${formData.display_name || formData.name}`}
+      />
     </div>
   );
 }
