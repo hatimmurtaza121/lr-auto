@@ -1,4 +1,4 @@
-import { executeWithSession } from './session-manager';
+import { executeWithSession, executeWithPersistentPage, SessionManager } from './session-manager';
 import { Page, BrowserContext } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import { screenshotWebSocketServer } from './websocket-server';
@@ -93,14 +93,16 @@ export async function createNewAccountWithSession(
     originalLog(...args);
   };
 
-  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+  // Get game info to extract team and game IDs
+  const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+  
+  const result = await executeWithPersistentPage(userId, gameCredentialId, gameInfo.team_id, gameInfo.game.id, async (page: Page, context: BrowserContext) => {
     // Handle both old camelCase and new snake_case parameter names
     const newAccountName = params.newAccountName || params.account_name || "testing07";
     const newPassword = params.newPassword || params.new_password || "Hatim121";
     
     try {
-      // Get game info to determine script path
-      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      // Game info already retrieved above
       
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
@@ -148,7 +150,10 @@ export async function resetPasswordWithSession(
   gameCredentialId: number,
   params: ActionParams
 ): Promise<{ success: boolean; message: string; username?: string; needsLogin?: boolean; gameInfo?: any }> {
-  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+  // Get game info to extract team and game IDs
+  const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+  
+  const result = await executeWithPersistentPage(userId, gameCredentialId, gameInfo.team_id, gameInfo.game.id, async (page: Page, context: BrowserContext) => {
     // Handle both old camelCase and new snake_case parameter names
     const targetUsername = params.targetUsername || params.target_username;
     const newPassword = params.newPassword || params.new_password || "NewPassword123";
@@ -161,8 +166,7 @@ export async function resetPasswordWithSession(
     }
 
     try {
-      // Get game info to determine script path
-      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      // Game info already retrieved above
       
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
@@ -206,7 +210,10 @@ export async function rechargeWithSession(
   gameCredentialId: number,
   params: ActionParams
 ): Promise<{ success: boolean; message: string; username?: string; amount?: number; needsLogin?: boolean; gameInfo?: any }> {
-  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+  // Get game info to extract team and game IDs
+  const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+  
+  const result = await executeWithPersistentPage(userId, gameCredentialId, gameInfo.team_id, gameInfo.game.id, async (page: Page, context: BrowserContext) => {
     // Handle both old camelCase and new snake_case parameter names
     const targetUsername = params.targetUsername || params.target_username;
     const amount = params.amount || 0;
@@ -227,8 +234,7 @@ export async function rechargeWithSession(
     }
 
     try {
-      // Get game info to determine script path
-      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      // Game info already retrieved above
       
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
@@ -274,7 +280,10 @@ export async function redeemWithSession(
   gameCredentialId: number,
   params: ActionParams
 ): Promise<{ success: boolean; message: string; username?: string; amount?: number; needsLogin?: boolean; gameInfo?: any }> {
-  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+  // Get game info to extract team and game IDs
+  const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+  
+  const result = await executeWithPersistentPage(userId, gameCredentialId, gameInfo.team_id, gameInfo.game.id, async (page: Page, context: BrowserContext) => {
     // Handle both old camelCase and new snake_case parameter names
     const targetUsername = params.targetUsername || params.target_username;
     const amount = params.amount || 0;
@@ -295,8 +304,7 @@ export async function redeemWithSession(
     }
 
     try {
-      // Get game info to determine script path
-      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      // Game info already retrieved above
       
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();
@@ -354,49 +362,81 @@ export async function loginWithSession(
     originalLog(...args);
   };
 
+  // For login, we need to bypass the session check and go directly to login
+  const sessionManager = SessionManager.getInstance();
+  let page: Page | undefined;
+  let context: BrowserContext | undefined;
+  
   try {
-    // Get game info to determine script path (but don't use saved credentials)
+    // Get game info
     const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
     
-    // Ensure WebSocket server is initialized and make it available to the script
-    ensureWebSocketServerInitialized();
-    (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+    // Get the persistent page for this team+game combination
+    page = await sessionManager.getPersistentPage(gameInfo.team_id, gameInfo.game.id);
+    if (!page) {
+      throw new Error('Failed to get persistent page');
+    }
+    context = page.context();
     
-    // Import and execute the login script function
-    const scriptModule = require(`../../scripts/login.js`);
-    // console.log('Login wrapper - passing teamId to script:', teamId);
-    // console.log('Login wrapper - params:', params);
-    // Always use manually entered credentials, never fall back to saved ones
-    const loginResult = await scriptModule.loginAndSaveState(
-      params?.username || '', // Use whatever is in the input fields
-      params?.password || '', // Use whatever is in the input fields
-      gameInfo.game.login_url,
-      userId,
-      gameCredentialId,
-      { ...params, teamId, sessionId } // Pass the params, teamId, and sessionId to the login script
-    );
+    // Navigate to the login URL (not dashboard)
+    await page.goto(gameInfo.game.login_url);
+    await page.waitForLoadState('networkidle');
     
+    // Execute the login function with the persistent page
+    const result = await (async (page: Page, context: BrowserContext) => {
+      try {
+        // Ensure WebSocket server is initialized and make it available to the script
+        ensureWebSocketServerInitialized();
+        (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+        
+        // Import and execute the login script function with the persistent page
+        const scriptModule = require(`../../scripts/login.js`);
+        // console.log('Login wrapper - passing teamId to script:', teamId);
+        // console.log('Login wrapper - params:', params);
+        // Always use manually entered credentials, never fall back to saved ones
+        const loginResult = await scriptModule.loginWithPersistentPage(
+          page, // Pass the persistent page
+          context, // Pass the persistent context
+          params?.username || '', // Use whatever is in the input fields
+          params?.password || '', // Use whatever is in the input fields
+          gameInfo.game.login_url,
+          userId,
+          gameCredentialId,
+          { ...params, teamId, sessionId } // Pass the params, teamId, and sessionId to the login script
+        );
+        
+        if (loginResult.success) {
+          // Generate a session token for the successful login
+          const sessionToken = crypto.randomBytes(32).toString('hex');
+          
+          return {
+            success: true,
+            message: 'Login successful',
+            sessionToken: sessionToken,
+            gameCredentialId: gameCredentialId,
+            logs
+          };
+        } else {
+          return {
+            success: false,
+            message: loginResult.message || 'Login failed',
+            logs
+          };
+        }
+      } catch (error) {
+        return {
+          success: false,
+          message: `Error during login: ${error}`,
+          logs
+        };
+      }
+    })(page, context);
+
     // Restore original console.log
     console.log = originalLog;
+
+    return result;
     
-    if (loginResult.success) {
-      // Generate a session token for the successful login
-      const sessionToken = crypto.randomBytes(32).toString('hex');
-      
-      return {
-        success: true,
-        message: 'Login successful',
-        sessionToken: sessionToken,
-        gameCredentialId: gameCredentialId,
-        logs
-      };
-    } else {
-      return {
-        success: false,
-        message: loginResult.message || 'Login failed',
-        logs
-      };
-    }
   } catch (error) {
     // Restore original console.log
     console.log = originalLog;
@@ -420,12 +460,14 @@ export async function executeDynamicActionWithSession(
   teamId?: number,
   sessionId?: string
 ): Promise<{ success: boolean; message: string; needsLogin?: boolean; gameInfo?: any }> {
-  const result = await executeWithSession(userId, gameCredentialId, async (page: Page, context: BrowserContext) => {
+  // Get game info to extract team and game IDs
+  const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+  
+  const result = await executeWithPersistentPage(userId, gameCredentialId, gameInfo.team_id, gameInfo.game.id, async (page: Page, context: BrowserContext) => {
     // console.log(`Starting dynamic action: ${actionName} with params:`, params);
 
     try {
-      // Get game info to determine script path
-      const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
+      // Game info already retrieved above
       
       // Ensure WebSocket server is initialized and make it available to the script
       ensureWebSocketServerInitialized();

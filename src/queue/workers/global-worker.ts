@@ -171,6 +171,97 @@ export class GlobalWorker {
       // Race between execution and timeout
       result = await Promise.race([executionPromise, timeoutPromise]);
 
+      // Check if result indicates session expired and needs login
+      if (result && typeof result === 'object' && result.needsLogin === true) {
+        console.log(`Job ${job.id}: Session expired, automatically triggering login for ${data.gameName}`);
+        
+        // Broadcast that we're triggering automatic login
+        this.broadcastWorkerStatus(true, `Session expired, logging in...`, [`Session expired, logging in...`]);
+        await this.broadcastGameLogUpdate(data.gameName, `Session expired, logging in...`, [`Session expired, logging in...`], data.gameCredentialId);
+        
+        try {
+          // Get credentials from database for automatic login
+          const sessionManager = (await import('@/utils/session-manager')).SessionManager.getInstance();
+          const gameCredential = await sessionManager.getGameCredentialInfo(data.gameCredentialId);
+          
+          console.log(`Job ${job.id}: Retrieved credentials from database:`, {
+            gameCredentialId: data.gameCredentialId,
+            username: gameCredential.username,
+            password: gameCredential.password ? '***' : 'EMPTY',
+            gameName: gameCredential.game.name
+          });
+          
+          // Check if credentials are empty
+          if (!gameCredential.username || !gameCredential.password) {
+            console.error(`Job ${job.id}: Credentials are empty in database for gameCredentialId=${data.gameCredentialId}`);
+            result = {
+              success: false,
+              message: `No saved credentials found for ${data.gameName}. Please login manually first.`
+            };
+          } else {
+            // Use the saved credentials for automatic login
+            const loginParams = {
+              username: gameCredential.username,
+              password: gameCredential.password,
+              teamId: data.teamId,
+              sessionId: data.sessionId
+            };
+            
+            console.log(`Job ${job.id}: Using saved credentials for automatic login: username=${gameCredential.username}`);
+            
+            // Ensure WebSocket server is available for screenshots during automatic login
+            const { screenshotWebSocketServer } = await import('@/utils/websocket-server');
+            if (!screenshotWebSocketServer.isServerInitialized()) {
+              screenshotWebSocketServer.initialize(8080);
+            }
+            (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+            
+            // Trigger automatic login with saved credentials
+            const loginResult = await loginWithSession(
+              data.userId,
+              data.gameCredentialId,
+              loginParams,
+              data.teamId,
+              data.sessionId
+            );
+          
+          if (loginResult.success) {
+            console.log(`Job ${job.id}: Automatic login successful, retrying original action`);
+            
+            // Retry the original action after successful login
+            this.broadcastWorkerStatus(true, `Login successful, retrying ${data.action}...`, [`Login successful, retrying ${data.action}...`]);
+            await this.broadcastGameLogUpdate(data.gameName, `Login successful, retrying ${data.action}...`, [`Login successful, retrying ${data.action}...`], data.gameCredentialId);
+            
+            // Execute the original action again
+            if (data.action === 'login') {
+              result = loginResult; // If it was a login action, use the login result
+            } else {
+              result = await executeDynamicActionWithSession(
+                data.userId,
+                data.gameCredentialId,
+                data.action,
+                data.params || {},
+                data.teamId,
+                data.sessionId
+              );
+            }
+          } else {
+            console.log(`Job ${job.id}: Automatic login failed: ${loginResult.message}`);
+            result = {
+              success: false,
+              message: `Automatic login failed: ${loginResult.message}`
+            };
+          }
+          }
+        } catch (loginError) {
+          console.error(`Job ${job.id}: Error during automatic login:`, loginError);
+          result = {
+            success: false,
+            message: `Automatic login error: ${loginError instanceof Error ? loginError.message : String(loginError)}`
+          };
+        }
+      }
+
       await job.updateProgress(100);
       
       // Calculate execution time using BullMQ's built-in timing

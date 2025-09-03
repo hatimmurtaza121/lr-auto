@@ -54,6 +54,36 @@ console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY 
 console.log('Current working directory:', process.cwd());
 console.log('Env file path:', require('path').resolve('.env.local'));
 
+// Function to capture session storage data from the browser
+async function captureSessionStorageData(page) {
+  try {
+    console.log('Capturing session storage data from browser...');
+    
+    // Execute JavaScript in the browser to get session storage
+    const sessionStorageData = await page.evaluate(() => {
+      const data = {};
+      try {
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key) {
+            data[key] = sessionStorage.getItem(key);
+          }
+        }
+        console.log('Session storage items found:', Object.keys(data));
+      } catch (error) {
+        console.error('Error accessing session storage:', error);
+      }
+      return data;
+    });
+    
+    console.log(`Session storage captured: ${Object.keys(sessionStorageData).length} items`);
+    return sessionStorageData;
+  } catch (error) {
+    console.error('Error capturing session storage:', error);
+    return {};
+  }
+}
+
 async function solveCaptchaWithGemini(captchaImagePath) {
   try {
     console.log('Sending captcha image to Gemini 2.0 Flash...');
@@ -491,6 +521,14 @@ async function loginToGame(loginUrl, username, password) {
         await context.storageState({ path: './auth-state.json' });
         console.log('Authentication state saved');
         
+        // NEW: Capture session storage data
+        console.log('Capturing session storage data...');
+        const sessionStorageData = await captureSessionStorageData(page);
+        console.log(`Session storage captured: ${Object.keys(sessionStorageData).length} items`);
+        Object.entries(sessionStorageData).forEach(([key, value]) => {
+          console.log(`  - ${key}: ${value}`);
+        });
+        
         // Browser stays open - user can continue using it
         console.log('Login complete! Browser will remain open for you to use.');
         return { success: true, message: 'Login successful', browser, context, page };
@@ -555,6 +593,14 @@ async function loginInExistingBrowser(page, teamId, gameId) {
         // Save the authentication state
         await page.context().storageState({ path: './auth-state.json' });
         console.log('Authentication state saved');
+        
+        // NEW: Capture session storage data
+        console.log('Capturing session storage data...');
+        const sessionStorageData = await captureSessionStorageData(page);
+        console.log(`Session storage captured: ${Object.keys(sessionStorageData).length} items`);
+        Object.entries(sessionStorageData).forEach(([key, value]) => {
+          console.log(`  - ${key}: ${value}`);
+        });
         
         return { success: true, message: 'Login successful' };
         

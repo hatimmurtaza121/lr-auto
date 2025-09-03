@@ -131,7 +131,7 @@ export async function executeActionScript(
             // Create a proper async function that can handle await statements
             // We need to define the async function explicitly in the Function constructor
             const executeScript = new Function(
-                'page', 'context', 'params', 'createWebSocketScreenshotCapture',
+                'page', 'context', 'params', 'createWebSocketScreenshotCapture', 'restoreSessionStorageInPage',
                 `
                 // Define an async function that will execute the script
                 const runScript = async function() {
@@ -156,7 +156,7 @@ export async function executeActionScript(
             );
             
             // Execute and await the result
-            result = await executeScript(page, context, params, createWebSocketScreenshotCapture);
+            result = await executeScript(page, context, params, createWebSocketScreenshotCapture, restoreSessionStorageInPage);
             
             // Ensure the result has the expected structure
             if (result && typeof result === 'object') {
@@ -263,19 +263,50 @@ async function getFallbackScript(actionName: string, gameName: string, gameId: n
     }
 }
 
+// Helper function to restore session storage in a page
+export async function restoreSessionStorageInPage(page: Page, sessionStorageData: Record<string, string>): Promise<void> {
+  try {
+    if (sessionStorageData && Object.keys(sessionStorageData).length > 0) {
+      console.log('Restoring session storage data...');
+      console.log(`Session storage items to restore: ${Object.keys(sessionStorageData).length}`);
+      
+      await page.evaluate((sessionStorageData) => {
+        try {
+          // Restore session storage data (don't clear existing)
+          Object.entries(sessionStorageData).forEach(([key, value]) => {
+            sessionStorage.setItem(key, value);
+            console.log(`Restored session storage: ${key} = ${value}`);
+          });
+          
+          console.log('Session storage restoration completed');
+        } catch (error) {
+          console.error('Error restoring session storage:', error);
+        }
+      }, sessionStorageData);
+      
+      console.log('Session storage data restored successfully');
+    } else {
+      console.log('No session storage data to restore');
+    }
+  } catch (error) {
+    console.error('Error restoring session storage:', error);
+    // Don't throw error - session storage restoration is not critical
+  }
+}
+
 // Helper function to validate script code
 export function validateScriptCode(scriptCode: string): { isValid: boolean; error?: string } {
-    try {
-        // Wrap the script code in an async function to handle await statements
-        const wrappedCode = `(async function(page, context, params, createWebSocketScreenshotCapture) {\n${scriptCode}\n})`;
-        
-        // Basic validation - check if it's valid JavaScript
-        new Function('page', 'context', 'params', 'createWebSocketScreenshotCapture', wrappedCode);
-        return { isValid: true };
-    } catch (error) {
-        return { 
-            isValid: false, 
-            error: error instanceof Error ? error.message : 'Invalid script syntax' 
-        };
-    }
+  try {
+    // Wrap the script code in an async function to handle await statements
+    const wrappedCode = `(async function(page, context, params, createWebSocketScreenshotCapture) {\n${scriptCode}\n})`;
+    
+    // Basic validation - check if it's valid JavaScript
+    new Function('page', 'context', 'params', 'createWebSocketScreenshotCapture', wrappedCode);
+    return { isValid: true };
+  } catch (error) {
+    return { 
+      isValid: false, 
+      error: error instanceof Error ? error.message : 'Invalid script syntax' 
+    };
+  }
 }

@@ -7,6 +7,7 @@ class BrowserRegistry {
   private browsers: Set<Browser> = new Set();
   private contexts: Set<BrowserContext> = new Set();
   private pages: Set<Page> = new Set();
+  private persistentPages: Set<Page> = new Set(); // NEW: Track persistent pages separately
 
   registerBrowser(browser: Browser) {
     this.browsers.add(browser);
@@ -18,6 +19,11 @@ class BrowserRegistry {
 
   registerPage(page: Page) {
     this.pages.add(page);
+  }
+
+  registerPersistentPage(page: Page) {
+    this.persistentPages.add(page);
+    console.log('BrowserRegistry: Registered persistent page for protection');
   }
 
   unregisterBrowser(browser: Browser) {
@@ -32,18 +38,24 @@ class BrowserRegistry {
     this.pages.delete(page);
   }
 
+  unregisterPersistentPage(page: Page) {
+    this.persistentPages.delete(page);
+    console.log('BrowserRegistry: Unregistered persistent page');
+  }
+
   /**
-   * Force cleanup all browser resources
+   * Force cleanup all browser resources (EXCLUDING persistent pages)
    */
   async cleanupAll() {
-    console.log('BrowserRegistry: Starting forced cleanup of all resources...');
+    console.log('BrowserRegistry: Starting forced cleanup of all resources (excluding persistent pages)...');
     
-    // Close all pages
-    for (const page of this.pages) {
+    // Close all regular pages (NOT persistent pages)
+    const pagesToClose = Array.from(this.pages);
+    for (const page of pagesToClose) {
       try {
         if (!page.isClosed()) {
           await page.close();
-          console.log('BrowserRegistry: Closed page');
+          console.log('BrowserRegistry: Closed regular page');
         }
       } catch (error) {
         console.error('BrowserRegistry: Error closing page:', error);
@@ -51,11 +63,23 @@ class BrowserRegistry {
     }
     this.pages.clear();
 
-    // Close all contexts
-    for (const context of this.contexts) {
+    // DO NOT close persistent pages - they should persist across jobs
+    console.log(`BrowserRegistry: Preserving ${this.persistentPages.size} persistent pages for session continuity`);
+
+    // Close all contexts EXCEPT those containing persistent pages
+    const contextsToClose = Array.from(this.contexts);
+    for (const context of contextsToClose) {
       try {
-        await context.close();
-        console.log('BrowserRegistry: Closed context');
+        // Check if this context contains any persistent pages
+        const contextPages = context.pages();
+        const hasPersistentPages = contextPages.some(page => this.persistentPages.has(page));
+        
+        if (!hasPersistentPages) {
+          await context.close();
+          console.log('BrowserRegistry: Closed context without persistent pages');
+        } else {
+          console.log('BrowserRegistry: Preserving context with persistent pages');
+        }
       } catch (error) {
         console.error('BrowserRegistry: Error closing context:', error);
       }
@@ -160,6 +184,20 @@ export async function cleanupBrowserResourcesWithTimeout(timeoutMs: number = 100
  */
 export function registerBrowserForCleanup(browser: Browser) {
   browserRegistry.registerBrowser(browser);
+}
+
+/**
+ * Register a persistent page (will NOT be closed during cleanup)
+ */
+export function registerPersistentPageForCleanup(page: Page) {
+  browserRegistry.registerPersistentPage(page);
+}
+
+/**
+ * Unregister a persistent page
+ */
+export function unregisterPersistentPageForCleanup(page: Page) {
+  browserRegistry.unregisterPersistentPage(page);
 }
 
 /**

@@ -28,6 +28,14 @@ export interface SessionData {
     secure?: boolean;
     sameSite?: "Strict" | "Lax" | "None";
   }>;
+  origins?: Array<{
+    origin: string;
+    localStorage: Array<{
+      name: string;
+      value: string;
+    }>;
+  }>;
+  sessionStorage?: Record<string, string>; // NEW: Session storage data
 }
 
 export interface GameCredentials {
@@ -45,8 +53,11 @@ export interface GameInfo {
 }
 
 export class SessionManager {
-  private browser: Browser | null = null;
+  private browsers: Map<number, Browser> = new Map(); // NEW: Multiple browsers keyed by team ID
+  private persistentPages: Map<string, Page> = new Map(); // NEW: Multiple persistent pages keyed by team+game
+  private persistentContexts: Map<number, BrowserContext> = new Map(); // NEW: Multiple persistent contexts keyed by team ID
   private currentSessionId: number | null = null;
+  private static globalSessionManager: SessionManager | null = null; // NEW: Global instance
 
   /**
    * Validate session data structure
@@ -105,6 +116,7 @@ export class SessionManager {
    * Get existing session from database (most recent active session)
    */
   private async getExistingSession(userId: string, gameCredentialId: number) {
+    console.log(`Looking for session: userId=${userId}, gameCredentialId=${gameCredentialId}`);
     const supabase = getSupabaseClient();
     const { data: session, error } = await supabase
       .from('session')
@@ -133,17 +145,27 @@ export class SessionManager {
       .limit(1)
       .single() as any;
 
-    if (error || !session) {
+    if (error) {
+      console.log(`Session query error:`, error);
       return null;
     }
+    
+    if (!session) {
+      console.log(`No active session found for userId=${userId}, gameCredentialId=${gameCredentialId}`);
+      return null;
+    }
+    
+    console.log(`Found session: id=${session.id}, expires_at=${session.expires_at}, is_active=${session.is_active}`);
 
     // Check if session has expired or has no expiration date
     const now = new Date();
     const expiresAt = session.expires_at ? new Date(session.expires_at) : null;
     
+    console.log(`Session expiration check: now=${now.toISOString()}, expires_at=${session.expires_at}, expiresAt=${expiresAt?.toISOString()}`);
+    
     // Consider session inactive if expires_at is null or if it has expired
     if (!expiresAt || (expiresAt && now > expiresAt)) {
-      // console.log(`Session is inactive - expires_at: ${session.expires_at}`);
+      console.log(`Session is expired/inactive - expires_at: ${session.expires_at}, now: ${now.toISOString()}`);
       
       // Mark session as inactive
       const supabase = getSupabaseClient();
@@ -154,6 +176,8 @@ export class SessionManager {
       
       return null;
     }
+    
+    console.log(`Session is valid and active`);
 
     return {
       sessionData: session.session_data,
@@ -175,7 +199,7 @@ export class SessionManager {
   /**
    * Get game credential info
    */
-  private async getGameCredentialInfo(gameCredentialId: number) {
+  async getGameCredentialInfo(gameCredentialId: number) {
     const supabase = getSupabaseClient();
     const { data: gameCredential, error: credentialError } = await supabase
       .from('game_credential')
@@ -245,17 +269,22 @@ export class SessionManager {
   }
 
   /**
-   * Perform login and capture session data
+   * Perform login and capture session data (legacy method - uses default team browser)
    */
   private async performLogin(game: any): Promise<{
     sessionData: SessionData;
     credentials: GameCredentials;
   }> {
-    if (!this.browser) {
-      this.browser = await chromium.launch({ headless: config.BROWSER_HEADLESS });
+    // Use default team ID 1 for legacy compatibility
+    const defaultTeamId = 1;
+    let browser = this.browsers.get(defaultTeamId);
+    
+    if (!browser) {
+      browser = await chromium.launch({ headless: config.BROWSER_HEADLESS });
+      this.browsers.set(defaultTeamId, browser);
     }
 
-    const context = await this.browser.newContext();
+    const context = await browser.newContext();
     const page = await context.newPage();
 
     try {
@@ -426,22 +455,123 @@ export class SessionManager {
   }
 
   /**
-   * Create browser context with stored session
+   * Get global session manager instance (singleton)
+   */
+  static getInstance(): SessionManager {
+    if (!SessionManager.globalSessionManager) {
+      SessionManager.globalSessionManager = new SessionManager();
+    }
+    return SessionManager.globalSessionManager;
+  }
+
+  /**
+   * Get or create persistent page for specific team and game combination
+   */
+  async getPersistentPage(teamId: number, gameId: number): Promise<Page> {
+    const pageKey = `${teamId}-${gameId}`;
+    
+    // Check if we already have a persistent page for this team+game combination
+    let page = this.persistentPages.get(pageKey);
+    if (page && !page.isClosed()) {
+      console.log(`Using existing persistent page for team ${teamId}, game ${gameId}`);
+      return page;
+    }
+    
+    console.log(`Creating new persistent page for team ${teamId}, game ${gameId}`);
+    
+    // Get or create browser for this team
+    let browser = this.browsers.get(teamId);
+    if (!browser) {
+      browser = await chromium.launch({ 
+        headless: config.BROWSER_HEADLESS,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      this.browsers.set(teamId, browser);
+      
+      // Register browser for cleanup
+      try {
+        const { registerBrowserForCleanup } = await import('@/utils/browser-cleanup');
+        registerBrowserForCleanup(browser);
+      } catch (error) {
+        console.log('Could not register browser for cleanup:', error);
+      }
+    }
+    
+    // Get or create persistent context for this team
+    let context = this.persistentContexts.get(teamId);
+    if (!context) {
+      context = await browser.newContext();
+      this.persistentContexts.set(teamId, context);
+      
+      // Register context for cleanup (but it will be protected if it contains persistent pages)
+      try {
+        const { registerContextForCleanup } = await import('@/utils/browser-cleanup');
+        registerContextForCleanup(context);
+      } catch (error) {
+        console.log('Could not register persistent context for cleanup:', error);
+      }
+    }
+    
+    // Create new page from the team's context
+    page = await context.newPage();
+    this.persistentPages.set(pageKey, page);
+    
+    // Register persistent page for protection (will NOT be closed during cleanup)
+    try {
+      const { registerPersistentPageForCleanup } = await import('@/utils/browser-cleanup');
+      registerPersistentPageForCleanup(page);
+      console.log(`Persistent page created and registered for protection (team ${teamId}, game ${gameId})`);
+    } catch (error) {
+      console.log('Could not register persistent page for protection:', error);
+    }
+    
+    return page;
+  }
+
+  /**
+   * Create browser context with stored session (legacy method - uses default team browser)
    */
   async createAuthenticatedContext(sessionData: SessionData): Promise<BrowserContext> {
     try {
-      if (!this.browser) {
-        this.browser = await chromium.launch({ 
+      // Use default team ID 1 for legacy compatibility
+      const defaultTeamId = 1;
+      let browser = this.browsers.get(defaultTeamId);
+      
+      if (!browser) {
+        browser = await chromium.launch({ 
           headless: config.BROWSER_HEADLESS, // Use config setting
           args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
+        this.browsers.set(defaultTeamId, browser);
       }
 
-      const context = await this.browser.newContext();
+      const context = await browser.newContext();
       
       // Set cookies from session data
       if (sessionData.cookies && sessionData.cookies.length > 0) {
         await context.addCookies(sessionData.cookies);
+      }
+
+      // Set local storage from session data
+      if (sessionData.origins && sessionData.origins.length > 0) {
+        for (const origin of sessionData.origins) {
+          if (origin.localStorage && origin.localStorage.length > 0) {
+            // Create a page to set localStorage for this origin
+            const page = await context.newPage();
+            try {
+              await page.goto(origin.origin);
+              await page.evaluate((localStorageData) => {
+                localStorageData.forEach((item: any) => {
+                  localStorage.setItem(item.name, item.value);
+                });
+              }, origin.localStorage);
+              await page.close();
+            } catch (error) {
+              console.error(`Error setting localStorage for ${origin.origin}:`, error);
+              await page.close();
+            }
+          }
+        }
       }
 
       // Register context for cleanup
@@ -455,6 +585,63 @@ export class SessionManager {
       return context;
     } catch (error) {
       throw new Error(`Failed to create authenticated context: ${error}`);
+    }
+  }
+
+  /**
+   * Restore session data to the persistent context for specific team
+   */
+  async restoreSessionToPersistentContext(sessionData: SessionData, teamId: number, gameId: number): Promise<void> {
+    const context = this.persistentContexts.get(teamId);
+    
+    if (!context) {
+      console.log(`No persistent context found for team ${teamId}, game ${gameId}`);
+      return;
+    }
+
+    try {
+      console.log(`Restoring session data to persistent context for team ${teamId}, game ${gameId}:`, {
+        hasCookies: sessionData.cookies?.length || 0,
+        hasOrigins: sessionData.origins?.length || 0
+      });
+
+      // Set cookies from session data
+      if (sessionData.cookies && sessionData.cookies.length > 0) {
+        await context.addCookies(sessionData.cookies);
+        console.log(`Restored ${sessionData.cookies.length} cookies to persistent context for team ${teamId}, game ${gameId}`);
+      }
+
+      // Skip localStorage restoration to avoid temporary page creation
+      console.log('Skipping localStorage restoration to avoid temporary page creation');
+    } catch (error) {
+      console.error(`Error restoring session to persistent context for team ${teamId}, game ${gameId}:`, error);
+    }
+  }
+
+  /**
+   * Restore session storage data in a page after navigation
+   */
+  async restoreSessionStorageInPage(page: Page, sessionData: SessionData): Promise<void> {
+    try {
+      console.log('Restoring session data:', {
+        hasCookies: sessionData.cookies?.length || 0,
+        hasOrigins: sessionData.origins?.length || 0,
+        hasSessionStorage: !!sessionData.sessionStorage,
+        sessionStorageKeys: sessionData.sessionStorage ? Object.keys(sessionData.sessionStorage) : []
+      });
+      
+      // Import the utility function from script-executor
+      const { restoreSessionStorageInPage: restoreSessionStorage } = await import('@/utils/script-executor');
+      
+      // Use the utility function to restore session storage
+      if (sessionData.sessionStorage) {
+        await restoreSessionStorage(page, sessionData.sessionStorage);
+      } else {
+        console.log('No session storage data to restore');
+      }
+    } catch (error) {
+      console.error('Error restoring session storage:', error);
+      // Don't throw error - session storage restoration is not critical
     }
   }
 
@@ -570,33 +757,141 @@ export class SessionManager {
   }
 
   /**
+   * Get browser and resource statistics
+   */
+  getResourceStats() {
+    return {
+      totalBrowsers: this.browsers.size,
+      totalContexts: this.persistentContexts.size,
+      totalPages: this.persistentPages.size,
+      browsersByTeam: Array.from(this.browsers.keys()),
+      pagesByTeamGame: Array.from(this.persistentPages.keys())
+    };
+  }
+
+  /**
    * Clean up browser resources
    */
   async cleanup() {
-    if (this.browser) {
+    // DO NOT close persistent pages - we want them to persist across jobs!
+    console.log('SessionManager cleanup called - preserving persistent pages for session continuity');
+    
+    // Only close browser if explicitly requested (not during normal job execution)
+    // This method should rarely be called for the global session manager
+  }
+
+  /**
+   * Force cleanup - only call this when you want to completely reset everything
+   */
+  async forceCleanup() {
+    console.log('Force cleanup called - closing all persistent resources');
+    
+    // Close all persistent pages
+    for (const [pageKey, page] of this.persistentPages) {
+      if (page && !page.isClosed()) {
+        await page.close();
+      }
+    }
+    this.persistentPages.clear();
+    
+    // Close all persistent contexts
+    for (const [teamId, context] of this.persistentContexts) {
+      if (context) {
+        await context.close();
+      }
+    }
+    this.persistentContexts.clear();
+    
+    // Close all browsers
+    for (const [teamId, browser] of this.browsers) {
       // Unregister browser from cleanup registry
       try {
         const { unregisterBrowser } = await import('@/utils/browser-cleanup');
-        unregisterBrowser(this.browser);
+        unregisterBrowser(browser);
       } catch (error) {
         console.log('Could not unregister browser from cleanup:', error);
       }
       
-      await this.browser.close();
-      this.browser = null;
+      await browser.close();
     }
+    this.browsers.clear();
   }
 }
 
 /**
- * Wrapper function to execute actions with session management
+ * NEW: Execute actions with persistent page (same page for same team+game combination)
+ */
+export async function executeWithPersistentPage<T>(
+  userId: string,
+  gameCredentialId: number,
+  teamId: number,
+  gameId: number,
+  actionFunction: (page: Page, context: BrowserContext) => Promise<T>
+): Promise<T | { needsLogin: boolean; gameInfo: any }> {
+  const sessionManager = SessionManager.getInstance();
+  let page: Page | undefined;
+  let context: BrowserContext | undefined;
+  
+  try {
+    // Get or create session
+    const { sessionData, gameInfo, needsLogin } = await sessionManager.getOrCreateSession(userId, gameCredentialId);
+    
+    if (needsLogin) {
+      return { needsLogin: true, gameInfo };
+    }
+    
+    // Get the persistent page for this team+game combination
+    page = await sessionManager.getPersistentPage(teamId, gameId);
+    context = page.context();
+    
+    // Restore session data to the persistent context (cookies and localStorage)
+    await sessionManager.restoreSessionToPersistentContext(sessionData, teamId, gameId);
+    
+    // Navigate to the game dashboard
+    if (gameInfo.dashboard_url) {
+      await page.goto(gameInfo.dashboard_url);
+    } else {
+      await page.goto(gameInfo.login_url);
+    }
+    
+    await page.waitForLoadState('networkidle');
+    
+    // Restore session storage data after navigation
+    await sessionManager.restoreSessionStorageInPage(page, sessionData);
+    
+    // Check if we got redirected to login page after navigation
+    const currentUrl = page.url();
+    const expectedUrl = gameInfo.dashboard_url || gameInfo.login_url;
+    
+    console.log(`Expected URL: ${expectedUrl}`);
+    console.log(`Current URL: ${currentUrl}`);
+    
+    // Check if we're still on the expected page (not redirected to login)
+    if (currentUrl !== expectedUrl && currentUrl.includes('login')) {
+      console.log('Redirected to login page - session may have expired');
+      return { needsLogin: true, gameInfo };
+    }
+    
+    // Execute the action function with the persistent page
+    return await actionFunction(page, context);
+    
+  } catch (error) {
+    console.error('Error in executeWithPersistentPage:', error);
+    throw error;
+  }
+}
+
+/**
+ * Wrapper function to execute actions with session management (LEGACY - creates new page each time)
  */
 export async function executeWithSession<T>(
   userId: string,
   gameCredentialId: number,
   actionFunction: (page: Page, context: BrowserContext) => Promise<T>
 ): Promise<T | { needsLogin: boolean; gameInfo: any }> {
-  const sessionManager = new SessionManager();
+  // LEGACY FUNCTION - Use executeWithPersistentPage instead for better performance
+  console.warn('executeWithSession is deprecated. Use executeWithPersistentPage for better session management.');
+  const sessionManager = SessionManager.getInstance(); // Use singleton instead of new instance
   let page: Page | undefined;
   let context: BrowserContext | undefined;
   
@@ -610,15 +905,9 @@ export async function executeWithSession<T>(
     
     // Create authenticated browser context
     context = await sessionManager.createAuthenticatedContext(sessionData);
-    page = await context.newPage();
     
-    // Register page for cleanup
-    try {
-      const { registerPageForCleanup } = await import('@/utils/browser-cleanup');
-      registerPageForCleanup(page);
-    } catch (error) {
-      console.log('Could not register page for cleanup:', error);
-    }
+    // NEW: Use persistent page for all platforms (legacy function - use default IDs)
+    page = await sessionManager.getPersistentPage(1, 1); // Default team and game IDs for legacy function
     
     // Navigate to the game dashboard
     if (gameInfo.dashboard_url) {
@@ -628,6 +917,9 @@ export async function executeWithSession<T>(
     }
     
     await page.waitForLoadState('networkidle');
+    
+    // NEW: Restore session storage data after navigation
+    await sessionManager.restoreSessionStorageInPage(page, sessionData);
     
     // Check if we got redirected to login page after navigation
     const currentUrl = page.url();
