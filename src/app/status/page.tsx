@@ -205,62 +205,97 @@ export default function StatusPage() {
         throw new Error('User not authenticated');
       }
 
-      // Fetch all teams
-      const teamsResponse = await fetch('/api/team');
+      // Fetch all teams and games in parallel
+      const [teamsResponse, gamesResponse] = await Promise.all([
+        fetch('/api/team'),
+        fetch('/api/game')
+      ]);
+
       if (!teamsResponse.ok) {
         throw new Error('Failed to fetch teams');
       }
-      const teamsResult = await teamsResponse.json();
-      const allTeams = teamsResult.teams || [];
-
-      // Fetch all games
-      const gamesResponse = await fetch('/api/game');
       if (!gamesResponse.ok) {
         throw new Error('Failed to fetch games');
       }
-      const gamesResult = await gamesResponse.json();
+
+      const [teamsResult, gamesResult] = await Promise.all([
+        teamsResponse.json(),
+        gamesResponse.json()
+      ]);
+
+      const allTeams = teamsResult.teams || [];
       const allGames = gamesResult.games || [];
 
-      // Fetch status for each team
-      const teamsData: TeamData[] = [];
-      
-      for (const team of allTeams) {
-        const statusResponse = await fetch(`/api/update-game-status?teamId=${team.id}`, {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`
+      // Fetch status for all teams in parallel
+      const teamStatusPromises = allTeams.map(async (team: any, index: number) => {
+        try {
+          const statusResponse = await fetch(`/api/update-game-status?teamId=${team.id}`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          });
+
+          let statusData: GameStatus[] = [];
+          if (statusResponse.ok) {
+            const statusResult = await statusResponse.json();
+            statusData = statusResult.data || [];
           }
-        });
 
-        let statusData: GameStatus[] = [];
-        if (statusResponse.ok) {
-          const statusResult = await statusResponse.json();
-          statusData = statusResult.data || [];
-        }
+          // Create complete game status list for this team
+          const completeGameStatuses = allGames.map((game: any) => {
+            const existingStatus = statusData.find((status: any) => status.game_id === game.id);
+            
+            if (existingStatus) {
+              // Ensure all 5 actions are present, fill missing ones with unknown
+              const allActions = {
+                login: { status: 'unknown', updated_at: new Date().toISOString() },
+                new_account: { status: 'unknown', updated_at: new Date().toISOString() },
+                password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
+                recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+                redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+              };
+              
+              // Merge existing status with default unknown status
+              Object.assign(allActions, existingStatus.actions);
+              
+              return {
+                ...existingStatus,
+                actions: allActions
+              };
+            } else {
+              // Create new game status with unknown for all actions
+              return {
+                game_id: game.id,
+                game_name: game.name,
+                login_url: game.login_url,
+                actions: {
+                  login: { status: 'unknown', updated_at: new Date().toISOString() },
+                  new_account: { status: 'unknown', updated_at: new Date().toISOString() },
+                  password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
+                  recharge: { status: 'unknown', updated_at: new Date().toISOString() },
+                  redeem: { status: 'unknown', updated_at: new Date().toISOString() }
+                }
+              };
+            }
+          });
 
-        // Create complete game status list for this team
-        const completeGameStatuses = allGames.map((game: any) => {
-          const existingStatus = statusData.find((status: any) => status.game_id === game.id);
-          
-          if (existingStatus) {
-            // Ensure all 5 actions are present, fill missing ones with unknown
-            const allActions = {
-              login: { status: 'unknown', updated_at: new Date().toISOString() },
-              new_account: { status: 'unknown', updated_at: new Date().toISOString() },
-              password_reset: { status: 'unknown', updated_at: new Date().toISOString() },
-              recharge: { status: 'unknown', updated_at: new Date().toISOString() },
-              redeem: { status: 'unknown', updated_at: new Date().toISOString() }
-            };
-            
-            // Merge existing status with default unknown status
-            Object.assign(allActions, existingStatus.actions);
-            
-            return {
-              ...existingStatus,
-              actions: allActions
-            };
-          } else {
-            // Create new game status with unknown for all actions
-            return {
+          // Sort game statuses in descending order by game name
+          const sortedGameStatuses = completeGameStatuses.sort((a: GameStatus, b: GameStatus) => 
+            b.game_name.localeCompare(a.game_name)
+          );
+
+          return {
+            id: team.id,
+            name: team.name,
+            gameStatuses: sortedGameStatuses
+          };
+        } catch (error) {
+          console.error(`Error fetching status for team ${team.id}:`, error);
+          // Return team with empty statuses on error
+          return {
+            id: team.id,
+            name: team.name,
+            gameStatuses: allGames.map((game: any) => ({
               game_id: game.id,
               game_name: game.name,
               login_url: game.login_url,
@@ -271,21 +306,13 @@ export default function StatusPage() {
                 recharge: { status: 'unknown', updated_at: new Date().toISOString() },
                 redeem: { status: 'unknown', updated_at: new Date().toISOString() }
               }
-            };
-          }
-        });
+            }))
+          };
+        }
+      });
 
-        // Sort game statuses in descending order by game name
-        const sortedGameStatuses = completeGameStatuses.sort((a: GameStatus, b: GameStatus) => 
-          b.game_name.localeCompare(a.game_name)
-        );
-
-        teamsData.push({
-          id: team.id,
-          name: team.name,
-          gameStatuses: sortedGameStatuses
-        });
-      }
+      // Wait for all team status requests to complete
+      const teamsData = await Promise.all(teamStatusPromises);
 
       setAllTeamsData(teamsData);
       setLastUpdated(new Date());
