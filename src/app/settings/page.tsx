@@ -441,6 +441,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
         }}
         initialScript={formData.script_code}
         title={`Edit Script - ${formData.display_name || formData.name}`}
+        actionInputs={formData.inputs_json}
       />
     </div>
   );

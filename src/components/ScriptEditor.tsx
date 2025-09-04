@@ -8,6 +8,14 @@ interface ScriptEditorProps {
   onSave: (script: string) => void;
   initialScript?: string;
   title?: string;
+  actionInputs?: {
+    fields: Array<{
+      key: string;
+      label: string;
+      placeholder?: string;
+      required?: boolean;
+    }>;
+  };
 }
 
 export default function ScriptEditor({ 
@@ -15,7 +23,8 @@ export default function ScriptEditor({
   onClose, 
   onSave, 
   initialScript = '', 
-  title = 'Script Editor' 
+  title = 'Script Editor',
+  actionInputs
 }: ScriptEditorProps) {
   const [script, setScript] = useState(initialScript);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -80,12 +89,6 @@ export default function ScriptEditor({
           </div>
           <div className="flex items-center space-x-2">
             <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-            >
-              Save (Ctrl+S)
-            </button>
-            <button
               onClick={handleClose}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
               title="Close (Esc)"
@@ -99,24 +102,61 @@ export default function ScriptEditor({
 
         {/* Editor */}
         <div className="flex-1 p-4">
-          <div className="h-full flex flex-col">
-            <div className="mb-2">
-              <p className="text-sm text-gray-600">
-                Enter your Playwright automation script below. Use <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">Ctrl+S</kbd> to save or <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">Esc</kbd> to close.
-              </p>
+          <div className="h-full flex gap-4">
+            {/* Main Editor */}
+            <div className="flex-1 flex flex-col">
+              <div className="mb-2">
+                <p className="text-sm text-gray-600">
+                  Enter your playwright script below. Use <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">Ctrl+S</kbd> to save or <kbd className="px-1 py-0.5 bg-gray-100 rounded text-xs">Esc</kbd> to close.
+                </p>
+              </div>
+              <textarea
+                value={script}
+                onChange={handleScriptChange}
+                onKeyDown={handleKeyDown}
+                placeholder="// Enter your playwright script here...&#10;// Example:&#10;// await page.goto('https://example.com');&#10;// await page.fill('input[name=&quot;username&quot;]', 'user123');&#10;// await page.click('button[type=&quot;submit&quot;]');"
+                className="flex-1 w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
+                style={{ 
+                  fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+                  lineHeight: '1.5',
+                  tabSize: 2
+                }}
+              />
             </div>
-            <textarea
-              value={script}
-              onChange={handleScriptChange}
-              onKeyDown={handleKeyDown}
-              placeholder="// Enter your Playwright automation script here...&#10;// Example:&#10;// await page.goto('https://example.com');&#10;// await page.fill('input[name=&quot;username&quot;]', 'user123');&#10;// await page.click('button[type=&quot;submit&quot;]');"
-              className="flex-1 w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
-              style={{ 
-                fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
-                lineHeight: '1.5',
-                tabSize: 2
-              }}
-            />
+
+            {/* Helper Panel */}
+            {actionInputs && actionInputs.fields && actionInputs.fields.length > 0 && (
+              <div className="w-80 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Common Setup Lines</h3>
+                <div className="space-y-3">
+                  <div className="text-xs text-gray-600 font-mono bg-white p-2 rounded border">
+                    <div className="text-gray-500 mb-1">// Start of the script:</div>
+                    <div>await page.reload();</div>
+                    <div>await page.waitForLoadState('networkidle');</div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">Available Inputs:</div>
+                    {actionInputs.fields.map((field, index) => (
+                      <div key={index} className="text-xs text-gray-600 font-mono bg-white p-2 rounded border">
+                        <div className="text-gray-500">// {field.label}</div>
+                        <div>params.{field.key}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">Return format:</div>
+                    <div className="text-xs text-gray-600 font-mono bg-white p-2 rounded border">
+                      <div>return {`{`}</div>
+                      <div>  success: true/false,</div>
+                      <div>  message: 'Relevant message'</div>
+                      <div>{`};`}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
