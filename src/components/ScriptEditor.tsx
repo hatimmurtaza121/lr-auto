@@ -72,12 +72,10 @@ export default function ScriptEditor({
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-      onClick={handleClose}
     >
       <div 
         className="bg-white rounded-lg shadow-2xl w-[80vw] h-[80vh] flex flex-col"
         style={{ maxWidth: '80vw', maxHeight: '80vh' }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">

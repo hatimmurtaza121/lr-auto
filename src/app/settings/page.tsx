@@ -194,8 +194,8 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[72vh] overflow-y-auto" onClick={(e) => { e.stopPropagation(); }}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[72vh] overflow-y-auto">
         <h2 className="text-xl font-semibold mb-4">
           {editData ? 'Edit' : 'Add New'} {type === 'team' ? 'Team' : type === 'game' ? 'Game' : 'Action'}
         </h2>
@@ -459,8 +459,8 @@ function ConfirmDialog({ isOpen, message, onCancel, onConfirm, loading = false }
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onCancel}>
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
         <h2 className="text-xl font-semibold mb-4">Confirm Delete</h2>
         <p className="text-gray-700 mb-6">{message}</p>
         <div className="flex space-x-3">
