@@ -459,7 +459,7 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
         <div className="h-full bg-gray-100 rounded-2xl border-2 border-gray-200 overflow-hidden p-4 ">
           {isLoggedIn ? (
             <div className="h-full flex flex-col ">
-              <div className="text-sm font-semibold text-gray-700 mb-2 border-b border-gray-300 pb-1">
+              <div className="text-sm font-semibold text-gray-700 mb-2">
                 Live Action
               </div>
               
@@ -477,7 +477,13 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
               {/* Display action logs in compact format */}
               <div className="overflow-y-auto overflow-x-hidden space-y-2 max-h-[32.5rem]">
                 {gameJobs.map((job, index) => (
-                  <div key={job.jobId} className="p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-xs overflow-hidden">
+                  <div key={job.jobId} className={`p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-xs overflow-hidden border-l-4 ${
+                    job.status === 'completed' ? 'border-l-green-500' :
+                    job.status === 'failed' ? 'border-l-red-500' :
+                    job.status === 'active' ? 'border-l-blue-500' :
+                    job.status === 'waiting' ? 'border-l-yellow-500' :
+                    'border-l-gray-300'
+                  }`}>
                     {/* Header row with action name and status */}
                     <div className="flex items-center justify-between mb-1">
                       <div className="text-xs font-medium text-gray-700 truncate flex-1 pr-2">
@@ -531,12 +537,27 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
                     
 
                     
-                    {/* Execution time at bottom right */}
-                    {job.executionTime && (
-                      <div className="text-xs text-gray-500 text-right mt-1">
-                        {job.executionTime.toFixed(1)}s
+                    {/* Bottom row with date/time on left and execution time on right */}
+                    <div className="flex justify-between items-center mt-1">
+                      {/* Date and time on the left */}
+                      <div className="text-xs text-gray-500">
+                        {job.timestamp ? new Date(job.timestamp).toLocaleString('en-US', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        }) : ''}
                       </div>
-                    )}
+                      
+                      {/* Execution time on the right */}
+                      {job.executionTime && (
+                        <div className="text-xs text-gray-500">
+                          {job.executionTime.toFixed(1)}s
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
