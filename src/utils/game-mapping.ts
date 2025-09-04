@@ -108,7 +108,7 @@ export async function getAllGames(): Promise<Game[]> {
     const { data: games, error } = await supabase
       .from('game')
       .select('*')
-      .order('name', { ascending: false });
+      .order('name');
 
     if (error) {
       console.error('Error fetching games:', error);

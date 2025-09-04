@@ -572,8 +572,7 @@ export default function Settings() {
           *,
           game:game_id (id, name)
         `)
-        .order('game_id')
-        .order('name');
+        .order('id', { ascending: false });
 
       if (actionsError) {
         console.error('Error fetching actions:', actionsError);
