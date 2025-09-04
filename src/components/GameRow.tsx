@@ -24,6 +24,10 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
   const [sessionId, setSessionId] = useState<string>(''); // NEW: Store session ID
   const [gameJobs, setGameJobs] = useState<any[]>([]);
   const [jobStats, setJobStats] = useState<any>({});
+  const [hasMoreLogs, setHasMoreLogs] = useState(true);
+  const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const logsContainerRef = useRef<HTMLDivElement>(null);
   const blobUrlRef = useRef<string>('');
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -116,8 +120,10 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
           // Handle log updates - now just refresh database data
           console.log(`GameRow ${gameName}: Received log update, refreshing database data`);
           
-          // Refresh game jobs from database
-          fetchGameJobs();
+                  // Refresh game jobs from database
+        setCurrentOffset(0);
+        setHasMoreLogs(true);
+        fetchGameJobs(false);
           
           // Notify parent component
           onLogUpdate?.(data.currentLog || '', []);
@@ -187,7 +193,10 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     
     // Only fetch game jobs if actually logged in (not just during login)
     if (isLoggedIn) {
-      fetchGameJobs();
+      // Reset pagination state for initial load
+      setCurrentOffset(0);
+      setHasMoreLogs(true);
+      fetchGameJobs(false);
     }
 
     return () => {
@@ -246,8 +255,10 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       
       // Listen for immediate refresh when actions are executed
       const handleActionExecuted = () => {
-        // Immediate refresh when action is executed
-        fetchGameJobs();
+        // Reset pagination and refresh when action is executed
+        setCurrentOffset(0);
+        setHasMoreLogs(true);
+        fetchGameJobs(false);
       };
       
       window.addEventListener('action-executed', handleActionExecuted);
@@ -263,7 +274,8 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     if (isLoggedIn && (jobStats.active > 0 || jobStats.waiting > 0)) {
       // Poll every 2 seconds when there are active jobs
       const interval = setInterval(() => {
-        fetchGameJobs();
+        // Only refresh current logs, don't load more
+        fetchGameJobs(false);
       }, 2000);
       
       return () => clearInterval(interval);
@@ -287,7 +299,9 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
         }
         
         // Immediately refresh game jobs to show the new job
-        fetchGameJobs();
+        setCurrentOffset(0);
+        setHasMoreLogs(true);
+        fetchGameJobs(false);
       }
     };
 
@@ -353,7 +367,9 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       if (response.ok) {
         console.log(`GameRow ${gameName}: Job ${jobId} cancelled successfully`);
         // Refresh the game jobs to show updated status
-        fetchGameJobs();
+        setCurrentOffset(0);
+        setHasMoreLogs(true);
+        fetchGameJobs(false);
       } else {
         console.error(`GameRow ${gameName}: Failed to cancel job ${jobId}`);
       }
@@ -363,7 +379,7 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
   };
 
   // Fetch game-specific jobs from queue
-  const fetchGameJobs = async () => {
+  const fetchGameJobs = async (loadMore = false) => {
     try {
       console.log(`GameRow ${gameName}: Fetching game jobs from queue...`);
       
@@ -388,8 +404,11 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
         return;
       }
 
-      // Fetch game-specific jobs
-      const response = await fetch(`/api/queue/game-jobs?teamId=${teamId}&gameId=${gameId}`, {
+      // Calculate offset for pagination
+      const offset = loadMore ? currentOffset : 0;
+      
+      // Fetch game-specific jobs with pagination
+      const response = await fetch(`/api/queue/game-jobs?teamId=${teamId}&gameId=${gameId}&limit=6&offset=${offset}`, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -398,17 +417,56 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
       if (response.ok) {
         const result = await response.json();
         console.log(`GameRow ${gameName}: Received ${result.jobs?.length || 0} game jobs`);
-        setGameJobs(result.jobs || []);
+        
+        if (loadMore) {
+          // Append new logs to existing ones
+          setGameJobs(prev => [...prev, ...(result.jobs || [])]);
+        } else {
+          // Replace all logs (initial load or refresh)
+          setGameJobs(result.jobs || []);
+        }
+        
         setJobStats(result.stats || {});
+        setHasMoreLogs(result.hasMore || false);
+        setCurrentOffset(result.nextOffset || 0);
       } else {
         console.error(`GameRow ${gameName}: Failed to fetch game jobs:`, response.statusText);
-        setGameJobs([]);
-        setJobStats({});
+        if (!loadMore) {
+          setGameJobs([]);
+          setJobStats({});
+        }
       }
     } catch (error) {
       console.error(`GameRow ${gameName}: Error fetching game jobs:`, error);
-      setGameJobs([]);
-      setJobStats({});
+      if (!loadMore) {
+        setGameJobs([]);
+        setJobStats({});
+      }
+    }
+  };
+
+  // Load more logs when user scrolls to bottom (6 logs at a time)
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    
+    // Check if user scrolled to bottom (with 50px buffer)
+    if (scrollTop + clientHeight >= scrollHeight - 50) {
+      if (hasMoreLogs && !loadingMoreLogs) {
+        setLoadingMoreLogs(true);
+        fetchGameJobs(true).finally(() => {
+          setLoadingMoreLogs(false);
+        });
+      }
+    }
+  };
+
+  // Manual load more function
+  const handleLoadMore = () => {
+    if (hasMoreLogs && !loadingMoreLogs) {
+      setLoadingMoreLogs(true);
+      fetchGameJobs(true).finally(() => {
+        setLoadingMoreLogs(false);
+      });
     }
   };
 
@@ -475,7 +533,11 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
               )}
               
               {/* Display action logs in compact format */}
-              <div className="overflow-y-auto overflow-x-hidden space-y-2 max-h-[32.5rem]">
+              <div 
+                ref={logsContainerRef}
+                className="overflow-y-auto overflow-x-hidden space-y-2 max-h-[32.5rem]"
+                onScroll={handleScroll}
+              >
                 {gameJobs.map((job, index) => (
                   <div key={job.jobId} className={`p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-xs overflow-hidden border-l-4 ${
                     job.status === 'completed' ? 'border-l-green-500' :
@@ -560,6 +622,32 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
                     </div>
                   </div>
                 ))}
+                
+                {/* Load more indicator */}
+                {loadingMoreLogs && (
+                  <div className="flex justify-center py-2">
+                    <div className="text-xs text-gray-500">Loading more logs...</div>
+                  </div>
+                )}
+                
+                {/* No more logs message */}
+                {!hasMoreLogs && gameJobs.length > 0 && (
+                  <div className="flex justify-center py-2">
+                    <div className="text-xs text-gray-400">No more logs available</div>
+                  </div>
+                )}
+                
+                {/* Load more button (fallback) */}
+                {hasMoreLogs && !loadingMoreLogs && gameJobs.length > 0 && (
+                  <div className="flex justify-center py-2">
+                    <button
+                      onClick={handleLoadMore}
+                      className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                    >
+                      Load More Logs
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const teamId = searchParams.get('teamId');
     const gameId = searchParams.get('gameId');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const offset = parseInt(searchParams.get('offset') || '0');
 
     if (!teamId || !gameId) {
       return NextResponse.json({ 
@@ -98,7 +100,7 @@ export async function GET(request: NextRequest) {
       .eq('team_id', parseInt(teamId))
       .eq('game_id', parseInt(gameId))
       .order('updated_at', { ascending: false })
-      .limit(50); // Limit to last 50 completed actions
+      .range(offset, offset + limit - 1); // Use range for pagination
 
     if (logsError) {
       console.error('Error fetching completed logs:', logsError);
@@ -146,14 +148,21 @@ export async function GET(request: NextRequest) {
     // The order is now: newest jobs first (running or queued), then older jobs, then completed jobs
     // This ensures the most recent activity appears at the top regardless of job status
 
+    // Check if there are more logs available
+    const hasMore = completedJobs.length === limit;
+    const totalCompleted = completedJobs.filter(j => j.status === 'completed').length;
+    const totalFailed = completedJobs.filter(j => j.status === 'failed').length;
+
     return NextResponse.json({
       success: true,
       jobs: allJobs,
+      hasMore: hasMore,
+      nextOffset: offset + limit,
       stats: {
         active: filterAndTransformJobs(active, 'active').length,
         waiting: filterAndTransformJobs(waiting, 'waiting').length,
-        completed: completedJobs.filter(j => j.status === 'completed').length,
-        failed: completedJobs.filter(j => j.status === 'failed').length
+        completed: totalCompleted,
+        failed: totalFailed
       }
     });
 

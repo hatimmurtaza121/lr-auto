@@ -407,7 +407,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         <div className="lg:col-span-1">
           {/* Login form or GameDashboard content */}
           {isCheckingSession ? (
-            <div className="flex items-center justify-center h-32">
+            <div className="flex items-center justify-center h-full min-h-[400px]">
               <div className="flex items-center space-x-3">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                 <span className="text-lg text-gray-600">Checking session...</span>
