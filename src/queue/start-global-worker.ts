@@ -3,13 +3,13 @@
 import 'dotenv/config'; // Load environment variables from .env.local
 import { config } from 'dotenv';
 config({ path: '.env.local' });
-import { GlobalWorker } from './workers/global-worker';
+import { globalWorker } from './workers/global-worker';
 import { testRedisConnection } from './config/redis';
 import { screenshotWebSocketServer } from '@/utils/websocket-server';
 
 async function startGlobalWorker() {
   try {
-    console.log('Starting Global BullMQ Worker (1 job at a time)...');
+    console.log('Starting Global BullMQ Pro Worker (6 teams, 3 jobs per team)...');
     
     // Initialize WebSocket server for screenshot broadcasting
     console.log('Initializing WebSocket server...');
@@ -23,25 +23,23 @@ async function startGlobalWorker() {
       process.exit(1);
     }
     
-    // Initialize global worker
-    const worker = new GlobalWorker();
-    
+    // Use singleton global worker
     console.log('Global worker started successfully');
-    console.log('Worker stats:', worker.getWorkerStats());
-    console.log('Processing: 1 job at a time globally');
+    console.log('Worker stats:', globalWorker.getWorkerStats());
+    console.log('Processing: 3 jobs per team (18 total parallel jobs)');
     console.log('WebSocket server ready for connections');
     
     // Keep the process running
     process.on('SIGTERM', async () => {
       console.log('Shutting down global worker...');
-      await worker.close();
+      await globalWorker.close();
       screenshotWebSocketServer.close();
       process.exit(0);
     });
     
     process.on('SIGINT', async () => {
       console.log('Shutting down global worker...');
-      await worker.close();
+      await globalWorker.close();
       screenshotWebSocketServer.close();
       process.exit(0);
     });

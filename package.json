@@ -21,6 +21,7 @@
     "@mui/material-nextjs": "^7.2.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.52.0",
+    "@taskforcesh/bullmq-pro": "^7.38.5",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "bullmq": "^5.56.8",

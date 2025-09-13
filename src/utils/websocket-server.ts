@@ -317,10 +317,10 @@ class ScreenshotWebSocketServer {
        // Convert both to strings for comparison to handle number/string mismatches
        const connectionHasTeam = connection.subscribedTeams.includes(teamId);
       
-      console.log(`WebSocket Server: Checking connection ${connectionId} for game ID ${gameId} (name: "${gameName}")`);
-      console.log(`  → Subscribed game IDs: [${connection.subscribedGameIds.join(', ')}]`);
-      console.log(`  → Has game ID ${gameId}: ${connectionHasGame}`);
-      console.log(`  → Connection subscribed to teams: [${connection.subscribedTeams.join(', ')}], Screenshot team: ${teamId}, Match: ${connectionHasTeam}`);
+      // console.log(`WebSocket Server: Checking connection ${connectionId} for game ID ${gameId} (name: "${gameName}")`);
+      // console.log(`  → Subscribed game IDs: [${connection.subscribedGameIds.join(', ')}]`);
+      // console.log(`  → Has game ID ${gameId}: ${connectionHasGame}`);
+      // console.log(`  → Connection subscribed to teams: [${connection.subscribedTeams.join(', ')}], Screenshot team: ${teamId}, Match: ${connectionHasTeam}`);
       
       if (connection.ws.readyState === WebSocket.OPEN && connectionHasGame && connectionHasTeam) {
         
@@ -343,7 +343,7 @@ class ScreenshotWebSocketServer {
       this.connections.forEach((conn, id) => {
         console.log(`  - Connection ${id}: Team ${conn.teamId}, Game IDs: [${conn.subscribedGameIds.join(', ')}], Subscribed Teams: [${conn.subscribedTeams.join(', ')}]`);
         const hasGame = conn.subscribedGameIds.includes(gameId);
-        console.log(`    → Has game ID ${gameId}: ${hasGame}`);
+        // console.log(`    → Has game ID ${gameId}: ${hasGame}`);
       });
     } else {
       console.log(`WebSocket Server: Screenshot sent to ${sentCount} connections for game ID ${gameId} (${gameName}) - ${action}`);

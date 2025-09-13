@@ -5,16 +5,16 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
-    const action = searchParams.get('action');
+    const teamId = searchParams.get('teamId');
 
-    if (!jobId || !action) {
+    if (!jobId || !teamId) {
       return NextResponse.json({ 
-        error: 'Job ID and action are required' 
+        error: 'Job ID and team ID are required' 
       }, { status: 400 });
     }
 
-    // Get job status from queue
-    const status = await ActionProducer.getJobStatus(jobId, action);
+    // Get job status from team queue
+    const status = await ActionProducer.getJobStatus(jobId, parseInt(teamId));
 
     if (!status) {
       return NextResponse.json({ 

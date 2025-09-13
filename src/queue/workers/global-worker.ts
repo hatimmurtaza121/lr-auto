@@ -1,44 +1,99 @@
-import { Worker, Job } from 'bullmq';
-import { actionQueue } from '../config/queues';
+import { WorkerPro as Worker, JobPro as Job } from '@taskforcesh/bullmq-pro';
+import { teamQueueManager } from '../config/queues';
 import { createRedisConnection } from '../config/redis';
 import { loginWithSession, executeDynamicActionWithSession } from '@/utils/action-wrappers';
 import { screenshotWebSocketServer } from '@/utils/websocket-server';
 import { updateGameStatus } from '@/utils/game-status';
 
 export class GlobalWorker {
-  private worker: Worker;
+  private teamWorkers = new Map<number, Worker>();
   private isProcessing = false;
 
   constructor() {
-    this.worker = new Worker('action-queue', async (job: Job) => {
+    // Initialize workers dynamically from database
+    this.initializeTeamWorkers().catch(error => {
+      console.error('Failed to initialize team workers:', error);
+    });
+  }
+
+  private async initializeTeamWorkers() {
+    try {
+      // Fetch teams from database
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      
+      const { data: teams, error } = await supabase
+        .from('team')
+        .select('id')
+        .order('id');
+        
+      if (error) {
+        console.error('Error fetching teams from database:', error);
+        // Fallback to hardcoded teams 1-6
+        console.log('Falling back to hardcoded teams 1-6');
+        for (let teamId = 1; teamId <= 6; teamId++) {
+          this.createTeamWorker(teamId);
+        }
+        return;
+      }
+      
+      if (teams && teams.length > 0) {
+        console.log(`Found ${teams.length} teams in database:`, teams.map(t => t.id));
+        for (const team of teams) {
+          this.createTeamWorker(team.id);
+        }
+      } else {
+        console.log('No teams found in database, falling back to hardcoded teams 1-6');
+        for (let teamId = 1; teamId <= 6; teamId++) {
+          this.createTeamWorker(teamId);
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing team workers:', error);
+      // Fallback to hardcoded teams 1-6
+      console.log('Falling back to hardcoded teams 1-6');
+      for (let teamId = 1; teamId <= 6; teamId++) {
+        this.createTeamWorker(teamId);
+      }
+    }
+  }
+
+  private createTeamWorker(teamId: number) {
+    const queue = teamQueueManager.getTeamQueue(teamId);
+    
+    const worker = new Worker(`team-${teamId}-queue`, async (job: Job) => {
       await this.processJob(job);
     }, {
       connection: createRedisConnection(),
-      concurrency: 1, // Process one job at a time (FIFO)
+      concurrency: 3, // 3 jobs per team
+      group: {
+        concurrency: 1 // Only 1 job per group at a time (this is the key fix!)
+      },
       removeOnComplete: { count: 10 },
       removeOnFail: { count: 10 },
-      
     });
 
-    // Set up event handlers
-    this.worker.on('completed', (job) => {
-      // console.log(`Job ${job.id} completed successfully`);
+    // Set up event handlers for this team worker
+    worker.on('completed', (job) => {
+      console.log(`Team ${teamId} - Job ${job.id} completed successfully`);
       this.broadcastWorkerStatus(false);
     });
 
-    this.worker.on('failed', (job, err) => {
+    worker.on('failed', (job, err) => {
       if (job) {
-        console.log(`Job ${job.id} failed:`, err.message);
-        // Broadcast failure status
+        console.log(`Team ${teamId} - Job ${job.id} failed:`, err.message);
         this.broadcastWorkerStatus(false, `Job failed: ${err.message}`, [`Job failed: ${err.message}`]);
       }
       this.broadcastWorkerStatus(false);
     });
 
-    this.worker.on('error', (err) => {
-      console.error('Worker error:', err);
+    worker.on('error', (err) => {
+      console.error(`Team ${teamId} worker error:`, err);
       this.broadcastWorkerStatus(false, `Worker error: ${err.message}`, [`Worker error: ${err.message}`]);
     });
+
+    this.teamWorkers.set(teamId, worker);
+    console.log(`Team ${teamId} worker initialized with concurrency 3, group concurrency 1`);
   }
 
   private broadcastWorkerStatus(isExecuting: boolean, currentLog?: string, allLogs?: string[]) {
@@ -376,14 +431,26 @@ export class GlobalWorker {
   }
 
   getWorkerStats() {
+    const teamStats = Array.from(this.teamWorkers.entries()).map(([teamId, worker]) => ({
+      teamId,
+      isRunning: worker.isRunning(),
+      concurrency: worker.concurrency,
+      queue: `team-${teamId}-queue`
+    }));
+
     return {
-      isRunning: this.worker.isRunning(),
-      concurrency: this.worker.concurrency,
-      queues: ['action-queue']
+      totalTeams: this.teamWorkers.size,
+      teamStats,
+      totalConcurrency: Array.from(this.teamWorkers.values()).reduce((sum, worker) => sum + worker.concurrency, 0)
     };
   }
 
   async close() {
-    await this.worker.close();
+    const closePromises = Array.from(this.teamWorkers.values()).map(worker => worker.close());
+    await Promise.all(closePromises);
+    this.teamWorkers.clear();
   }
-} 
+}
+
+// Export singleton instance
+export const globalWorker = new GlobalWorker(); 

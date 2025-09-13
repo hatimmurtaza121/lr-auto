@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       action: 'login',
       params: { username, password }, // Pass credentials to the job
       teamId: parseInt(teamId),
-      gameId: game.id,
+      gameId: game.id, // Game ID used for both filtering and platform grouping
       gameName: gameName,
       sessionId: `login_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };

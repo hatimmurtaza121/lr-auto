@@ -4,9 +4,9 @@ export interface JobData {
   action: string;
   params: any;
   teamId: number;
-  gameId: number; // Add gameId for direct filtering
+  gameId: number; // Game ID used for both filtering and platform grouping
   gameName: string;
-  sessionId: string; // NEW: Session ID that initiated this job
+  sessionId: string; // Session ID that initiated this job
   result?: JobResult; // Store the job result in the job data
   cancelled?: boolean; // Flag to mark job as cancelled
   cancelledAt?: number; // Timestamp when job was cancelled

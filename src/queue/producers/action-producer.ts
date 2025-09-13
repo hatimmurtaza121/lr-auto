@@ -1,41 +1,25 @@
-import { actionQueue } from '../config/queues';
+import { teamQueueManager } from '../config/queues';
 import { JobData, JobProgress } from '../types/job-types';
 
 export class ActionProducer {
   /**
-   * Add a job to the unified action queue
+   * Add a job to the team queue with platform grouping
    */
   static async addJob(jobData: JobData): Promise<string> {
     try {
       // Validate job data
-      if (!jobData.userId || !jobData.gameCredentialId || !jobData.action) {
-        throw new Error('Invalid job data: missing required fields');
+      if (!jobData.userId || !jobData.gameCredentialId || !jobData.action || !jobData.teamId || !jobData.gameId) {
+        throw new Error('Invalid job data: missing required fields (userId, gameCredentialId, action, teamId, gameId)');
       }
       
-      // Generate unique job ID
-      const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substring(2, 11);
-      const jobId = `${jobData.action}-${timestamp}-${randomId}`;
+      // Add job to team queue with game grouping (serial processing per game within team)
+      const jobId = await teamQueueManager.addJob(jobData.teamId, jobData.gameId, jobData);
       
-      // Add job to unified action queue (FIFO - no priority)
-      const job = await actionQueue.add(
-        jobData.action,
-        jobData,
-        {
-          delay: 0, // No delay, process immediately
-          jobId: jobId,
-          removeOnComplete: 100, // Keep last 100 completed jobs
-          removeOnFail: 50, // Keep last 50 failed jobs
-
-        }
-      );
-
-      const finalJobId = job.id || jobId;
-      // console.log(`Job added to action queue with ID: ${finalJobId} (action: ${jobData.action})`);
-      return finalJobId;
+      console.log(`Job added to team-${jobData.teamId} queue with game-${jobData.gameId} grouping, ID: ${jobId} (action: ${jobData.action})`);
+      return jobId;
     } catch (error) {
-      console.error('Error adding job to queue:', error);
-      throw new Error(`Failed to add job to queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error adding job to team queue:', error);
+      throw new Error(`Failed to add job to team queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -59,14 +43,14 @@ export class ActionProducer {
   }
 
   /**
-   * Get job status from queue
+   * Get job status from team queue
    */
-  static async getJobStatus(jobId: string, action: string): Promise<JobProgress | null> {
+  static async getJobStatus(jobId: string, teamId: number): Promise<JobProgress | null> {
     try {
-      const job = await actionQueue.getJob(jobId);
+      const job = await teamQueueManager.getJobStatus(teamId, jobId);
       
       if (!job) {
-        // console.log(`Job ${jobId} not found in action-queue`);
+        console.log(`Job ${jobId} not found in team-${teamId} queue`);
         return null;
       }
 
@@ -215,51 +199,13 @@ export class ActionProducer {
   }
 
   /**
-   * Cancel a specific job by ID
+   * Cancel a specific job by ID in team queue
    */
-  static async cancelJob(jobId: string): Promise<boolean> {
+  static async cancelJob(jobId: string, teamId: number): Promise<boolean> {
     try {
-      // console.log(`=== CANCELLING JOB ${jobId} ===`);
+      console.log(`=== CANCELLING JOB ${jobId} IN TEAM ${teamId} ===`);
       
-      // console.log(`Got action queue, looking for job ${jobId}`);
-      
-      // Get the specific job by ID
-      const job = await actionQueue.getJob(jobId);
-      
-      if (!job) {
-        // console.log(`Job ${jobId} not found in action-queue`);
-        return false;
-      }
-
-      // console.log(`Found job ${jobId} in action-queue`);
-      // console.log(`Job data:`, job.data);
-      // console.log(`Job ID:`, job.id);
-      // console.log(`Job name:`, job.name);
-
-      // Check if job can be cancelled (waiting, prioritized, or active jobs)
-      const state = await job.getState();
-      // console.log(`Job ${jobId} state:`, state);
-      
-      if (state !== 'waiting' && state !== 'prioritized' && state !== 'active') {
-        // console.log(`Job ${jobId} cannot be cancelled - it is in ${state} state`);
-        return false;
-      }
-
-      if (state === 'waiting' || state === 'prioritized') {
-        // console.log(`Job ${jobId} is in ${state} state, removing from queue`);
-        // Remove the specific job from the action queue
-        // console.log(`Removing job ${jobId} from action-queue...`);
-        await job.remove();
-      } else if (state === 'active') {
-        // console.log(`Job ${jobId} is in active state, marking as cancelled`);
-        // Mark job as cancelled so worker can check and skip processing
-        const jobData = { ...job.data, cancelled: true, cancelledAt: Date.now() };
-        // console.log(`Marking job ${jobId} as cancelled:`, jobData);
-        await job.updateData(jobData);
-      }
-      
-      // console.log(`Job ${jobId} cancelled successfully`);
-      return true;
+      return await teamQueueManager.cancelJob(teamId, jobId);
     } catch (error) {
       console.error('Error cancelling job:', error);
       return false;
@@ -267,23 +213,13 @@ export class ActionProducer {
   }
 
   /**
-   * Get queue statistics
+   * Get queue statistics for a team
    */
-  static async getQueueStats(action: string) {
+  static async getQueueStats(teamId: number) {
     try {
-      const waiting = await actionQueue.getWaiting();
-      const active = await actionQueue.getActive();
-      const completed = await actionQueue.getCompleted();
-      const failed = await actionQueue.getFailed();
-
-      return {
-        waiting: waiting.length,
-        active: active.length,
-        completed: completed.length,
-        failed: failed.length,
-      };
+      return await teamQueueManager.getQueueStats(teamId);
     } catch (error) {
-      console.error('Error getting queue stats:', error);
+      console.error('Error getting team queue stats:', error);
       return null;
     }
   }

@@ -4,16 +4,16 @@ import { ActionProducer } from '@/queue/producers/action-producer';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
+    const teamId = searchParams.get('teamId');
 
-    if (!action) {
+    if (!teamId) {
       return NextResponse.json({ 
-        error: 'Action is required' 
+        error: 'Team ID is required' 
       }, { status: 400 });
     }
 
-    // Get queue statistics
-    const stats = await ActionProducer.getQueueStats(action);
+    // Get queue statistics for team
+    const stats = await ActionProducer.getQueueStats(parseInt(teamId));
 
     if (!stats) {
       return NextResponse.json({ 

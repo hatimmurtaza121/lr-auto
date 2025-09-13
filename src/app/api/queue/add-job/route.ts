@@ -43,6 +43,19 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    // Get game ID for platform grouping
+    const { data: game, error: gameError } = await supabase
+      .from('game')
+      .select('id')
+      .eq('name', gameName)
+      .single();
+
+    if (gameError || !game) {
+      return NextResponse.json({ 
+        error: 'Game not found' 
+      }, { status: 404 });
+    }
+
     // Create job data
     const jobData: JobData = {
       userId: user.id,
@@ -50,7 +63,9 @@ export async function POST(request: NextRequest) {
       action,
       params: params || {},
       teamId: parseInt(teamId),
+      gameId: game.id, // Game ID used for both filtering and platform grouping
       gameName,
+      sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`, // Generate session ID
     };
 
     // Validate action type - allow any action name since they're dynamic
