@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ActionProducer } from '@/queue/producers/action-producer';
-import { actionQueue } from '@/queue/config/queues';
+import { teamQueueManager } from '@/queue/config/queues';
 import { createClient } from '@supabase/supabase-js';
 import { getUserSession } from '@/utils/api-helpers';
 
@@ -48,20 +48,30 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get all jobs from the queue
-    const waiting = await actionQueue.getWaiting();
-    const active = await actionQueue.getActive();
-    const completed = await actionQueue.getCompleted();
-    const failed = await actionQueue.getFailed();
+    // Get all jobs from the team queue
+    const teamQueue = teamQueueManager.getTeamQueue(parseInt(teamId));
+    
+    // For grouped jobs, use getGroupJobs to get waiting jobs in the specific game group
+    const groupId = `game-${gameId}`;
+    const waiting = await teamQueue.getGroupJobs(groupId, 0, -1, 'waiting');
+    
+    const active = await teamQueue.getActive();
+    const completed = await teamQueue.getCompleted();
+    const failed = await teamQueue.getFailed();
 
-    // Filter jobs by team ID and game ID directly
+    // Filter jobs by game ID (team is already filtered by queue)
     const filterAndTransformJobs = (jobs: any[], status: string) => {
       return jobs
         .filter(job => {
           const jobData = job.data;
+          // For waiting jobs, getGroupJobs already filters by group, so no additional filtering needed
+          // For other statuses, check if job belongs to the specific game (using group ID)
+          if (status === 'waiting') {
+            return jobData; // getGroupJobs already filtered by group
+          }
+          const groupId = job.opts?.group?.id;
           return jobData && 
-                 jobData.teamId === parseInt(teamId) && 
-                 jobData.gameId === parseInt(gameId);
+                 groupId === `game-${gameId}`;
         })
         .map(job => {
           const jobData = job.data;
@@ -78,7 +88,9 @@ export async function GET(request: NextRequest) {
             timestamp: job.timestamp,
             progress: job.progress || 0,
             params: jobData.params,
-            userId: jobData.userId
+            userId: jobData.userId,
+            executionTime: job.processedOn && job.finishedOn ? 
+              (job.finishedOn - job.processedOn) / 1000 : undefined
           };
         });
     };

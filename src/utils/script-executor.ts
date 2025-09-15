@@ -36,8 +36,8 @@ export function createWebSocketScreenshotCapture(
             
             // Emit custom event that parent can listen to
             if ((global as any).screenshotWebSocketServer) {
-                console.log(`Screenshot captured for ${gameName} - ${action} (${screenshotBuffer.length} bytes)`);
-                console.log(`Broadcasting to WebSocket server (Team: ${teamId}, Session: ${sessionId})`);
+                // console.log(`Screenshot captured for ${gameName} - ${action} (${screenshotBuffer.length} bytes)`);
+                // console.log(`Broadcasting to WebSocket server (Team: ${teamId}, Session: ${sessionId})`);
                 
                 // NEW: Use session-based broadcasting with game ID
                 (global as any).screenshotWebSocketServer.broadcastScreenshot(
@@ -49,7 +49,7 @@ export function createWebSocketScreenshotCapture(
                     sessionId
                 );
                 
-                console.log(`Screenshot sent successfully`);
+                // console.log(`Screenshot sent successfully`);
             } else {
                 console.log(`WebSocket server not available for screenshot broadcast`);
             }

@@ -1,5 +1,6 @@
 import { teamQueueManager } from '../config/queues';
 import { JobData, JobProgress } from '../types/job-types';
+import { screenshotWebSocketServer } from '@/utils/websocket-server';
 
 export class ActionProducer {
   /**
@@ -16,6 +17,10 @@ export class ActionProducer {
       const jobId = await teamQueueManager.addJob(jobData.teamId, jobData.gameId, jobData);
       
       console.log(`Job added to team-${jobData.teamId} queue with game-${jobData.gameId} grouping, ID: ${jobId} (action: ${jobData.action})`);
+      
+      // Note: For grouped jobs, waiting jobs are fetched via API using getGroupJobs()
+      // No need to broadcast waiting events as they don't work properly with groups
+      
       return jobId;
     } catch (error) {
       console.error('Error adding job to team queue:', error);

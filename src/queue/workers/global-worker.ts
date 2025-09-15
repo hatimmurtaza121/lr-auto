@@ -11,7 +11,10 @@ export class GlobalWorker {
 
   constructor() {
     // Initialize workers dynamically from database
-    this.initializeTeamWorkers().catch(error => {
+    this.initializeTeamWorkers().then(() => {
+      // Start monitoring queue events after workers are initialized
+      this.startQueueMonitoring();
+    }).catch(error => {
       console.error('Failed to initialize team workers:', error);
     });
   }
@@ -69,20 +72,26 @@ export class GlobalWorker {
       group: {
         concurrency: 1 // Only 1 job per group at a time (this is the key fix!)
       },
-      removeOnComplete: { count: 10 },
-      removeOnFail: { count: 10 },
+      removeOnComplete: { count: 50 }, // Keep more completed jobs
+      removeOnFail: { count: 20 },
     });
 
     // Set up event handlers for this team worker
     worker.on('completed', (job) => {
       console.log(`Team ${teamId} - Job ${job.id} completed successfully`);
       this.broadcastWorkerStatus(false);
+      
+      // NEW: Broadcast job completion via WebSocket
+      screenshotWebSocketServer.broadcastJobUpdate(job, 'completed');
     });
 
     worker.on('failed', (job, err) => {
       if (job) {
         console.log(`Team ${teamId} - Job ${job.id} failed:`, err.message);
         this.broadcastWorkerStatus(false, `Job failed: ${err.message}`, [`Job failed: ${err.message}`]);
+        
+        // NEW: Broadcast job failure via WebSocket
+        screenshotWebSocketServer.broadcastJobUpdate(job, 'failed', { error: err.message });
       }
       this.broadcastWorkerStatus(false);
     });
@@ -91,6 +100,17 @@ export class GlobalWorker {
       console.error(`Team ${teamId} worker error:`, err);
       this.broadcastWorkerStatus(false, `Worker error: ${err.message}`, [`Worker error: ${err.message}`]);
     });
+
+    // NEW: Add progress event handler
+    worker.on('progress', (job, progress) => {
+      // console.log(`Team ${teamId} - Job ${job.id} progress: ${progress}%`);
+      // Ensure progress is a number
+      const progressValue = typeof progress === 'number' ? progress : 0;
+      screenshotWebSocketServer.broadcastJobProgress(job, progressValue);
+    });
+
+    // Note: For grouped jobs, we don't use the 'waiting' event as it doesn't work with groups
+    // Instead, we fetch waiting jobs using getGroupJobs() in the API
 
     this.teamWorkers.set(teamId, worker);
     console.log(`Team ${teamId} worker initialized with concurrency 3, group concurrency 1`);
@@ -130,6 +150,13 @@ export class GlobalWorker {
     }
   }
 
+  // NEW: Broadcast job added to queue
+  async broadcastJobAdded(job: any) {
+    if (screenshotWebSocketServer.isServerInitialized()) {
+      screenshotWebSocketServer.broadcastJobUpdate(job, 'waiting');
+    }
+  }
+
   private dispatchScriptResult(jobId: string, result: any) {
     // Log the script result for debugging
     // The result will be passed through the existing job status polling system
@@ -155,6 +182,9 @@ export class GlobalWorker {
   async processJob(job: Job) {
     const data = job.data;
     let result: any;
+
+    // NEW: Broadcast job started processing
+    screenshotWebSocketServer.broadcastJobUpdate(job, 'active');
 
     // Broadcast that worker is starting execution
     this.broadcastWorkerStatus(true, `Starting ${data.action}...`, [`Starting ${data.action}...`]);
@@ -428,6 +458,17 @@ export class GlobalWorker {
       // For expected errors, we also don't retry as per requirements
       throw new Error(finalErrorMessage);
     }
+  }
+
+  // NEW: Start monitoring job events for real-time updates
+  private async startQueueMonitoring() {
+    console.log('Starting job monitoring for real-time updates...');
+    
+    // We'll use worker events which are more reliable than queue events
+    // The worker events are already set up in createTeamWorker method
+    // We just need to enhance them to broadcast job updates
+    
+    console.log('Job monitoring will use existing worker events');
   }
 
   getWorkerStats() {

@@ -146,6 +146,14 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
             });
             window.dispatchEvent(loginEvent);
           }
+        } else if (data.type === 'job-update' && data.gameId === gameId) {
+          // NEW: Handle real-time job updates
+          console.log(`GameRow ${gameName}: Received job update:`, data);
+          updateJobInList(data);
+        } else if (data.type === 'job-progress' && data.gameId === gameId) {
+          // NEW: Handle real-time job progress updates
+          console.log(`GameRow ${gameName}: Received job progress:`, data);
+          updateJobProgress(data);
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -298,7 +306,7 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
           createWebSocketConnection();
         }
         
-        // Immediately refresh game jobs to show the new job
+        // Immediately refresh game jobs to show the new queued job (using getGroupJobs)
         setCurrentOffset(0);
         setHasMoreLogs(true);
         fetchGameJobs(false);
@@ -344,6 +352,13 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
         return;
       }
       
+      // Get team ID
+      const teamId = getSelectedTeamId();
+      if (!teamId) {
+        console.error('No team selected');
+        return;
+      }
+      
       // Get user session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
@@ -360,6 +375,7 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
         },
         body: JSON.stringify({ 
           jobId,
+          teamId,
           action: job.action
         })
       });
@@ -479,6 +495,48 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
     createWebSocketConnection();
   };
 
+  // NEW: Helper functions for real-time job updates
+  const updateJobInList = (jobUpdate: any) => {
+    setGameJobs(prev => {
+      const existingIndex = prev.findIndex(job => job.jobId === jobUpdate.jobId);
+      
+      if (existingIndex >= 0) {
+        // Update existing job
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          status: jobUpdate.status,
+          progress: jobUpdate.progress || 0,
+          message: jobUpdate.message || updated[existingIndex].message,
+          timestamp: jobUpdate.timestamp || updated[existingIndex].timestamp
+        };
+        return updated;
+      } else {
+        // Add new job to the top
+        return [{
+          jobId: jobUpdate.jobId,
+          action: jobUpdate.action,
+          actionDisplayName: jobUpdate.action, // Will be updated by display name mapping
+          status: jobUpdate.status,
+          progress: jobUpdate.progress || 0,
+          message: jobUpdate.message || 'Job started',
+          timestamp: jobUpdate.timestamp || Date.now(),
+          params: jobUpdate.params || {}
+        }, ...prev];
+      }
+    });
+  };
+
+  const updateJobProgress = (progressUpdate: any) => {
+    setGameJobs(prev => 
+      prev.map(job => 
+        job.jobId === progressUpdate.jobId 
+          ? { ...job, progress: progressUpdate.progress }
+          : job
+      )
+    );
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
       
@@ -596,6 +654,7 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
                         {job.message}
                       </div>
                     )}
+                    
                     
 
                     

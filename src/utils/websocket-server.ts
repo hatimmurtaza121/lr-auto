@@ -346,7 +346,7 @@ class ScreenshotWebSocketServer {
         // console.log(`    → Has game ID ${gameId}: ${hasGame}`);
       });
     } else {
-      console.log(`WebSocket Server: Screenshot sent to ${sentCount} connections for game ID ${gameId} (${gameName}) - ${action}`);
+      // console.log(`WebSocket Server: Screenshot sent to ${sentCount} connections for game ID ${gameId} (${gameName}) - ${action}`);
     }
   }
 
@@ -462,6 +462,97 @@ class ScreenshotWebSocketServer {
     });
 
     // console.log(`Script result broadcasted to ${this.wss.clients.size} clients, ${failedCount} failed`);
+  }
+
+  // NEW: Job event broadcasting methods
+  broadcastJobUpdate(job: any, status: string, additionalData?: any) {
+    if (!this.wss) return;
+
+    const message = JSON.stringify({
+      type: 'job-update',
+      jobId: job.id,
+      status,
+      action: job.data?.action,
+      gameId: job.data?.gameId,
+      teamId: job.data?.teamId,
+      progress: job.progress || 0,
+      message: additionalData?.message || this.getJobStatusMessage(status, job.progress),
+      timestamp: Date.now(),
+      ...additionalData
+    });
+
+    // console.log(`WebSocket Server: Broadcasting job update:`, {
+    //   type: 'job-update',
+    //   jobId: job.id,
+    //   status,
+    //   action: job.data?.action,
+    //   gameId: job.data?.gameId,
+    //   teamId: job.data?.teamId
+    // });
+
+    // Send to relevant connections only (same filtering as screenshots)
+    this.connections.forEach((connection, connectionId) => {
+      if (connection.ws.readyState === WebSocket.OPEN) {
+        const subscribedToTeam = connection.subscribedTeams.includes(job.data?.teamId?.toString() || 'all');
+        const subscribedToGame = connection.subscribedGameIds.includes(job.data?.gameId);
+        
+        if (subscribedToTeam && subscribedToGame) {
+          try {
+            connection.ws.send(message);
+          } catch (error) {
+            console.error(`Failed to send job update to ${connectionId}:`, error);
+          }
+        }
+      }
+    });
+  }
+
+  broadcastJobProgress(job: any, progress: number) {
+    if (!this.wss) return;
+
+    const message = JSON.stringify({
+      type: 'job-progress',
+      jobId: job.id,
+      gameId: job.data?.gameId,
+      teamId: job.data?.teamId,
+      progress,
+      timestamp: Date.now()
+    });
+
+    // console.log(`WebSocket Server: Broadcasting job progress:`, {
+    //   type: 'job-progress',
+    //   jobId: job.id,
+    //   gameId: job.data?.gameId,
+    //   teamId: job.data?.teamId,
+    //   progress
+    // });
+
+    // Send to relevant connections only
+    this.connections.forEach((connection, connectionId) => {
+      if (connection.ws.readyState === WebSocket.OPEN) {
+        const subscribedToTeam = connection.subscribedTeams.includes(job.data?.teamId?.toString() || 'all');
+        const subscribedToGame = connection.subscribedGameIds.includes(job.data?.gameId);
+        
+        if (subscribedToTeam && subscribedToGame) {
+          try {
+            connection.ws.send(message);
+          } catch (error) {
+            console.error(`Failed to send job progress to ${connectionId}:`, error);
+          }
+        }
+      }
+    });
+  }
+
+  private getJobStatusMessage(status: string, progress: number): string {
+    switch (status) {
+      case 'waiting': return 'Job queued, waiting to start...';
+      case 'active': return `Job running... ${progress}%`;
+      case 'completed': return 'Job completed successfully';
+      case 'failed': return 'Job failed';
+      case 'stalled': return 'Job stalled';
+      default: return 'Job status unknown';
+    }
   }
 
   getConnectionCount(): number {
