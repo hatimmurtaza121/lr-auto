@@ -324,21 +324,19 @@ export default function StatusPage() {
     }
   };
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (showAllTeams) {
-        fetchAllTeamsStatus();
-      } else {
-        const teamId = getSelectedTeamId();
-        if (teamId) {
-          fetchGameStatus(teamId);
-        }
-      }
-    }, 30000);
+  // Manual refresh only - no auto-refresh for status page
 
-    return () => clearInterval(interval);
-  }, [showAllTeams]);
+  // Handle manual refresh
+  const handleRefresh = () => {
+    if (showAllTeams) {
+      fetchAllTeamsStatus();
+    } else {
+      const teamId = getSelectedTeamId();
+      if (teamId) {
+        fetchGameStatus(teamId);
+      }
+    }
+  };
 
   // Handle toggle between current team and all teams
   const handleToggleView = () => {
@@ -463,23 +461,34 @@ export default function StatusPage() {
       <div className="container mx-auto px-4 pt-20 pb-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">Status</h1>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleToggleView}
-                className="px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors flex-shrink-0"
-              >
-                {showAllTeams ? 'Show Current Team' : 'Show All Teams'}
-              </button>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span>Last updated:</span>
-              <span className="font-mono">{lastUpdated.toLocaleTimeString()}</span>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Status</h1>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefresh}
+                  className="p-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0"
+                  title="Refresh data"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleToggleView}
+                  className="px-3 py-2 text-sm sm:text-base text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors flex-shrink-0"
+                >
+                  {showAllTeams ? 'Show Current Team' : 'Show All Teams'}
+                </button>
+              </div>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
+                <span>Last updated:</span>
+                <span className="font-mono">{lastUpdated.toLocaleTimeString()}</span>
+              </div>
             </div>
           </div>
-          </div>
 
-          <p className="text-gray-600 text-lg">Overview of action logs</p>
+          <p className="text-gray-600 text-base sm:text-lg">Overview of action logs</p>
         </div>
 
         {error && (

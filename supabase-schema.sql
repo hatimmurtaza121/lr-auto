@@ -210,3 +210,63 @@ FROM game g
 WHERE NOT EXISTS (
   SELECT 1 FROM actions a WHERE a.game_id = g.id AND a.name = 'redeem'
 );
+
+-- Function to get game insights for a specific team
+CREATE OR REPLACE FUNCTION get_game_insights(team_id_param INTEGER)
+RETURNS TABLE (
+  game_id INTEGER,
+  game_name TEXT,
+  success_rate NUMERIC(5,2),
+  captcha_success_rate NUMERIC(5,2),
+  avg_execution_time NUMERIC(10,2),
+  total_requests BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH game_metrics AS (
+    SELECT 
+      g.id as game_id,
+      g.name as game_name,
+      COALESCE(
+        ROUND(
+          (COUNT(CASE WHEN gas.status = 'success' THEN 1 END)::NUMERIC / NULLIF(COUNT(gas.id), 0)) * 100, 
+          1
+        ), 
+        0
+      ) as success_rate,
+      COALESCE(
+        ROUND(
+          (COUNT(CASE WHEN gas.status = 'success' THEN 1 END)::NUMERIC / NULLIF(COUNT(gas.id), 0)) * 100, 
+          1
+        ), 
+        0
+      ) as captcha_success_rate,
+      COALESCE(
+        ROUND(AVG(gas.execution_time_secs), 1), 
+        0
+      ) as avg_execution_time,
+      COUNT(gas.id) as total_requests
+    FROM game g
+    LEFT JOIN game_action_status gas ON g.id = gas.game_id AND gas.team_id = team_id_param
+    GROUP BY g.id, g.name
+  ),
+  captcha_metrics AS (
+    SELECT 
+      ROUND(
+        (COUNT(CASE WHEN api_status = 'success' THEN 1 END)::NUMERIC / NULLIF(COUNT(*), 0)) * 100, 
+        1
+      ) as overall_captcha_rate
+    FROM captcha_log
+  )
+  SELECT 
+    gm.game_id,
+    gm.game_name,
+    gm.success_rate,
+    COALESCE(cm.overall_captcha_rate, 0) as captcha_success_rate,
+    gm.avg_execution_time,
+    gm.total_requests
+  FROM game_metrics gm
+  CROSS JOIN captcha_metrics cm
+  ORDER BY gm.total_requests DESC;
+END;
+$$ LANGUAGE plpgsql;
