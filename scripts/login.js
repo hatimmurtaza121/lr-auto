@@ -16,6 +16,12 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
     
     const screenshotInterval = setInterval(async () => {
         try {
+            // Check if page is still open before attempting screenshot
+            if (page.isClosed && page.isClosed()) {
+                clearInterval(screenshotInterval);
+                return;
+            }
+            
             screenshotCount++;
             // console.log(`Taking screenshot #${screenshotCount} for ${gameName} - ${action}...`);
             
@@ -39,7 +45,12 @@ function createWebSocketScreenshotCapture(page, gameName, action, interval = 500
                 console.log('WebSocket server not available for screenshot broadcasting');
             }
         } catch (error) {
-            console.log(`WebSocket screenshot #${screenshotCount} error:`, error);
+            // Only log the first error to avoid spam
+            if (screenshotCount === 1) {
+                console.log(`WebSocket screenshot error (browser likely closed): ${error.message}`);
+            }
+            // Clear the interval to stop further attempts
+            clearInterval(screenshotInterval);
         }
     }, interval);
 
