@@ -44,13 +44,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Get game ID for platform grouping
-    const { data: game, error: gameError } = await supabase
+    const { data: game, error: gameQueryError } = await supabase
       .from('game')
       .select('id')
       .eq('name', gameName)
       .single();
 
-    if (gameError || !game) {
+    if (gameQueryError || !game) {
       return NextResponse.json({ 
         error: 'Game not found' 
       }, { status: 404 });
