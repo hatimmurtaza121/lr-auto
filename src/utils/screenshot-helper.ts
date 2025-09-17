@@ -7,6 +7,7 @@ export interface ScreenshotOptions {
   interval?: number; // milliseconds between screenshots
   teamId?: string; // NEW: Team ID for filtering
   sessionId?: string; // NEW: Session ID for targeted delivery
+  gameId?: number; // NEW: Game ID for targeted delivery
 }
 
 export function createWebSocketScreenshotCapture(page: Page, options: ScreenshotOptions) {
