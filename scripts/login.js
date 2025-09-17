@@ -132,7 +132,7 @@ async function solveCaptchaWithGemini(captchaImagePath) {
     const imageBytes = fs.readFileSync(captchaImagePath);
     
     // Create the prompt for captcha solving
-    const prompt = "The image is a captcha. Please read ALL the characters you see in the main sequence, including numbers, letters, and symbols. Return ONLY the characters you see in order from left to right, with no additional explanation or formatting. Focus on the prominent, dark characters that appear to be the main captcha text, ignoring any faint background characters. Do not confuse similar-looking characters - for example, 7 is the digit seven, not the symbol '>'. If you cannot read it clearly, return 'ERROR'.";
+    const prompt = "The image is a captcha and will contain only numbers. Please read ALL the characters you see in the main sequence. Return ONLY the characters you see in order from left to right, with no additional explanation or formatting. Focus on the prominent, dark characters that appear to be the main captcha text, ignoring any faint background characters. Do not confuse similar-looking characters - for example, 7 is the digit seven, not the symbol '>'. If you cannot read it clearly, return 'ERROR'.";
     
     // Generate content with image
     const result = await model.generateContent([prompt, {
