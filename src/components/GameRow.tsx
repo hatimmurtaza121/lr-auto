@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { getSelectedTeamId } from '@/utils/team';
 import { getGameId } from '@/utils/game-mapping';
@@ -546,9 +547,11 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
           {/* In order to hide screenshots */}
           {/* {isLoggedIn && imageSrc ? ( */}
           {imageSrc ? (
-            <img 
+            <Image 
               src={imageSrc} 
               alt="Live view" 
+              width={800}
+              height={600}
               className="max-w-full max-h-full object-contain w-full h-full"
               onLoad={(e) => {
                 // Image loaded successfully

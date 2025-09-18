@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Navbar from '@/components/Navbar';
@@ -397,7 +397,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                 
                 {formData.script_code && (
                   <div className="p-3 bg-gray-50 rounded-md border">
-                    <p className="text-sm text-gray-600 mb-2">Script code is set (click "Edit Script" to view/edit)</p>
+                    <p className="text-sm text-gray-600 mb-2">Script code is set (click &quot;Edit Script&quot; to view/edit)</p>
                     <div className="text-xs text-gray-500 font-mono bg-white p-2 rounded border overflow-hidden">
                       {formData.script_code.length > 100 
                         ? `${formData.script_code.substring(0, 100)}...` 
@@ -408,7 +408,7 @@ function Modal({ isOpen, onClose, onSubmit, type, loading = false, editData, gam
                 
                 {!formData.script_code && (
                   <div className="p-3 bg-gray-50 rounded-md border">
-                    <p className="text-sm text-gray-600 mb-2">No script code set (click "Edit Script" to add)</p>
+                    <p className="text-sm text-gray-600 mb-2">No script code set (click &quot;Edit Script&quot; to add)</p>
                   </div>
                 )}
               </div>
@@ -532,18 +532,18 @@ export default function Settings() {
     setConfirmOpen(true);
   };
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       router.push('/main_login');
       return;
     }
     fetchData();
-  };
+  }, [router]);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const fetchData = async () => {
     try {

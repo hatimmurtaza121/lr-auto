@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     
     // For grouped jobs, use getGroupJobs to get waiting jobs in the specific game group
     const groupId = `game-${gameId}`;
-    const waiting = await teamQueue.getGroupJobs(groupId, 0, -1, 'waiting');
+    const waiting = await teamQueue.getGroupJobs(groupId, 0, -1);
     
     const active = await teamQueue.getActive();
     const completed = await teamQueue.getCompleted();

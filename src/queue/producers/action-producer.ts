@@ -115,11 +115,6 @@ export class ActionProducer {
         // console.log(`Job ${jobId} returnvalue === null:`, job.returnvalue === null);
         // console.log(`Job ${jobId} returnvalue === undefined:`, job.returnvalue === undefined);
         
-        // Try to get the job again to see if it's a timing issue
-        const jobAgain = await actionQueue.getJob(jobId);
-        if (jobAgain) {
-          // console.log(`Job ${jobId} re-fetched returnvalue:`, jobAgain.returnvalue);
-        }
       }
 
       // Generate status message inline

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { getSelectedTeamId } from '@/utils/team';
 
 interface BrowserViewProps {
@@ -255,9 +256,11 @@ export default function BrowserView({ isExecuting, gameId, gameName }: BrowserVi
       
               <div className="flex-1 bg-white rounded-2xl border-2 border-gray-200 overflow-hidden flex items-center justify-center">
         {imageSrc ? (
-          <img 
+          <Image 
             src={imageSrc} 
             alt="Live view" 
+            width={800}
+            height={600}
             className="max-w-full max-h-full object-contain"
             onLoad={(e) => {
               // Image loaded successfully

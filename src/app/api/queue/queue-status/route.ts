@@ -5,10 +5,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const teamId = searchParams.get('teamId');
+    const action = searchParams.get('action');
 
     if (!teamId) {
       return NextResponse.json({ 
         error: 'Team ID is required' 
+      }, { status: 400 });
+    }
+
+    if (!action) {
+      return NextResponse.json({ 
+        error: 'Action is required' 
       }, { status: 400 });
     }
 

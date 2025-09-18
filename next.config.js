@@ -6,10 +6,10 @@ const nextConfig = {
     optimizePackageImports: ['react', 'react-dom']
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   }
 };
 

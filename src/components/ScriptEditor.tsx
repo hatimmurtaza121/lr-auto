@@ -128,16 +128,16 @@ export default function ScriptEditor({
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">Common Setup Lines</h3>
                 <div className="space-y-3">
                   <div className="text-xs text-gray-600 font-mono bg-white p-2 rounded border">
-                    <div className="text-gray-500 mb-1">// Start of the script:</div>
+                    <div className="text-gray-500 mb-1">{/* Start of the script: */}</div>
                     <div>await page.reload();</div>
-                    <div>await page.waitForLoadState('networkidle');</div>
+                    <div>await page.waitForLoadState(&apos;networkidle&apos;);</div>
                   </div>
                   
                   <div className="space-y-2">
                     <div className="text-xs font-medium text-gray-700">Available Inputs:</div>
                     {actionInputs.fields.map((field, index) => (
                       <div key={index} className="text-xs text-gray-600 font-mono bg-white p-2 rounded border">
-                        <div className="text-gray-500">// {field.label}</div>
+                        <div className="text-gray-500">{/* {field.label} */}</div>
                         <div>params.{field.key}</div>
                       </div>
                     ))}
@@ -148,7 +148,7 @@ export default function ScriptEditor({
                     <div className="text-xs text-gray-600 font-mono bg-white p-2 rounded border">
                       <div>return {`{`}</div>
                       <div>  success: true/false,</div>
-                      <div>  message: 'Relevant message'</div>
+                      <div>  message: &apos;Relevant message&apos;</div>
                       <div>{`};`}</div>
                     </div>
                   </div>
