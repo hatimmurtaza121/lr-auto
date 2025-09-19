@@ -82,8 +82,8 @@ export default function ChooseTeamPage() {
       // Store selected team using utility function
       saveTeamId(selectedTeamId as number);
       
-      // Navigate to dashboard
-      router.push('/dashboard');
+      // Navigate to dashboard with team parameter
+      router.push(`/dashboard?team=${selectedTeamId}`);
     } catch (error) {
       console.error('Error saving team selection:', error);
       setError('Failed to save team selection');

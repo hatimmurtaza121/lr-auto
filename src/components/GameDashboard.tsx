@@ -179,6 +179,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
       setAllLogs([]);
 
       const teamId = getSelectedTeamId();
+      console.log(`GameDashboard: getSelectedTeamId() returned: ${teamId}`);
       if (!teamId) {
         setOutput('Error: No team selected');
         return;
@@ -205,6 +206,7 @@ export default function GameDashboard({ gameName, scriptPath, onNeedsLogin, onEx
         });
       }
 
+      console.log(`GameDashboard: Sending request to /api/execute-action with teamId: ${teamId}, gameName: ${gameName}`);
       const response = await fetch('/api/execute-action', {
         method: 'POST',
         headers: {

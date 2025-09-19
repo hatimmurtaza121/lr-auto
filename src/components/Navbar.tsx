@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { clearSelectedTeamId, getSelectedTeamId, setSelectedTeamId } from '@/utils/team';
+import { clearSelectedTeamId, getSelectedTeamId, setSelectedTeamId, createTeamURL } from '@/utils/team';
 
 interface Team {
   id: number;
@@ -89,6 +89,7 @@ export default function Navbar() {
     setSelectedTeamName(team.name);
     setTeamsDropdownOpen(false);
     setSidebarTeamsDropdownOpen(false);
+    // The URL will be updated automatically by setSelectedTeamId
     // Force a hard refresh to ensure the new team context is loaded
     window.location.reload();
   };
@@ -133,7 +134,7 @@ export default function Navbar() {
         <div className="hidden lg:flex flex-1 justify-center items-center space-x-8">
           {/* Dashboard Link */}
           <a
-            href="/dashboard"
+            href={createTeamURL("/dashboard")}
             className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
           >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,7 +145,7 @@ export default function Navbar() {
 
           {/* Status Link */}
           <a
-            href="/status"
+            href={createTeamURL("/status")}
             className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
           >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,7 +156,7 @@ export default function Navbar() {
 
           {/* Logs Link */}
           <a
-            href="/logs"
+            href={createTeamURL("/logs")}
             className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
           >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +167,7 @@ export default function Navbar() {
 
           {/* Insights Link */}
           <a
-            href="/insights"
+            href={createTeamURL("/insights")}
             className="flex items-center gap-2 text-gray-700 hover:text-black font-medium px-4 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 cursor-pointer group"
           >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,7 +301,7 @@ export default function Navbar() {
             <div className="p-4 space-y-2">
               {/* Dashboard */}
               <a
-                href="/dashboard"
+                href={createTeamURL("/dashboard")}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,7 +312,7 @@ export default function Navbar() {
 
               {/* Status */}
               <a
-                href="/status"
+                href={createTeamURL("/status")}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -322,7 +323,7 @@ export default function Navbar() {
 
               {/* Logs */}
               <a
-                href="/logs"
+                href={createTeamURL("/logs")}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -333,7 +334,7 @@ export default function Navbar() {
 
               {/* Insights */}
               <a
-                href="/insights"
+                href={createTeamURL("/insights")}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

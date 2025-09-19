@@ -933,24 +933,9 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
   });
 
   try {
-    // Start WebSocket screenshot capture for persistent page login
-    let stopScreenshotCapture;
-    try {
-      console.log('Starting WebSocket screenshot capture for persistent page login...');
-      
-      // Get game info to determine the correct game name and ID for screenshots
-      const gameInfo = await getGameInfo(loginGameCredentialId);
-      const gameName = gameInfo?.game?.name || 'unknown';
-      const gameId = gameInfo?.game?.id || 0;
-      
-      console.log(`Using game name: ${gameName}, game ID: ${gameId} for screenshot capture`);
-      
-      stopScreenshotCapture = createWebSocketScreenshotCapture(page, gameName, 'login', 500, loginTeamId?.toString() || 'unknown', loginSessionId, gameId);
-      console.log('Screenshot capture started successfully for persistent page login');
-    } catch (error) {
-      console.log('Failed to start screenshot capture for persistent page login:', error);
-      stopScreenshotCapture = () => {}; // No-op function
-    }
+    // FIXED: Screenshot capture is now started earlier in the wrapper
+    // No need to start it here to avoid duplication
+    console.log('Login script starting - screenshot capture already initialized by wrapper');
 
     const maxRetries = 5;
     let attempt = 1;
@@ -1096,9 +1081,7 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
         console.log('You can now run account creation without logging in again!');
         
         // Stop screenshot capture
-        if (stopScreenshotCapture) {
-          stopScreenshotCapture();
-        }
+        // FIXED: Screenshot capture cleanup handled by wrapper
         
         // Return success result for queue processing
         return {
@@ -1130,9 +1113,7 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
         } else {
           console.log(`Max retries (${maxRetries}) reached.`);
           // Stop screenshot capture
-          if (stopScreenshotCapture) {
-            stopScreenshotCapture();
-          }
+          // FIXED: Screenshot capture cleanup handled by wrapper
           return {
             success: false,
             message: 'Captcha error - max retries reached'
@@ -1148,9 +1129,7 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
         } else {
           console.log(`Max retries (${maxRetries}) reached.`);
           // Stop screenshot capture
-          if (stopScreenshotCapture) {
-            stopScreenshotCapture();
-          }
+          // FIXED: Screenshot capture cleanup handled by wrapper
           return {
             success: false,
             message: loginResult.message || 'Login failed - max retries reached'
@@ -1160,10 +1139,7 @@ async function loginWithPersistentPage(page, context, providedUsername, provided
     }
   } catch (error) {
     console.error('Error in loginWithPersistentPage:', error);
-    // Stop screenshot capture
-    if (stopScreenshotCapture) {
-      stopScreenshotCapture();
-    }
+    // FIXED: Screenshot capture cleanup is now handled by the wrapper
     return {
       success: false,
       message: `Login error: ${error.message}`

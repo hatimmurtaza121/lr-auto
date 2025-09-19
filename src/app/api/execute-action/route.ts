@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
 
     // Get team ID from headers
     const teamId = request.headers.get('x-team-id');
+    console.log(`execute-action API: Received teamId from headers: '${teamId}'`);
     if (!teamId) {
       return NextResponse.json({ error: 'Team ID required' }, { status: 400 });
     }
@@ -126,6 +127,8 @@ export async function POST(request: NextRequest) {
       gameName: request.headers.get('x-game-name') || '',
       sessionId: sessionId, // NEW: Include session ID
     };
+    
+    console.log(`execute-action API: Creating job with teamId: ${jobData.teamId}, gameId: ${jobData.gameId}, sessionId: ${jobData.sessionId}`);
 
     // Add job to queue
     const jobId = await ActionProducer.addJob(jobData);

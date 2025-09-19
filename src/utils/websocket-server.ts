@@ -135,6 +135,21 @@ class ScreenshotWebSocketServer {
           // Store user info for this connection
           const connection = this.connections.get(connectionId);
           if (connection) {
+            console.log(`WebSocket Server: Auth message received for connection ${connectionId}:`, {
+              userId: data.userId,
+              teamId: data.teamId,
+              gameId: data.gameId,
+              gameName: data.gameName
+            });
+            
+            // FIXED: Validate teamId before storing
+            if (!data.teamId || data.teamId === 'unknown' || data.teamId === 'all') {
+              console.error(`WebSocket Server: Invalid teamId '${data.teamId}' for connection ${connectionId}. Closing connection.`);
+              connection.ws.close(1008, 'Invalid team ID');
+              this.connections.delete(connectionId);
+              return;
+            }
+            
             connection.userId = data.userId;
             connection.teamId = data.teamId;
             connection.gameId = data.gameId;
@@ -158,12 +173,13 @@ class ScreenshotWebSocketServer {
               } else if (data.subscribeToTeams === 'all') {
                 connection.subscribedTeams = ['all'];
               } else if (data.subscribeToTeams === 'own') {
-                connection.subscribedTeams = [data.teamId?.toString() || 'all'];
+                connection.subscribedTeams = [data.teamId?.toString() || 'unknown'];
               }
-                         } else {
-               // Default: subscribe to own team only for security
-               connection.subscribedTeams = [data.teamId?.toString() || 'all'];
-             }
+            } else {
+              // Default: subscribe to own team only for security
+              // FIXED: Use the validated teamId (already checked above)
+              connection.subscribedTeams = [data.teamId.toString()];
+            }
             
             // console.log(`WebSocket Server: All subscribed game IDs for ${connectionId}: [${connection.subscribedGameIds.join(', ')}]`);
             // console.log(`WebSocket Server: All subscribed games for ${connectionId}: [${connection.subscribedGames.join(', ')}]`);
@@ -438,7 +454,7 @@ class ScreenshotWebSocketServer {
     // console.log(`Worker status broadcasted to ${this.wss.clients.size} clients, ${failedCount} failed`);
   }
 
-  broadcastScriptResult(jobId: string, result: any) {
+  broadcastScriptResult(jobId: string, result: any, teamId?: string, gameId?: number) {
     if (!this.wss) return;
 
     const message = JSON.stringify({
@@ -446,22 +462,35 @@ class ScreenshotWebSocketServer {
       jobId,
       result: result,
       message: result?.message || 'Script completed',
-      success: result?.success || false
+      success: result?.success || false,
+      teamId: teamId || 'all',
+      gameId: gameId || 0
     });
 
+    let sentCount = 0;
     let failedCount = 0;
-    this.wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
+
+    // Send to connections subscribed to this team and game (if specified)
+    this.connections.forEach((connection, connectionId) => {
+      // Game ID matching (if gameId is provided)
+      const connectionHasGame = !gameId || connection.subscribedGameIds.includes(gameId);
+      
+      // Team filtering (if teamId is provided)
+      const connectionHasTeam = !teamId || connection.subscribedTeams.includes(teamId);
+      
+      if (connection.ws.readyState === WebSocket.OPEN && connectionHasGame && connectionHasTeam) {
         try {
-          client.send(message);
+          connection.ws.send(message);
+          sentCount++;
         } catch (error) {
+          console.error(`Failed to send script result to connection ${connectionId}:`, error);
+          this.connections.delete(connectionId);
           failedCount++;
-          console.error('Failed to send script result to client:', error);
         }
       }
     });
 
-    // console.log(`Script result broadcasted to ${this.wss.clients.size} clients, ${failedCount} failed`);
+    console.log(`Script result broadcasted to ${sentCount} connections (teamId: ${teamId}, gameId: ${gameId}), ${failedCount} failed`);
   }
 
   // NEW: Job event broadcasting methods

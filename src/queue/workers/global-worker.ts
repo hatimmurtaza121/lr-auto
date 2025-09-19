@@ -163,10 +163,10 @@ export class GlobalWorker {
     // The ActionStatus component will receive it via the job status API
   }
 
-  private dispatchLoginJobComplete(gameName: string, result: any) {
+  private dispatchLoginJobComplete(gameName: string, result: any, teamId?: number, gameId?: number) {
     // Broadcast login completion via WebSocket so frontend can handle it
     if (screenshotWebSocketServer.isServerInitialized()) {
-      // Use the existing broadcastScriptResult method
+      // Use the existing broadcastScriptResult method with team and game filtering
       screenshotWebSocketServer.broadcastScriptResult('login-job', {
         type: 'login-job-complete',
         gameName: gameName,
@@ -174,8 +174,8 @@ export class GlobalWorker {
         success: result?.success || false,
         sessionToken: result?.sessionToken || null,
         message: result?.message || 'Login completed'
-      });
-      console.log(`Login job completed for ${gameName}:`, result);
+      }, teamId?.toString(), gameId);
+      console.log(`Login job completed for ${gameName} (teamId: ${teamId}, gameId: ${gameId}):`, result);
     }
   }
 
@@ -384,7 +384,7 @@ export class GlobalWorker {
       
       // Dispatch login completion event if this is a login job
       if (data.action === 'login') {
-        this.dispatchLoginJobComplete(data.gameName, result);
+        this.dispatchLoginJobComplete(data.gameName, result, data.teamId, data.gameId);
       }
       
       // Broadcast completion

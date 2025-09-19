@@ -3,6 +3,7 @@
 import { useState, lazy, Suspense, useEffect } from 'react';
 import { runPlaywrightScript } from '@/utils/playwright';
 import { createClient } from '@/lib/supabase/client';
+import { getSelectedTeamId } from '@/utils/team';
 import {
   TextField,
   Button,
@@ -94,9 +95,13 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
     // Listen for login job completion (DOM events)
     const handleLoginJobComplete = (event: CustomEvent) => {
-      const { gameName: completedGameName, action, success, sessionToken, message } = event.detail;
+      const { gameName: completedGameName, action, success, sessionToken, message, teamId: messageTeamId } = event.detail;
       
-      if (completedGameName === gameName && action === 'login') {
+      // Get current team ID for additional filtering
+      const currentTeamId = getSelectedTeamId();
+      
+      if (completedGameName === gameName && action === 'login' && 
+          (!messageTeamId || !currentTeamId || messageTeamId === currentTeamId)) {
         if (success) {
           setSessionToken(sessionToken || 'session-token');
           setIsLoggedIn(true);
@@ -133,8 +138,8 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
   const checkExistingSession = async () => {
     try {
-      // Get team ID from localStorage
-      const teamId = localStorage.getItem('selectedTeamId');
+      // Get team ID using URL-based approach
+      const teamId = getSelectedTeamId();
       if (!teamId) {
         setIsCheckingSession(false);
         return;
@@ -150,7 +155,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
       const response = await fetch(`/api/check-session?gameName=${gameName}`, {
         method: 'GET',
         headers: {
-          'x-team-id': teamId,
+          'x-team-id': teamId.toString(),
           'Authorization': `Bearer ${session.access_token}`
         }
       });
@@ -190,8 +195,8 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
     setErrorMessage(''); // Clear any previous errors
     
     try {
-      // Get team ID from localStorage
-      const teamId = localStorage.getItem('selectedTeamId');
+      // Get team ID using URL-based approach
+      const teamId = getSelectedTeamId();
       if (!teamId) {
         throw new Error('No team selected. Please select a team first.');
       }
@@ -207,7 +212,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'x-team-id': teamId,
+          'x-team-id': teamId.toString(),
           'x-game-name': gameName,
           'Authorization': `Bearer ${session.access_token}`
         },
@@ -286,8 +291,8 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
 
   const handleLogout = async () => {
     try {
-      // Get team ID from localStorage
-      const teamId = localStorage.getItem('selectedTeamId');
+      // Get team ID using URL-based approach
+      const teamId = getSelectedTeamId();
       if (!teamId) {
         return;
       }
@@ -303,7 +308,7 @@ export default function GameWidget({ gameName, displayName, hasCredentials = fal
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-team-id': teamId,
+          'x-team-id': teamId.toString(),
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({ gameName }),

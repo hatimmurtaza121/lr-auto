@@ -63,9 +63,6 @@ export default function BrowserView({ isExecuting, gameId, gameName }: BrowserVi
           setSessionId(data.sessionId);
           console.log(`BrowserView: Session established with ID: ${data.sessionId}`);
         } else if (data.type === 'screenshot') {
-          // Accept ALL screenshots (session ID matching removed)
-          console.log(`BrowserView: Received screenshot (${data.data.length} chars)`);
-          
           // Convert base64 to blob URL
           const byteCharacters = atob(data.data);
           const byteNumbers = new Array(byteCharacters.length);
@@ -85,7 +82,7 @@ export default function BrowserView({ isExecuting, gameId, gameName }: BrowserVi
           blobUrlRef.current = url;
           setImageSrc(url);
           
-          console.log(`BrowserView: Screenshot displayed successfully`);
+          //console.log(`BrowserView: Screenshot displayed successfully for game ${data.gameId}`);
         } else if (data.type === 'connection') {
         } else if (data.type === 'heartbeat') {
         } else if (data.type === 'worker_status') {

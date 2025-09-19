@@ -2,6 +2,7 @@ import { executeWithPersistentPage, SessionManager } from './session-manager';
 import { Page, BrowserContext } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import { screenshotWebSocketServer } from './websocket-server';
+import { createWebSocketScreenshotCapture } from './script-executor';
 import crypto from 'crypto';
 
 // Initialize WebSocket server for screenshot broadcasting
@@ -366,9 +367,10 @@ export async function loginWithSession(
   const sessionManager = SessionManager.getInstance();
   let page: Page | undefined;
   let context: BrowserContext | undefined;
+  let stopScreenshotCapture: (() => void) | undefined;
   
   try {
-    // Get game info
+    // Get game info FIRST
     const gameInfo = await getGameInfoFromCredentialId(gameCredentialId);
     
     // Get the persistent page for this team+game combination
@@ -378,6 +380,28 @@ export async function loginWithSession(
     }
     context = page.context();
     
+    // FIXED: Start screenshot capture IMMEDIATELY after getting page and game info
+    console.log('Starting WebSocket screenshot capture for login...');
+    ensureWebSocketServerInitialized();
+    (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
+    
+    try {
+      stopScreenshotCapture = createWebSocketScreenshotCapture(
+        page, 
+        gameInfo.game.name, 
+        'login', 
+        500, 
+        teamId?.toString() || 'unknown', 
+        sessionId || 'unknown', 
+        gameInfo.game.id
+      );
+      console.log('Screenshot capture started successfully for login');
+    } catch (screenshotError) {
+      console.error('CRITICAL: Failed to start screenshot capture for login:', screenshotError);
+      // Don't fail the entire login, but log the error
+      stopScreenshotCapture = () => {};
+    }
+    
     // Navigate to the login URL (not dashboard)
     await page.goto(gameInfo.game.login_url);
     await page.waitForLoadState('networkidle');
@@ -385,10 +409,6 @@ export async function loginWithSession(
     // Execute the login function with the persistent page
     const result = await (async (page: Page, context: BrowserContext) => {
       try {
-        // Ensure WebSocket server is initialized and make it available to the script
-        ensureWebSocketServerInitialized();
-        (global as any).screenshotWebSocketServer = screenshotWebSocketServer;
-        
         // Import and execute the login script function with the persistent page
         const scriptModule = require(`../../scripts/login.js`);
         // console.log('Login wrapper - passing teamId to script:', teamId);
@@ -402,7 +422,13 @@ export async function loginWithSession(
           gameInfo.game.login_url,
           userId,
           gameCredentialId,
-          { ...params, teamId, sessionId } // Pass the params, teamId, and sessionId to the login script
+          { 
+            ...params, 
+            teamId, 
+            sessionId,
+            gameName: gameInfo.game.name,  // Pass game name to avoid DB query
+            gameId: gameInfo.game.id       // Pass game ID to avoid DB query
+          }
         );
         
         if (loginResult.success) {
@@ -446,6 +472,16 @@ export async function loginWithSession(
       message: `Error during login: ${error}`,
       logs
     };
+  } finally {
+    // FIXED: Always stop screenshot capture when login completes or fails
+    if (stopScreenshotCapture) {
+      try {
+        stopScreenshotCapture();
+        console.log('Screenshot capture stopped for login');
+      } catch (cleanupError) {
+        console.log('Error stopping screenshot capture:', cleanupError);
+      }
+    }
   }
 } 
 

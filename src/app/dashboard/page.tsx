@@ -31,7 +31,6 @@ export default function Dashboard() {
   const router = useRouter();
   const [games, setGames] = useState<Game[]>([]);
   const [gameCredentials, setGameCredentials] = useState<GameCredential[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   

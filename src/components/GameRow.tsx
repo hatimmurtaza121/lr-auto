@@ -132,8 +132,13 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
           // Handle login completion from global worker
           const { gameName: completedGameName, action, success, sessionToken, message } = data.result;
           
-          if (completedGameName === gameName && action === 'login') {
-            console.log(`GameRow ${gameName}: Received login completion via WebSocket:`, data.result);
+          // Get current team ID for filtering
+          const currentTeamId = getSelectedTeamId();
+          const messageTeamId = data.teamId ? parseInt(data.teamId, 10) : null;
+          
+          if (completedGameName === gameName && action === 'login' && 
+              (!messageTeamId || !currentTeamId || messageTeamId === currentTeamId)) {
+            console.log(`GameRow ${gameName}: Received login completion via WebSocket (teamId: ${messageTeamId}, currentTeamId: ${currentTeamId}):`, data.result);
             
             // Dispatch custom event for GameWidget to handle
             const loginEvent = new CustomEvent('login-job-complete', {
@@ -142,7 +147,8 @@ export default function GameRow({ gameId, gameName, displayName, isLoggedIn, onL
                 action: action,
                 success: success,
                 sessionToken: sessionToken,
-                message: message
+                message: message,
+                teamId: messageTeamId
               }
             });
             window.dispatchEvent(loginEvent);
