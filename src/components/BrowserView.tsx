@@ -32,7 +32,7 @@ export default function BrowserView({ isExecuting, gameId, gameName }: BrowserVi
       reconnectTimeoutRef.current = null;
     }
 
-    const ws = new WebSocket(process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:8080');
+    const ws = new WebSocket(process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://54.179.194.192:8080');
     setWsConnection(ws);
     setConnectionStatus('connecting');
 

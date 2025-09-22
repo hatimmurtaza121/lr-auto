@@ -12,8 +12,10 @@ out/
 build/
 
 # Environment & auth dumps
+.env
 .env.local
 .env.*.local
+.env.production
 auth-state.json
 
 # Playwright artifacts

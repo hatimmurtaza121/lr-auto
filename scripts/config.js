@@ -19,7 +19,7 @@ module.exports = {
   CAPTCHA_TIMEOUT: 10000,
   
   // Browser settings
-  BROWSER_HEADLESS: false,
+  BROWSER_HEADLESS: true,
   BROWSER_SLOW_MO: 1000,
   
   // Supabase configuration

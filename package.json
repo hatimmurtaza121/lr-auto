@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node start-project.js",
+    "gtr": "node start-project.js",
+    "start": "next start",
     "lint": "next lint",
     "test:gemini": "node scripts/test-gemini.js",
     "login": "node scripts/login.js",
