@@ -91,7 +91,7 @@ export default function LoginPage() {
           className="text-gray-800 font-bold drop-shadow-lg text-center"
           sx={{ fontWeight: 500, letterSpacing: "0.5px" }}
         >
-          LR Automations
+          LR Automation
         </Typography>
       </div>
 

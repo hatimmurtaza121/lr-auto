@@ -127,7 +127,7 @@ export default function Navbar() {
             </svg>
           </button>
           
-          <span className="text-2xl font-bold text-black tracking-wide">LR Automations</span>
+          <span className="text-2xl font-bold text-black tracking-wide">LR Automation</span>
         </div>
 
         {/* Center - Navigation (Desktop Only) */}
